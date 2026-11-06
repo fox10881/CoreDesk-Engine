@@ -8,7 +8,7 @@ pub const NAME: &str = "CoreDesk Engine";
 pub const ID: &str = "CoreDeskEngine";
 /// Microsoft Store product id (Partner Center, packaging/msix/identity.json).
 pub const STORE_PRODUCT_ID: &str = "9MV6WG3XNWSX";
-pub const REPOSITORY_URL: &str = "https://github.com/fox10881/PecoFence";
+pub const REPOSITORY_URL: &str = "https://github.com/fox10881/CoreDesk-Engine";
 /// Previous AppData folder names, newest first: PecoFence was the identity
 /// before CoreDesk Engine, OpenFence before PecoFence. Configuration migrates
 /// forward from whichever one still holds saved data.

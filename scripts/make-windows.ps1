@@ -38,7 +38,7 @@ try {
     throw "Package version must match Cargo.toml ($workspaceVersion)"
   }
   if (-not $Repository) { $Repository = $env:GITHUB_REPOSITORY }
-  if (-not $Repository) { $Repository = "fox10881/CoreDesk" }
+  if (-not $Repository) { $Repository = "fox10881/CoreDesk-Engine" }
   if ($Repository -notmatch '^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$' -or $Repository.Split('/')[1] -in @('.', '..')) {
     throw "Repository must be a GitHub owner/repository name"
   }
