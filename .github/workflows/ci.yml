@@ -39,7 +39,7 @@ jobs:
         run: cargo test --workspace
       - name: Release build
         run: |
-          cargo build --locked --release -p coredesk -p coredesk-watchdog
+          cargo build --locked --release -p coredesk -p coredesk-watchdog -p coredesk-tap
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Separate invocation so the CLI's schemars feature is not unified into the app.
           cargo build --locked --release -p coredesk-cli
@@ -82,7 +82,7 @@ jobs:
         run: cargo test --workspace
       - name: Release build
         run: |
-          cargo build --locked --release -p coredesk -p coredesk-watchdog
+          cargo build --locked --release -p coredesk -p coredesk-watchdog -p coredesk-tap
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo build --locked --release -p coredesk-cli
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
