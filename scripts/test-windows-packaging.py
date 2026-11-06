@@ -98,7 +98,7 @@ def find_iscc(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target-dir", type=Path, default=ROOT / "target/package")
-    parser.add_argument("--repository", default=os.getenv("GITHUB_REPOSITORY") or "DayuanJiang/CoreDesk")
+    parser.add_argument("--repository", default=os.getenv("GITHUB_REPOSITORY") or "fox10881/CoreDesk-Engine")
     parser.add_argument("--iscc", help="ISCC.exe; default: the ISCC variable, PATH, then common install folders")
     args = parser.parse_args()
     iscc = find_iscc(args.iscc)
@@ -125,7 +125,7 @@ def main():
 
     identity = uuid.uuid4().hex[:12]
     product_id = f"CoreDeskEngine.InstallerTest.{identity}"
-    product_name = f"CoreDesk Installer Test {identity}"
+    product_name = f"CoreDesk Engine Installer Test {identity}"
     uninstall_key = UNINSTALL + "\\" + product_id + "_is1"
     run_names = (product_id, product_id + ".legacy")
     stage = ROOT / ".cache" / f"installer-{identity}"
@@ -134,7 +134,7 @@ def main():
     fixture = stage / "payload"
     shutil.copytree(payload, fixture)
     report = stage / "report.json"
-    actual_startup = {name: reg_value(RUN, name) for name in ("CoreDesk", "openFence")}
+    actual_startup = {name: reg_value(RUN, name) for name in ("CoreDeskEngine", "PecoFence", "openFence")}
     assert reg_value(uninstall_key, "InstallLocation") is None
     assert all(reg_value(RUN, name) is None for name in run_names)
     desktop_link = shell_folder(0x10) / f"{product_name}.lnk"
@@ -156,7 +156,7 @@ def main():
             log = stage / (name + ".log")
             deadline = time.monotonic() + 15
             while time.monotonic() < deadline:
-                if log.is_file() and "CoreDesk uninstall cleanup completed" in log.read_text(encoding="utf-8-sig", errors="replace"):
+                if log.is_file() and "CoreDesk Engine uninstall cleanup completed" in log.read_text(encoding="utf-8-sig", errors="replace"):
                     break
                 time.sleep(0.1)
             else:
