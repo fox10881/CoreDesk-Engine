@@ -52,6 +52,9 @@ enum SampleFormat {
     Pcm16,
     Pcm24,
     Pcm32,
+    /// 24 valid bits left-justified in a 32-bit container
+    /// (WAVEFORMATEXTENSIBLE `wBitsPerSample=32, wValidBitsPerSample=24`).
+    Pcm24In32,
 }
 
 struct Shared {
@@ -75,6 +78,13 @@ impl LoopbackCapture {
     /// Captures the default render endpoint as mono `f32` at the mix format's
     /// sample rate, invoking `on_block` per packet (~10 ms). `on_block` runs on
     /// the capture thread — it must not block.
+    /// Captures the default render endpoint as mono `f32` at the mix format's
+    /// sample rate, invoking `on_block` per packet (~10 ms). `on_block` runs on
+    /// the capture thread — it must not block.
+    ///
+    /// `start` waits out the first session open (~3 s cap): callers get a real
+    /// `info()` — and a synchronous `Err` when the endpoint can't be opened —
+    /// instead of racing the capture thread's first `open_session`.
     pub fn start<F>(on_block: F) -> Result<Self, String>
     where
         F: FnMut(&[f32]) + Send + 'static,
@@ -91,10 +101,21 @@ impl LoopbackCapture {
             .name("coredesk-wasapi".into())
             .spawn(move || capture_thread(inner, on_block))
             .map_err(|e| format!("spawn capture thread: {e}"))?;
-        Ok(Self {
+        let me = Self {
             shared,
             thread: Some(thread),
-        })
+        };
+        let deadline = Instant::now() + Duration::from_millis(3000);
+        while Instant::now() < deadline {
+            if me.shared.info.lock().map(|g| g.sample_rate).unwrap_or(0) != 0 {
+                return Ok(me);
+            }
+            if let Some(e) = me.last_error() {
+                return Err(e);
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        Err("first capture session did not open in 3s".into())
     }
 
     /// Pause/resume the stream. Paused means `IAudioClient::Stop` — the thread
@@ -195,7 +216,15 @@ fn take_id(pwstr: windows_core::PWSTR) -> String {
 
 /// Decodes the mix `WAVEFORMATEX` — float32, or PCM 16/24/32 (rare on shared
 /// mode but legal). `None` = a format we decline to misparse.
-fn decode_format(fmt: &WAVEFORMATEX) -> Option<(SampleFormat, u16, u32)> {
+///
+/// `ptr` must point at the original `GetMixFormat` COM allocation (not a stack
+/// copy): a `WAVE_FORMAT_EXTENSIBLE` tag means the buffer is really a
+/// `WAVEFORMATEXTENSIBLE` (`cbSize >= 22` proves it), and only the caller's
+/// original pointer carries that backing.
+fn decode_format(ptr: *const WAVEFORMATEX) -> Option<(SampleFormat, u16, u32)> {
+    // SAFETY: `ptr` is the live GetMixFormat buffer; reads stay within the
+    // fields cbSize guarantees.
+    let fmt = unsafe { &*ptr };
     let tag = fmt.wFormatTag as i32;
     if tag == WAVE_FORMAT_IEEE_FLOAT {
         return Some((SampleFormat::Float32, fmt.nChannels, fmt.nSamplesPerSec));
@@ -209,8 +238,8 @@ fn decode_format(fmt: &WAVEFORMATEX) -> Option<(SampleFormat, u16, u32)> {
         };
     }
     if tag == WAVE_FORMAT_EXTENSIBLE && fmt.cbSize as usize >= 22 {
-        // SAFETY: cbSize proves the allocation is a WAVEFORMATEXTENSIBLE.
-        let ext = unsafe { &*(fmt as *const WAVEFORMATEX).cast::<WAVEFORMATEXTENSIBLE>() };
+        // SAFETY: cbSize proves the backing allocation is a WAVEFORMATEXTENSIBLE.
+        let ext = unsafe { &*ptr.cast::<WAVEFORMATEXTENSIBLE>() };
         // The parent is 1-byte packed: copy the GUID out before comparing —
         // a reference to the packed field would be misaligned UB.
         let sub_format = ext.SubFormat;
@@ -218,10 +247,18 @@ fn decode_format(fmt: &WAVEFORMATEX) -> Option<(SampleFormat, u16, u32)> {
             return Some((SampleFormat::Float32, fmt.nChannels, fmt.nSamplesPerSec));
         }
         if sub_format == SUBTYPE_PCM {
-            return match fmt.wBitsPerSample {
-                16 => Some((SampleFormat::Pcm16, fmt.nChannels, fmt.nSamplesPerSec)),
-                24 => Some((SampleFormat::Pcm24, fmt.nChannels, fmt.nSamplesPerSec)),
-                32 => Some((SampleFormat::Pcm32, fmt.nChannels, fmt.nSamplesPerSec)),
+            // wValidBitsPerSample decides the real layout: a 24-bit stream
+            // padded into 32-bit containers is `wBitsPerSample=32` +
+            // `wValidBitsPerSample=24`.
+            // SAFETY: union field read — the PCM subtype guarantees the
+            // ValidBits member is the live arm.
+            let bits = unsafe { ext.Samples.wValidBitsPerSample };
+            let container = fmt.wBitsPerSample;
+            return match (container, bits) {
+                (16, 16) => Some((SampleFormat::Pcm16, fmt.nChannels, fmt.nSamplesPerSec)),
+                (24, 24) => Some((SampleFormat::Pcm24, fmt.nChannels, fmt.nSamplesPerSec)),
+                (32, 32) => Some((SampleFormat::Pcm32, fmt.nChannels, fmt.nSamplesPerSec)),
+                (32, 24) => Some((SampleFormat::Pcm24In32, fmt.nChannels, fmt.nSamplesPerSec)),
                 _ => None,
             };
         }
@@ -242,24 +279,41 @@ fn open_session(en: &IMMDeviceEnumerator) -> Result<Session, String> {
         let fmt_ptr = client
             .GetMixFormat()
             .map_err(|e| format!("GetMixFormat: {e}"))?;
+        // `decode_format` AND `Initialize` read the live COM buffer — a
+        // `WAVE_FORMAT_EXTENSIBLE` tag means the real struct is the 40-byte
+        // WAVEFORMATEXTENSIBLE; an 18-byte WAVEFORMATEX stack copy would hand
+        // both garbage for the tail (masked subtype GUID → refused format,
+        // garbage channel mask → E_INVALIDARG).
+        let decoded = decode_format(fmt_ptr);
         let fmt = *fmt_ptr;
-        bindings::CoTaskMemFree(fmt_ptr.cast());
-        let Some((format, channels, sample_rate)) = decode_format(&fmt) else {
-            let (tag, bits) = (fmt.wFormatTag, fmt.wBitsPerSample);
-            return Err(format!("unsupported mix format tag={tag} bits={bits}"));
+        let sub = (fmt.wFormatTag == WAVE_FORMAT_EXTENSIBLE as u16 && fmt.cbSize as usize >= 22)
+            .then(|| {
+                // cbSize proves the buffer is a WAVEFORMATEXTENSIBLE; copying
+                // the GUID avoids refs into the 1-byte packed parent.
+                let ext = &*fmt_ptr.cast::<WAVEFORMATEXTENSIBLE>();
+                ext.SubFormat
+            });
+        let Some((format, channels, sample_rate)) = decoded else {
+            bindings::CoTaskMemFree(fmt_ptr.cast());
+            let (tag, bits, cb) = (fmt.wFormatTag, fmt.wBitsPerSample, fmt.cbSize);
+            return Err(format!(
+                "unsupported mix format tag={tag} bits={bits} cb={cb} sub={sub:?}"
+            ));
         };
-        client
-            .Initialize(
-                AUDCLNT_SHAREMODE_SHARED,
-                (AUDCLNT_STREAMFLAGS_LOOPBACK
-                    | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
-                    | AUDCLNT_STREAMFLAGS_NOPERSIST) as u32,
-                REFERENCE_TIME(BUFFER_HNS),
-                REFERENCE_TIME(0),
-                &fmt,
-                None,
-            )
-            .ok()
+        let init = client.Initialize(
+            AUDCLNT_SHAREMODE_SHARED,
+            (AUDCLNT_STREAMFLAGS_LOOPBACK
+                | AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                | AUDCLNT_STREAMFLAGS_NOPERSIST) as u32,
+            REFERENCE_TIME(BUFFER_HNS),
+            // Event-callback mode requires periodicity == buffer duration;
+            // 0 is the E_INVALIDARG this loop kept tripping.
+            REFERENCE_TIME(BUFFER_HNS),
+            fmt_ptr,
+            None,
+        );
+        bindings::CoTaskMemFree(fmt_ptr.cast());
+        init.ok()
             .map_err(|e| format!("IAudioClient::Initialize: {e}"))?;
         let capture: IAudioCaptureClient = client
             .GetService()
@@ -331,7 +385,9 @@ fn packet_to_mono(
                         sum += v as f32 / 8_388_608.0;
                     }
                 }
-                SampleFormat::Pcm32 => {
+                SampleFormat::Pcm32 | SampleFormat::Pcm24In32 => {
+                    // Pcm24In32 is MSB-aligned 24-bit in a 32-bit container —
+                    // the same i32 read normalizes it correctly.
                     let p = data.add(base * 4).cast::<i32>();
                     for c in 0..channels {
                         sum += *p.add(c) as f32 / 2_147_483_648.0;
@@ -524,7 +580,8 @@ mod tests {
             SampleFormat::Pcm16
         ));
 
-        // WAVEFORMATEXTENSIBLE carrying the float subtype GUID.
+        // WAVEFORMATEXTENSIBLE carrying the float subtype GUID — the pointer
+        // lands at `Format` (offset 0), so the extensible tail is in-bounds.
         let mut ext = WAVEFORMATEXTENSIBLE {
             Format: fmt,
             dwChannelMask: 0,
@@ -536,6 +593,23 @@ mod tests {
         assert!(matches!(
             decode_format(&ext.Format).unwrap().0,
             SampleFormat::Float32
+        ));
+
+        // Extensible PCM, 24 valid bits in a 32-bit container — the shape
+        // many Realtek endpoints report.
+        let mut ext24 = WAVEFORMATEXTENSIBLE {
+            Format: fmt,
+            dwChannelMask: 0,
+            SubFormat: SUBTYPE_PCM,
+            ..Default::default()
+        };
+        ext24.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE as u16;
+        ext24.Format.cbSize = 22;
+        ext24.Format.wBitsPerSample = 32;
+        ext24.Samples.wValidBitsPerSample = 24;
+        assert!(matches!(
+            decode_format(&ext24.Format).unwrap().0,
+            SampleFormat::Pcm24In32
         ));
     }
 

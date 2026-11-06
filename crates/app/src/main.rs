@@ -26,6 +26,7 @@ mod shadow;
 mod share_log;
 mod state;
 mod visualizer_engine;
+mod visualizer_host;
 mod webview_comp;
 
 use coredesk_platform::com::OleGuard;

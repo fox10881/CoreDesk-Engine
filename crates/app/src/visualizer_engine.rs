@@ -41,7 +41,7 @@ const ATTACK: f32 = 0.55;
 const RELEASE: f32 = 0.12;
 
 /// One video frame's worth of analysis.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct SpectrumSnapshot {
     /// Log-spaced band energies, 0.0 … 1.0 (already attack/release smoothed).
     pub bands: [f32; BANDS],
@@ -62,6 +62,26 @@ impl Default for SpectrumSnapshot {
             peak: 0.0,
             paused: false,
         }
+    }
+}
+
+impl SpectrumSnapshot {
+    /// WebView post form: `{"t":"vizSpectrum","bands":[…],"level":x,"peak":y,"paused":b}`.
+    /// The widget host's feed timer pushes one of these per engine tick.
+    pub fn json(&self) -> String {
+        let mut bands = String::with_capacity(BANDS * 5);
+        bands.push('[');
+        for (i, b) in self.bands.iter().enumerate() {
+            if i > 0 {
+                bands.push(',');
+            }
+            bands.push_str(&format!("{b:.3}"));
+        }
+        bands.push(']');
+        format!(
+            "{{\"t\":\"vizSpectrum\",\"bands\":{bands},\"level\":{:.3},\"peak\":{:.3},\"paused\":{}}}",
+            self.level, self.peak, self.paused
+        )
     }
 }
 
@@ -116,30 +136,10 @@ impl VisualizerEngine {
         }
     }
 
-    /// Latest analysis for a renderer (lock is held for a copy only).
-    #[allow(dead_code)] // Widget frontends are staged separately; this is their feed.
-    pub fn snapshot(&self) -> SpectrumSnapshot {
-        self.spectrum.read().map(|g| g.clone()).unwrap_or_default()
-    }
-
-    /// WebView post form: `{"t":"vizSpectrum","bands":[…],"level":x,"peak":y,"paused":b}`.
-    /// The `v1`…`v5` widget hosts push this at their frame cadence.
-    #[allow(dead_code)] // Widget frontends are staged separately; this is their feed.
-    pub fn snapshot_json(&self) -> String {
-        let s = self.snapshot();
-        let mut bands = String::with_capacity(BANDS * 5);
-        bands.push('[');
-        for (i, b) in s.bands.iter().enumerate() {
-            if i > 0 {
-                bands.push(',');
-            }
-            bands.push_str(&format!("{b:.3}"));
-        }
-        bands.push(']');
-        format!(
-            "{{\"t\":\"vizSpectrum\",\"bands\":{bands},\"level\":{:.3},\"peak\":{:.3},\"paused\":{}}}",
-            s.level, s.peak, s.paused
-        )
+    /// The shared read side — the widget host clones this `Arc` into its
+    /// `WM_TIMER` pump and formats frames without touching the engine.
+    pub fn shared(&self) -> Arc<RwLock<SpectrumSnapshot>> {
+        self.spectrum.clone()
     }
 }
 
@@ -259,6 +259,11 @@ fn control_loop(
     let mut last_occl_check = Instant::now() - Duration::from_secs(1);
     let mut is_occluded = true; // assume hidden until proven otherwise
     let mut was_paused = true;
+    // Silence↔audible transition diagnostics ("is the engine hearing the
+    // desktop?" in the log without per-frame spam): audible = level > 5 % for
+    // a beat, silent = under 1 % for ~4 s.
+    let mut audible = false;
+    let mut silent_since: Option<Instant> = None;
 
     while !stop.load(Ordering::Relaxed) {
         if !active.load(Ordering::Relaxed) {
@@ -322,6 +327,20 @@ fn control_loop(
         let mut bands = [0.0f32; BANDS];
         let mut level_peak = (0.0f32, 0.0f32);
         analyze(&pcm, rate.max(8_000), &mut bands, &mut level_peak);
+        if !audible && level_peak.0 > 0.05 {
+            audible = true;
+            silent_since = None;
+            tracing::debug!(level = level_peak.0, "visualizer: audio detected");
+        } else if audible && level_peak.0 < 0.01 {
+            let since = silent_since.get_or_insert_with(Instant::now);
+            if since.elapsed() > Duration::from_secs(4) {
+                audible = false;
+                silent_since = None;
+                tracing::debug!("visualizer: audio silent");
+            }
+        } else if level_peak.0 >= 0.01 {
+            silent_since = None;
+        }
         for i in 0..BANDS {
             let k = if bands[i] > smoothed[i] {
                 ATTACK
@@ -397,7 +416,7 @@ mod tests {
     #[test]
     fn snapshot_json_shape() {
         let e = VisualizerEngine::new();
-        let j = e.snapshot_json();
+        let j = e.shared().read().map(|g| g.json()).unwrap_or_default();
         assert!(j.starts_with("{\"t\":\"vizSpectrum\""));
         assert!(j.contains("\"paused\":false"));
         assert!(j.contains("\"bands\":["));

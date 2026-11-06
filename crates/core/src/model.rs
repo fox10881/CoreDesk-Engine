@@ -252,17 +252,26 @@ pub struct Settings {
     #[serde(default = "default_true")]
     pub clock_use_24_hour: bool,
     /// Desktop audio-visualizer widget design: `"none"`/`""` = hidden
-    /// (default); `"v1".."v5"` pick a reactive-spectrum design rendered off
+    /// (default); `"v1".."v10"` pick a reactive-spectrum design rendered off
     /// the WASAPI loopback engine. Capture runs only while a design is armed
     /// AND the desktop is visible (occlusion-gated). `.cde` themes carry it.
     #[serde(default)]
     pub visualizer_style: String,
+    /// Adaptive backdrop coloring for the visualizer: samples the wallpaper
+    /// behind the widget and rebases every design's palette onto the sampled
+    /// accent hue (deepening strokes on bright backdrops). Off = fixed
+    /// cyber-cyan palette.
+    #[serde(default = "default_true")]
+    pub visualizer_adaptive_color: bool,
     /// Native desktop particle/weather effect: `"none"` (default) or one of the
-    /// 22 effect ids — `rain`, `thunderstorm`, `snow`, `fireflies`, `embers`,
+    /// 27 effect ids — `rain`, `thunderstorm`, `snow`, `fireflies`, `embers`,
     /// `sakura`, `mist`, `aurora`, `starfield`, `matrix`, `ripples`,
     /// `constellation`, `magic_trail`, `shatter_clicks`, `quantum_swarm`,
     /// `cyber_grid_reveal`, `repulsion_dust`, `bokeh`, `leaves`, `warp`,
-    /// `pulse`, `meteors`. Rendered by the zero-WebView2 Direct2D/DComp overlay.
+    /// `pulse`, `meteors` — plus the five audio-reactive `le_rain`, `le_grid`,
+    /// `le_bloom`, `le_aurora`, `le_rings`, which the same Direct2D overlay
+    /// draws while the WASAPI engine feeds them the shared spectrum.
+    /// Rendered by the zero-WebView2 Direct2D/DComp overlay.
     #[serde(default = "desktop_effect_default")]
     pub desktop_effect: String,
     /// Particle density 10–100 %; scales the live-particle count linearly.
@@ -315,6 +324,11 @@ pub const EFFECT_IDS: &[&str] = &[
     "warp",
     "pulse",
     "meteors",
+    "le_rain",
+    "le_grid",
+    "le_bloom",
+    "le_aurora",
+    "le_rings",
 ];
 
 /// Per-effect baseline live-particle counts — the compiled default each
@@ -347,6 +361,11 @@ pub const EFFECT_BASE_PARTICLES: &[(&str, u32)] = &[
     ("warp", 190),
     ("pulse", 14),
     ("meteors", 28),
+    ("le_rain", 240),
+    ("le_grid", 0),
+    ("le_bloom", 0),
+    ("le_aurora", 0),
+    ("le_rings", 0),
 ];
 
 /// Baseline live-particle count for `effect_id` (`0` = no particle loop /
@@ -389,6 +408,11 @@ pub const EFFECT_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("warp", "Warp drive"),
     ("pulse", "Sonic pulse"),
     ("meteors", "Meteor shower"),
+    ("le_rain", "Resonance Rain (audio)"),
+    ("le_grid", "Neon Grid Horizon (audio)"),
+    ("le_bloom", "Ambient Bloom (audio)"),
+    ("le_aurora", "Spectrum Aurora (audio)"),
+    ("le_rings", "Pulse Rings (audio)"),
 ];
 
 /// English display name for a live-effect id (`"Live effect"` fallback —
@@ -518,13 +542,24 @@ pub fn is_clock_widget_id(id: &str) -> bool {
     CLOCK_WIDGET_IDS.contains(&id)
 }
 
-/// Audio-visualizer design ids — the five reactive-spectrum widgets.
+/// Audio-visualizer design ids — the ten reactive-spectrum widgets.
 /// `visualizer_style` validates against this; `""`/`"none"` hide the widget.
-pub const VISUALIZER_WIDGET_IDS: &[&str] = &["v1", "v2", "v3", "v4", "v5"];
+pub const VISUALIZER_WIDGET_IDS: &[&str] =
+    &["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"];
 
-/// `true` for a known visualizer-design id (`v1..v5`).
+/// `true` for a known visualizer-design id (`v1..v10`).
 pub fn is_visualizer_widget_id(id: &str) -> bool {
     VISUALIZER_WIDGET_IDS.contains(&id)
+}
+
+/// `true` for audio-reactive Live-Effect ids (`le_*`): the native overlay
+/// draws them, the visualizer engine's shared spectrum snapshot feeds them —
+/// selecting one arms WASAPI capture even with no visualizer widget shown.
+pub fn is_live_audio_effect(id: &str) -> bool {
+    matches!(
+        id,
+        "le_rain" | "le_grid" | "le_bloom" | "le_aurora" | "le_rings"
+    )
 }
 
 /// English display names for clock-design ids — same strings the Settings
@@ -557,6 +592,16 @@ pub const WIDGET_DISPLAY_NAMES: &[(&str, &str)] = &[
     ("g13", "Retro Split-Flap"),
     ("g14", "Orbital Geometry"),
     ("g15", "Regent Classic Analog"),
+    ("v1", "Particle Field"),
+    ("v2", "Arc Reactor Ring"),
+    ("v3", "Spectrum Ribbons"),
+    ("v4", "Neon Terrain"),
+    ("v5", "Resonance Orbs"),
+    ("v6", "Bass Bloom"),
+    ("v7", "Equalizer Skyline"),
+    ("v8", "Spiral Sequencer"),
+    ("v9", "Comet Trails"),
+    ("v10", "Pulse Lattice"),
 ];
 
 /// English display name for a clock-design id (`"Clock widget"` fallback —
@@ -832,6 +877,7 @@ impl Default for Settings {
             clock_adaptive_color: true,
             clock_use_24_hour: true,
             visualizer_style: String::new(),
+            visualizer_adaptive_color: true,
             desktop_effect: "none".to_string(),
             desktop_effect_intensity: 50,
             effect_params: BTreeMap::new(),
@@ -2605,9 +2651,11 @@ impl Config {
             known
         });
         // Same closed-catalog rule for the widget dictionary: unknown
-        // design ids drop, known entries get field-level clamps.
+        // design ids drop, known entries get field-level clamps. Both the
+        // clock gallery and the `v1`…`v5` visualizers live here — a theme
+        // carrying a design's remembered rect must survive the clean-up.
         s.widget_params.retain(|id, p| {
-            let known = is_clock_widget_id(id);
+            let known = is_clock_widget_id(id) || is_visualizer_widget_id(id);
             if known {
                 p.sanitize();
             }

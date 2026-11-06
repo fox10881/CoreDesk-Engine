@@ -47,6 +47,9 @@ pub const WM_APP_STARTUP_TASK: u32 = msg::WM_APP + 17;
 /// The clock-backdrop sampler finished on a worker; `lparam` is a boxed
 /// `backdrop_probe::Sample` the UI thread takes ownership of.
 pub const WM_APP_CLOCK_PROBE: u32 = msg::WM_APP + 18;
+/// A `coredesk-viz-probe` worker finished sampling the wallpaper under the
+/// visualizer widget; `lparam` is a boxed `backdrop_probe::Sample`.
+pub const WM_APP_VIZ_PROBE: u32 = msg::WM_APP + 19;
 
 /// What a file drop does with the dropped paths (Explorer's Move / Copy / Create shortcut, the
 /// effect the drop target reported).
@@ -217,6 +220,8 @@ pub enum Command {
     /// and respawn at its live rect — to recover a broken (opaque-black) WebView
     /// surface without opening settings.
     RefreshClock,
+    /// Same fail-safe on the visualizer widget's context menu.
+    RefreshVisualizer,
     /// Context menu on a fence's title/background at screen coordinates.
     FenceMenu {
         fence: FenceId,

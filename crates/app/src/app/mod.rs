@@ -5,7 +5,7 @@ use crate::commands::{
     Command, CommandQueue, TransferMode, WM_APP_CLOCK_PROBE, WM_APP_COMMAND, WM_APP_FRAME,
     WM_APP_FS_CHANGED, WM_APP_LIVE_WALLPAPER, WM_APP_PEEK_FOCUSED, WM_APP_PREWARM_DONE,
     WM_APP_SHELL_CHANGED, WM_APP_STARTUP_BACKDROPS, WM_APP_STARTUP_TASK, WM_APP_TRAY,
-    WM_APP_WALLPAPER,
+    WM_APP_VIZ_PROBE, WM_APP_WALLPAPER,
 };
 use crate::fence_window::{
     BackdropMode, BackdropSets, Behavior, FenceContext, FenceWindow, ItemView, SearchMarks, TabView,
@@ -115,6 +115,9 @@ const TIMER_PEEK_FOCUS_RETRY: usize = 49;
 const TIMER_WALLPAPER_POLL: usize = 50;
 /// Clock-backdrop sampler cadence — armed only while the widget is shown.
 const TIMER_CLOCK_PROBE: usize = 69;
+/// Visualizer-backdrop sampler cadence — same 2.5 s probe rhythm as the
+/// clock's; armed only while a visualizer host exists.
+const TIMER_VIZ_PROBE: usize = 70;
 /// `events.subscribe` diff tick while at least one CLI stream is open (see `ipc.rs`).
 const TIMER_IPC_EVENTS: usize = 53;
 /// Read only the 16-byte desktop identity, never images/COM, while otherwise idle.
@@ -299,6 +302,10 @@ pub struct App {
     /// widgets; `None` while `visualizer_style` is `""`/`"none"` — and the
     /// engine itself stops the stream whenever the desktop is occluded.
     visualizer: Option<crate::visualizer_engine::VisualizerEngine>,
+    /// The chrome-free WebView2 host rendering the active visualizer design —
+    /// fed `vizSpectrum` frames by its own `WM_TIMER` reading the engine's
+    /// shared spectrum.
+    visualizer_host: Option<crate::visualizer_host::VisualizerHost>,
     /// Signature of the last `feState` pushed to the glass editor — repeat
     /// pushes are skipped so its unsaved draft is never clobbered (empty
     /// forces a push: fresh page, or after close).
@@ -318,6 +325,7 @@ pub struct App {
     settings_class: WindowClass,
     fe_glass_class: WindowClass,
     clock_class: WindowClass,
+    visualizer_class: WindowClass,
     theme_mode: ThemeMode,
     /// The user's accent palette at the last visual refresh (None = built-in default look).
     accent: Option<systheme::AccentPalette>,
@@ -642,6 +650,16 @@ impl App {
                             }
                             Some(0)
                         }
+                        WM_APP_VIZ_PROBE => {
+                            let sample =
+                                unsafe { Box::from_raw(lparam as *mut backdrop_probe::Sample) };
+                            if let Ok(mut guard) = cell.try_borrow_mut()
+                                && let Some(app) = guard.as_mut()
+                            {
+                                app.apply_viz_theme(*sample);
+                            }
+                            Some(0)
+                        }
                         WM_APP_ICON_READY => {
                             // One timer per batch: SetTimer restarts a running timer, so arming
                             // it for every result would hold the drain back for as long as the
@@ -765,6 +783,13 @@ impl App {
                                         && let Some(app) = guard.as_mut()
                                     {
                                         app.probe_clock_backdrop();
+                                    }
+                                }
+                                TIMER_VIZ_PROBE => {
+                                    if let Ok(mut guard) = cell.try_borrow_mut()
+                                        && let Some(app) = guard.as_mut()
+                                    {
+                                        app.probe_viz_backdrop();
                                     }
                                 }
                                 TIMER_HOUSEKEEPING => {
@@ -1279,6 +1304,7 @@ impl App {
         let settings_class = SettingsHost::register_class()?;
         let fe_glass_class = crate::fe_glass_host::FeGlassHost::register_class()?;
         let clock_class = crate::clock_host::ClockHost::register_class()?;
+        let visualizer_class = crate::visualizer_host::VisualizerHost::register_class()?;
         let peek_class = PeekOverlay::register_class()?;
         let effects_class = crate::effects_host::EffectsHost::register_class()?;
 
@@ -1347,6 +1373,7 @@ impl App {
                 queue.clone(),
             )),
             visualizer: None,
+            visualizer_host: None,
             fe_glass_pushed: RefCell::new(String::new()),
             settings_focus_fence: None,
             feedback: Default::default(),
@@ -1358,6 +1385,7 @@ impl App {
             settings_class,
             fe_glass_class,
             clock_class,
+            visualizer_class,
             theme_mode,
             accent,
             wallpaper_override: args.wallpaper_override.clone(),
@@ -2154,6 +2182,7 @@ impl App {
             Command::ItemProperties { fence, items } => self.show_properties(fence, &items),
             Command::RefreshFence(fence) => self.manual_refresh(fence),
             Command::RefreshClock => self.soft_restart_clock(),
+            Command::RefreshVisualizer => self.soft_restart_visualizer(),
             Command::RenameFence { fence, title } => {
                 self.end_item_rename_visuals();
                 let title = title.trim();
@@ -2265,7 +2294,19 @@ impl App {
                     self.clock = None;
                     window::kill_timer(self.control.hwnd(), TIMER_CLOCK_PROBE);
                 }
-                if self.settings.is_none() && self.fe_glass.is_none() && self.clock.is_none() {
+                if self
+                    .visualizer_host
+                    .as_ref()
+                    .is_some_and(|h| h.hwnd() == hwnd)
+                {
+                    self.visualizer_host = None;
+                    window::kill_timer(self.control.hwnd(), TIMER_VIZ_PROBE);
+                }
+                if self.settings.is_none()
+                    && self.fe_glass.is_none()
+                    && self.clock.is_none()
+                    && self.visualizer_host.is_none()
+                {
                     // The WebView2 environment only exists for the windows: release it
                     // with the last controller so the browser process manager can shut
                     // down too (reopening costs a cold ~200 ms environment start).

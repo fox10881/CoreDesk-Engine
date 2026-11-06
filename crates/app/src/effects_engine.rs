@@ -7,11 +7,15 @@
 //! color is rewritten per particle plus gradient brushes pre-baked at 8
 //! opacity levels — created lazily on first use after a device rebuild.
 
+use std::sync::{Arc, RwLock};
+
 use coredesk_render::{
     Bitmap, Brush, ColorF, DrawingSession, Ellipse, GradientStop, LinearGradient, Matrix3x2,
     RadialGradient, Rect, TextFormat, Vector2,
 };
 use windows_core::Result;
+
+use crate::visualizer_engine::SpectrumSnapshot;
 
 /// Upper bound of live particles; `intensity` scales the active prefix.
 /// The bound itself is structural — it lives in `coredesk_core` so the
@@ -53,6 +57,14 @@ pub enum Effect {
     Warp,
     Pulse,
     Meteors,
+    /// Audio-reactive (`le_*`): the app hands over the visualizer engine's
+    /// shared spectrum; these draw from `snap` rather than the particle pool
+    /// (LeRain still runs rain-style drops on top).
+    LeRain,
+    LeGrid,
+    LeBloom,
+    LeAurora,
+    LeRings,
 }
 
 impl Effect {
@@ -82,6 +94,11 @@ impl Effect {
             "warp" => Self::Warp,
             "pulse" => Self::Pulse,
             "meteors" => Self::Meteors,
+            "le_rain" => Self::LeRain,
+            "le_grid" => Self::LeGrid,
+            "le_bloom" => Self::LeBloom,
+            "le_aurora" => Self::LeAurora,
+            "le_rings" => Self::LeRings,
             _ => return None,
         })
     }
@@ -111,7 +128,22 @@ impl Effect {
             Self::Warp => "warp",
             Self::Pulse => "pulse",
             Self::Meteors => "meteors",
+            Self::LeRain => "le_rain",
+            Self::LeGrid => "le_grid",
+            Self::LeBloom => "le_bloom",
+            Self::LeAurora => "le_aurora",
+            Self::LeRings => "le_rings",
         }
+    }
+
+    /// `le_*` effects read the shared WASAPI spectrum each tick instead of
+    /// driving purely procedural motion — mirrored by
+    /// `coredesk_core::is_live_audio_effect` (keep both tables in sync).
+    pub fn is_live_audio(&self) -> bool {
+        matches!(
+            self,
+            Self::LeRain | Self::LeGrid | Self::LeBloom | Self::LeAurora | Self::LeRings
+        )
     }
 
     /// Cursor-driven effects may sleep the tick loop while the pointer is still.
@@ -249,6 +281,11 @@ pub struct FxCache {
     pen: Option<Brush>,
     /// Matrix glyph strip: 24 cells × 20 px in one row.
     glyphs: Option<Bitmap>,
+    /// Near-white unit radial glow (audio `le_*` bloom/aurora) — baked
+    /// uncolored so `lp.tint` (the Windows accent) lands on it cleanly.
+    glow_audio: Vec<RadialGradient>,
+    /// Near-white unit vertical fade (audio `le_*` curtain/grid washes).
+    audio_fade: Vec<LinearGradient>,
 }
 
 impl FxCache {
@@ -356,6 +393,19 @@ pub struct Engine {
     emit_i: usize,
     /// Resolved externalized tunables (`Settings::effect_params` → apply).
     lp: LiveParams,
+    /// Audio channel for `le_*` effects: the app's visualizer engine shares
+    /// this `Arc`; `None` renders the resting frame (silent, dim).
+    spectrum: Option<Arc<RwLock<SpectrumSnapshot>>>,
+    /// The last frame's snapshot copy — `tick` refreshes it once so `draw`
+    /// never takes the lock and the whole frame stays coherent.
+    snap: SpectrumSnapshot,
+    /// Ring records for `le_rain` (floor ripples) and `le_rings` (center
+    /// pulses): `x,y` center, `r` radius, `vr` expand speed, `a` alpha,
+    /// `life` 1→0 decay, `k` band-source hue index (0..23).
+    rings: [P; 40],
+    rings_n: usize,
+    /// Previous frame's peak — the rising-edge detector that fires beats.
+    prev_peak: f32,
 }
 
 #[inline]
@@ -411,6 +461,11 @@ impl Engine {
             button_down: false,
             button_prev: false,
             emit_i: 0,
+            spectrum: None,
+            snap: SpectrumSnapshot::default(),
+            rings: [P::default(); 40],
+            rings_n: 0,
+            prev_peak: 0.0,
         };
         e.seed();
         e
@@ -492,9 +547,17 @@ impl Engine {
         self.button_down = down;
     }
 
+    /// Hand over (or clear) the visualizer engine's shared spectrum. Only
+    /// `le_*` effects read it; safe to call mid-run — `tick` picks it up.
+    pub fn set_spectrum(&mut self, spectrum: Option<Arc<RwLock<SpectrumSnapshot>>>) {
+        self.spectrum = spectrum;
+    }
+
     /// First-fill the pool so the effect starts fully formed.
     fn seed(&mut self) {
         self.t = 0.0;
+        self.rings_n = 0;
+        self.prev_peak = 0.0;
         let n = self.target_count();
         for i in 0..MAX_PARTICLES {
             self.ps[i] = if i < n {
@@ -708,9 +771,29 @@ impl Engine {
                 p.a = self.range(0.4, 0.95);
                 p.k = self.range(0.0, 1.0); // warm↔cool hue mix
             }
+            Effect::LeRain => {
+                // Rain-style drops; fall speed is audio-modulated in tick,
+                // floor hits emit ripple rings instead of splashes.
+                if anywhere {
+                    p.y = self.range(0.0, h);
+                    let n = self.target_count().max(1) as f32;
+                    p.x = (i as f32 + self.rnd()) * (w / n);
+                } else {
+                    p.y = self.range(-40.0, -8.0);
+                }
+                p.vy = self.range(480.0, 720.0);
+                p.vx = p.vy * 0.18;
+                p.r = self.range(16.0, 30.0);
+                p.a = self.range(0.22, 0.5);
+                p.k = self.range(1.1, 1.7);
+            }
             // Emitter-driven actor pools: slots stay dead (life 0) until the
             // shared `next_emit` timer claims one per ring/streak.
             Effect::Pulse | Effect::Meteors => {
+                p.life = 0.0;
+            }
+            // Procedural audio effects draw from `snap`, not the pool.
+            Effect::LeGrid | Effect::LeBloom | Effect::LeAurora | Effect::LeRings => {
                 p.life = 0.0;
             }
         }
@@ -732,6 +815,18 @@ impl Engine {
             Effect::ShatterClicks => dead && !self.button_down,
             // The grid is static — a resting cursor means the same frame.
             Effect::CyberGridReveal => still,
+            // Audio effects sleep while silent: the wake poll re-reads the
+            // *live* handle (the tick-copied snap would be stale while
+            // sleeping) and re-arms the frame timer on the first beat.
+            e if e.is_live_audio() => match &self.spectrum {
+                None => true,
+                Some(sp) => match sp.try_read() {
+                    Ok(g) => {
+                        g.paused || (g.level < 0.02 && g.peak < 0.02 && dead && self.rings_n == 0)
+                    }
+                    Err(_) => false,
+                },
+            },
             // Swarm and dust drift forever; everything else never sleeps.
             _ => false,
         }
@@ -742,6 +837,14 @@ impl Engine {
         // velocities, lifetimes and timers without touching per-effect code.
         let dt = dt.min(0.1) * self.lp.speed;
         self.t += dt;
+        if self.effect.is_live_audio() {
+            // One read per frame: the whole tick+draw works on this copy.
+            self.snap = self
+                .spectrum
+                .as_ref()
+                .and_then(|sp| sp.read().ok().map(|g| *g))
+                .unwrap_or_default();
+        }
         let n = self.target_count().min(self.ps.len());
         match self.effect {
             Effect::Rain | Effect::Thunderstorm => self.tick_rain(n, dt),
@@ -765,6 +868,12 @@ impl Engine {
             Effect::Warp => self.tick_warp(n, dt),
             Effect::Pulse => self.tick_pulse(n, dt),
             Effect::Meteors => self.tick_meteors(n, dt),
+            Effect::LeRain => self.tick_le_rain(n, dt),
+            Effect::LeRings => self.tick_le_rings(dt),
+            // Grid/bloom/aurora are procedural — `snap` + `t` drive the draw.
+            Effect::LeGrid | Effect::LeBloom | Effect::LeAurora => {
+                self.tick_rings(dt);
+            }
         }
         // External wind/gravity: additive uniform field over the live prefix.
         if self.lp.wind != 0.0 || self.lp.gravity != 0.0 {
@@ -803,6 +912,99 @@ impl Engine {
 
     fn respawn(&mut self, i: usize) {
         self.ps[i] = self.spawn(i, false);
+    }
+
+    /// Band average — `bands[a..=z]` mean energy (0..1).
+    fn bands_avg(&self, a: usize, z: usize) -> f32 {
+        let z = z.min(self.snap.bands.len() - 1);
+        if a > z {
+            return 0.0;
+        }
+        self.snap.bands[a..=z].iter().sum::<f32>() / (z - a + 1) as f32
+    }
+
+    /// Shared ring aging for `le_rain`/`le_rings` (and the procedural LEs
+    /// inherit it): expand + fade, swap-remove the dead, rearm `prev_peak`.
+    fn tick_rings(&mut self, dt: f32) {
+        let mut i = 0;
+        while i < self.rings_n {
+            let r = &mut self.rings[i];
+            r.r += r.vr * dt;
+            r.life -= dt * 1.1;
+            if r.life <= 0.0 {
+                self.rings[i] = self.rings[self.rings_n - 1];
+                self.rings_n -= 1;
+            } else {
+                i += 1;
+            }
+        }
+        self.prev_peak = self.snap.peak;
+    }
+
+    /// Emit a ring at `(x, y)`; `band` carries the hue slot. Drops the
+    /// oldest ring when the pool is full — a dense beat keeps newest.
+    fn emit_ring(&mut self, x: f32, y: f32, band: usize, speed: f32) {
+        if self.rings_n >= self.rings.len() {
+            self.rings.copy_within(1.., 0);
+            self.rings_n -= 1;
+        }
+        let r = P {
+            x,
+            y,
+            r: self.range(3.0, 8.0),
+            vr: speed,
+            a: self.range(0.5, 0.9),
+            life: 1.0,
+            k: band as f32,
+            ..P::default()
+        };
+        self.rings[self.rings_n] = r;
+        self.rings_n += 1;
+    }
+
+    /// `le_rain`: bass lifts the fall speed, floor hits ripple, hard
+    /// transients backlight the sky once per edge.
+    fn tick_le_rain(&mut self, n: usize, dt: f32) {
+        let bass = self.bands_avg(0, 6);
+        let floor = self.h * 0.96;
+        for i in 0..n {
+            let p = self.ps[i];
+            let mut p = p;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt * (0.55 + bass * 1.1);
+            if p.y > floor {
+                if self.rnd() < 0.4 {
+                    let speed = self.range(70.0, 150.0) * (0.6 + bass);
+                    self.emit_ring(p.x, floor, 3 + (i % 4), speed);
+                }
+                self.respawn(i);
+            } else {
+                if p.x > self.w + 40.0 {
+                    self.respawn(i);
+                } else {
+                    self.ps[i] = p;
+                }
+            }
+        }
+        self.tick_rings(dt);
+        if self.snap.peak > 0.82 && self.prev_peak <= 0.82 {
+            self.flash = 0.6;
+        }
+    }
+
+    /// `le_rings`: each beat rising-edge emits a triple staggered ring from
+    /// screen center; `level` widens the burst count.
+    fn tick_le_rings(&mut self, dt: f32) {
+        let (cx, cy) = (self.w * 0.5, self.h * 0.5);
+        if self.snap.peak > 0.45 && self.prev_peak <= 0.4 {
+            let burst = 1 + (self.snap.level * 3.0) as usize;
+            for j in 0..burst.min(3) {
+                let speed =
+                    self.range(160.0, 260.0) * (0.8 + self.snap.level * 0.8) + j as f32 * 40.0;
+                self.emit_ring(cx, cy, (j * 8).min(23), speed);
+            }
+        }
+        self.tick_rings(dt);
     }
 
     fn tick_rain(&mut self, n: usize, dt: f32) {
@@ -1456,6 +1658,11 @@ impl Engine {
             Effect::Warp => self.draw_warp(s, cache),
             Effect::Pulse => self.draw_pulse(s, cache),
             Effect::Meteors => self.draw_meteors(s, cache),
+            Effect::LeRain => self.draw_le_rain(s, cache),
+            Effect::LeGrid => self.draw_le_grid(s, cache),
+            Effect::LeBloom => self.draw_le_bloom(s, cache),
+            Effect::LeAurora => self.draw_le_aurora(s, cache),
+            Effect::LeRings => self.draw_le_rings(s, cache),
         }
         if self.flash > 0.0 {
             if let Some(b) = cache.pen(s) {
@@ -2116,6 +2323,186 @@ impl Engine {
             let Some(b) = cache.pen(s) else { return };
             b.set_color(self.cf(1.0, 1.0, 1.0, 0.9 * a));
             s.fill_ellipse(&ellipse(p.x, p.y, p.r, p.r), b);
+        }
+    }
+
+    /// `le_rain` — audio-driven rainfall: slanted streaks + bass-fed
+    /// ripples spreading along the floor line; peaks backlight the sky via
+    /// the shared `flash` overlay the draw tail already composites.
+    fn draw_le_rain(&self, s: &DrawingSession<'_>, cache: &mut FxCache) {
+        let n = self.target_count().min(self.ps.len());
+        let Some(b) = cache.pen(s) else { return };
+        let norm = (1.0f32 + 0.21 * 0.21).sqrt();
+        for p in &self.ps[..n] {
+            if p.life <= 0.0 {
+                continue;
+            }
+            let len = p.r;
+            b.set_color(self.cf(0.80, 0.90, 1.0, p.a));
+            s.draw_line(
+                v2(p.x, p.y),
+                v2(p.x - 0.21 * len / norm, p.y - len / norm),
+                b,
+                p.k,
+            );
+        }
+        for r in &self.rings[..self.rings_n] {
+            let a = (r.a * r.life).clamp(0.0, 1.0);
+            if a <= 0.01 {
+                continue;
+            }
+            let hue = r.k / 23.0;
+            b.set_color(self.cf(0.70 + hue * 0.25, 0.86, 1.0 - hue * 0.15, a * 0.5));
+            s.draw_ellipse(&ellipse(r.x, r.y, r.r, r.r * 0.30), b, 0.8 + r.life);
+        }
+    }
+
+    /// `le_grid` — synthwave horizon: a vertical line fan from the vanishing
+    /// point plus horizontal rows scrolling toward the viewer; per-line
+    /// alpha/width track the band under each position.
+    fn draw_le_grid(&self, s: &DrawingSession<'_>, cache: &mut FxCache) {
+        let (w, h) = (self.w, self.h);
+        let horizon = h * 0.58;
+        let cx = w * 0.5;
+        // Horizon bloom — an accent glow stretched wide along the skyline.
+        if FxCache::radial(
+            s,
+            &[
+                stop(0.0, self.cf(0.80, 0.92, 1.0, 0.75)),
+                stop(1.0, self.cf(0.70, 0.88, 1.0, 0.0)),
+            ],
+            &mut cache.glow_audio,
+        ) {
+            let a = 0.10 + self.snap.level * 0.45;
+            let g = &cache.glow_audio[bucket(a)];
+            let base = s.transform();
+            let m =
+                Matrix3x2::scale(w * 0.55, h * 0.10) * Matrix3x2::translation(cx, horizon) * base;
+            s.with_transform(&m, || s.fill_ellipse(&ellipse(0.0, 0.0, 1.0, 1.0), g));
+        }
+        let Some(b) = cache.pen(s) else { return };
+        // Vertical fan — screen-x maps onto a band for per-line energy.
+        const COLS: usize = 24;
+        for i in 0..=COLS {
+            let t = i as f32 / COLS as f32;
+            let xb = cx + (t - 0.5) * w * 2.8;
+            let e = self.snap.bands[(t * 23.0).round() as usize];
+            b.set_color(self.cf(0.55, 0.88, 1.0, 0.06 + e * 0.5));
+            s.draw_line(
+                v2(cx + (xb - cx) * 0.045, horizon),
+                v2(xb, h),
+                b,
+                0.8 + e * 1.8,
+            );
+        }
+        // Horizontals — scroll toward the viewer; `level` quickens the roll.
+        const ROWS: usize = 11;
+        let phase = (self.t * (0.35 + self.snap.level * 1.3)).fract();
+        for i in 0..ROWS {
+            let z = ((i as f32 + phase) / ROWS as f32).fract();
+            let y = horizon + (h - horizon) * z * z;
+            let e = self.snap.bands[(i * 2).min(23)];
+            b.set_color(self.cf(0.60, 0.92, 1.0, (0.05 + e * 0.45) * (0.25 + z * 0.75)));
+            s.draw_line(v2(0.0, y), v2(w, y), b, 0.8 + e * 1.4 + z * 0.8);
+        }
+    }
+
+    /// `le_bloom` — one huge soft glow breathing with bass; near-white base
+    /// so the accent tint reads true. The subtle "premium" option.
+    fn draw_le_bloom(&self, s: &DrawingSession<'_>, cache: &mut FxCache) {
+        let bass = self.bands_avg(0, 6);
+        let a = 0.10 + self.snap.level * 0.40 + bass * 0.20;
+        if !FxCache::radial(
+            s,
+            &[
+                stop(0.0, self.cf(0.88, 0.94, 1.0, 0.85)),
+                stop(0.5, self.cf(0.78, 0.88, 1.0, 0.35)),
+                stop(1.0, self.cf(0.72, 0.85, 1.0, 0.0)),
+            ],
+            &mut cache.glow_audio,
+        ) {
+            return;
+        }
+        let g = &cache.glow_audio[bucket(a.min(1.0))];
+        let base = s.transform();
+        let r = self.h.min(self.w) * (0.40 + bass * 0.32);
+        let m = Matrix3x2::scale(r, r) * Matrix3x2::translation(self.w * 0.5, self.h * 0.56) * base;
+        s.with_transform(&m, || s.fill_ellipse(&ellipse(0.0, 0.0, 1.0, 1.0), g));
+    }
+
+    /// `le_aurora` — 24 vertical curtain slices across the top of the
+    /// desktop; each column's height/brightness is its band energy with a
+    /// slow lateral sway; a second dim layer adds depth.
+    fn draw_le_aurora(&self, s: &DrawingSession<'_>, cache: &mut FxCache) {
+        let (w, h) = (self.w, self.h);
+        if !FxCache::linear(
+            s,
+            v2(0.0, 0.0),
+            v2(0.0, 1.0),
+            &[
+                stop(0.0, self.cf(0.78, 0.94, 1.0, 0.85)),
+                stop(0.62, self.cf(0.68, 0.88, 1.0, 0.30)),
+                stop(1.0, self.cf(0.62, 0.85, 1.0, 0.0)),
+            ],
+            &mut cache.audio_fade,
+        ) {
+            return;
+        }
+        let base = s.transform();
+        let n = self.snap.bands.len();
+        let col_w = w / n as f32;
+        for layer in 0..2 {
+            let lift = layer as f32 * h * 0.045;
+            for i in 0..n {
+                let e = self.snap.bands[i] * (1.0 - layer as f32 * 0.45);
+                if e < 0.015 {
+                    continue;
+                }
+                let sway =
+                    (self.t * 0.7 + i as f32 * 0.45 + layer as f32 * 1.7).sin() * col_w * 1.5;
+                let ch = h * (0.05 + e * 0.42);
+                let g = &cache.audio_fade[bucket((0.10 + e * 0.7).min(1.0))];
+                let m = Matrix3x2::scale(col_w * 1.7, ch)
+                    * Matrix3x2::translation(
+                        i as f32 * col_w + sway - col_w * 0.35,
+                        h * 0.015 + lift,
+                    )
+                    * base;
+                s.with_transform(&m, || s.fill_rect(&Rect::new(0.0, 0.0, 1.0, 1.0), g));
+            }
+        }
+    }
+
+    /// `le_rings` — concentric sonar rings from screen center on each beat
+    /// rising edge, plus a faint center ember breathing with `level`.
+    fn draw_le_rings(&self, s: &DrawingSession<'_>, cache: &mut FxCache) {
+        let Some(b) = cache.pen(s) else { return };
+        for r in &self.rings[..self.rings_n] {
+            let a = (r.a * r.life).clamp(0.0, 1.0);
+            if a <= 0.01 {
+                continue;
+            }
+            let hue = r.k / 23.0;
+            b.set_color(self.cf(0.62 + hue * 0.33, 0.90 - hue * 0.12, 1.0, a * 0.55));
+            s.draw_ellipse(&ellipse(r.x, r.y, r.r, r.r), b, 1.2 + r.life * 1.8);
+            b.set_color(self.cf(0.85, 0.95, 1.0, a * 0.22));
+            s.draw_ellipse(&ellipse(r.x, r.y, r.r * 0.72, r.r * 0.72), b, 0.8);
+        }
+        if FxCache::radial(
+            s,
+            &[
+                stop(0.0, self.cf(0.85, 0.94, 1.0, 0.8)),
+                stop(1.0, self.cf(0.72, 0.88, 1.0, 0.0)),
+            ],
+            &mut cache.glow_audio,
+        ) {
+            let a = 0.12 + self.snap.level * 0.45;
+            let g = &cache.glow_audio[bucket(a.min(1.0))];
+            let base = s.transform();
+            let r = 34.0 + self.snap.level * 60.0 + self.snap.peak * 24.0;
+            let m =
+                Matrix3x2::scale(r, r) * Matrix3x2::translation(self.w * 0.5, self.h * 0.5) * base;
+            s.with_transform(&m, || s.fill_ellipse(&ellipse(0.0, 0.0, 1.0, 1.0), g));
         }
     }
 }

@@ -1205,6 +1205,15 @@ impl App {
             // the sheets; the frame material itself is theme-agnostic.
             self.sync_app_glass();
         }
+        if accent_changed
+            && coredesk_core::is_live_audio_effect(&self.state.config.settings.desktop_effect)
+        {
+            // `le_*` effects tint from the Windows accent — re-apply so the
+            // overlay's synthesized `lp.tint` (and its baked gradients)
+            // picks up Settings › Colours retints live.
+            let s = self.state.config.settings.clone();
+            self.apply_desktop_effect(&s);
+        }
         for w in self.fences.values().chain(self.desktop_windows.values()) {
             w.set_theme(theme, backdrops.clone(), shadow);
         }

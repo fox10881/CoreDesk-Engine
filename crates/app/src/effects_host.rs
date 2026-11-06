@@ -17,13 +17,14 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use coredesk_platform::window::{
     self, ClassOptions, MessageHandler, Window, WindowBuilder, WindowClass, style,
 };
 use coredesk_platform::{HWND, desktop, dwm, monitors, msg, wmf_wallpaper};
-use coredesk_render::{Panel, RenderStack};
+use coredesk_render::{ColorF, Panel, RenderStack};
 use windows_composition::{ContainerVisual, DesktopWindowTarget};
 use windows_core::Result;
 
@@ -31,6 +32,7 @@ use crate::commands::{Command, CommandQueue};
 use coredesk_core::EffectParams;
 
 use crate::effects_engine::{Effect, Engine, FxCache, LiveParams};
+use crate::visualizer_engine::SpectrumSnapshot;
 
 const CLASS_NAME: &str = desktop::EFFECTS_OVERLAY_CLASS;
 
@@ -70,6 +72,13 @@ struct HostCore {
     queue: CommandQueue,
     last_tick: Instant,
     dpi: u32,
+    /// Audio channel for `le_*` effects — the app clones the visualizer
+    /// engine's shared snapshot in; forwarded to every engine at `open`.
+    spectrum: Option<Arc<RwLock<SpectrumSnapshot>>>,
+    /// The Windows accent (wallpaper-following on most systems): synthesized
+    /// into `lp.tint` for `le_*` effects unless the modder pinned
+    /// `primary_color` in `Live_Effects_config.json`.
+    accent: Option<ColorF>,
 }
 
 impl EffectsHost {
@@ -98,6 +107,8 @@ impl EffectsHost {
                 queue,
                 last_tick: Instant::now(),
                 dpi: 96,
+                spectrum: None,
+                accent: None,
             })),
         }
     }
@@ -105,6 +116,25 @@ impl EffectsHost {
     /// The overlay HWND, for `DesktopAnchor::register_desktop_surface`.
     pub fn hwnd(&self) -> Option<HWND> {
         self.core.borrow().window.as_ref().map(|w| w.hwnd())
+    }
+
+    /// Hand the live engine the visualizer's shared spectrum (`le_*`
+    /// effects) — or clear it on a non-audio effect. `None` also reaches a
+    /// running engine mid-flight.
+    pub fn set_spectrum(&self, spectrum: Option<Arc<RwLock<SpectrumSnapshot>>>) {
+        let mut c = self.core.borrow_mut();
+        c.spectrum = spectrum;
+        let shared = c.spectrum.clone();
+        if let Some(e) = c.engine.as_mut() {
+            e.set_spectrum(shared);
+        }
+    }
+
+    /// The current Windows accent, pushed on every apply + theme refresh:
+    /// `apply` synthesizes it into `lp.tint` for audio effects that have no
+    /// explicit `primary_color`, so `le_*` palettes follow the wallpaper.
+    pub fn set_accent(&self, accent: Option<ColorF>) {
+        self.core.borrow_mut().accent = accent;
     }
 
     /// Apply the persisted pair. `"none"`/unknown ids tear the overlay down
@@ -120,7 +150,12 @@ impl EffectsHost {
             self.close();
             return;
         };
-        let lp = params.map(LiveParams::from_params).unwrap_or_default();
+        let mut lp = params.map(LiveParams::from_params).unwrap_or_default();
+        if effect.is_live_audio() && lp.tint.is_none() {
+            // Adaptive palette: the Windows accent (wallpaper-driven) lands
+            // as the tint; an explicit `primary_color` always wins.
+            lp.tint = self.core.borrow().accent;
+        }
         {
             let mut c = self.core.borrow_mut();
             if let Some(e) = c.engine.as_mut()
@@ -257,7 +292,7 @@ impl EffectsHost {
         let dpi = window::dpi_of(hwnd);
         panel_resize(&mut panel, w_px, h_px)?;
         let scale = dpi.max(96) as f32 / 96.0;
-        let engine = Engine::new(
+        let mut engine = Engine::new(
             effect,
             intensity,
             w_px as f32 / scale,
@@ -269,6 +304,7 @@ impl EffectsHost {
             let mut c = self.core.borrow_mut();
             c.dpi = dpi;
             c.wants_cursor = effect.wants_cursor();
+            engine.set_spectrum(c.spectrum.clone());
             c.engine = Some(engine);
             c.cache = FxCache::default();
             c.panel = Some(panel);

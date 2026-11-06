@@ -38,6 +38,12 @@ fn clock_style_json(s: &coredesk_core::Settings) -> String {
     .to_string()
 }
 
+/// `{"t":"vizStyle"}` post — swaps the widget page's renderer in place
+/// (`v1`…`v5`; the window's own rect is moved separately per design).
+fn viz_style_json(style: &str) -> String {
+    serde_json::json!({ "t": "vizStyle", "style": style }).to_string()
+}
+
 /// Overlay sidecar-on-disk authored deltas under `s`'s in-memory dicts,
 /// run before resolving/applying so a hand-edit made while the app ran is
 /// honored without a restart.
@@ -144,6 +150,30 @@ fn clock_theme_json(
         "adaptive": s.clock_adaptive_color,
         "use24Hour": s.clock_use_24_hour,
         "els": clock_els_json(s),
+    });
+    if let Some(sample) = sample {
+        let o = v.as_object_mut().unwrap();
+        o.insert("isLightBackdrop".into(), (sample.luminance > 150).into());
+        o.insert("luminance".into(), sample.luminance.into());
+        o.insert(
+            "accent".into(),
+            format!(
+                "#{:02x}{:02x}{:02x}",
+                sample.accent[0], sample.accent[1], sample.accent[2]
+            )
+            .into(),
+        );
+    }
+    v.to_string()
+}
+
+/// `{"t":"vizTheme"}` post — same contract as `clockTheme`: `sample` `Some`
+/// carries a probe result (accent hue + backdrop luminance the page rebases
+/// its palette on); `None` is the params/adaptive push on toggles.
+fn viz_theme_json(s: &coredesk_core::Settings, sample: Option<&backdrop_probe::Sample>) -> String {
+    let mut v = serde_json::json!({
+        "t": "vizTheme",
+        "adaptive": s.visualizer_adaptive_color,
     });
     if let Some(sample) = sample {
         let o = v.as_object_mut().unwrap();
@@ -501,6 +531,7 @@ impl App {
         // fail-safe soft restart respawns it transparent at its live rect.
         if matches!(source, ConfigSource::Theme | ConfigSource::Retune) {
             self.soft_restart_clock();
+            self.soft_restart_visualizer();
         }
         self.state.save_if_dirty();
         self.push_settings_state();
@@ -677,20 +708,103 @@ impl App {
         }
     }
 
-    /// Desktop audio visualizer: `""`/`"none"` drops the engine (its capture
-    /// thread + WASAPI stream are joined); a `v1`…`v5` id lazily creates it
-    /// and arms the loopback — the engine itself pauses the stream whenever
-    /// the desktop is occluded, so an armed-but-hidden visualizer costs 0 %.
+    /// Desktop audio visualizer: `""`/`"none"` closes the host and drops the
+    /// engine (capture thread + WASAPI stream are joined); a `v1`…`v5` id
+    /// lazily creates both and arms the loopback — the engine itself pauses
+    /// the stream whenever the desktop is occluded, so an armed-but-hidden
+    /// visualizer costs 0 %. Bounds are per design (`widget_params[style]`).
     pub(super) fn apply_visualizer_style(&mut self, style: &str) {
         let s = style.trim();
         if s.is_empty() || s == "none" {
-            self.visualizer = None;
+            if let Some(h) = self.visualizer_host.take() {
+                h.close();
+            }
+            // A running `le_*` desktop effect still owns the spectrum feed —
+            // only drop capture when nothing is listening.
+            if !coredesk_core::is_live_audio_effect(&self.state.config.settings.desktop_effect) {
+                self.visualizer = None;
+            }
+            window::kill_timer(self.control.hwnd(), super::TIMER_VIZ_PROBE);
             return;
         }
-        let engine = self
+        if let Some(h) = &self.visualizer_host {
+            // Style swap on a live widget: repost the design and snap to
+            // that design's remembered rect (each keeps its own spot).
+            h.post_json(&viz_style_json(s));
+            if let Some(b) = self
+                .state
+                .config
+                .settings
+                .widget_params
+                .get(s)
+                .and_then(|p| p.bounds)
+            {
+                h.set_bounds(b);
+            }
+            h.rearm_transparency();
+            self.probe_viz_backdrop();
+            return;
+        }
+        // Engine before host — the widget's feed timer clones its shared
+        // spectrum at `open` and must never observe a dropped engine.
+        let shared = self
             .visualizer
-            .get_or_insert_with(crate::visualizer_engine::VisualizerEngine::new);
-        engine.set_active(true);
+            .get_or_insert_with(crate::visualizer_engine::VisualizerEngine::new)
+            .shared();
+        if !self.ensure_web_env() {
+            return;
+        }
+        let bounds = self
+            .state
+            .config
+            .settings
+            .widget_params
+            .get(s)
+            .and_then(|p| p.bounds);
+        match crate::visualizer_host::VisualizerHost::open(
+            &self.visualizer_class,
+            self.web_env.as_ref().unwrap(),
+            bounds,
+            self.queue.clone(),
+            shared,
+        ) {
+            Ok(host) => {
+                self.visualizer_host = Some(host);
+                if let Some(e) = self.visualizer.as_mut() {
+                    e.set_active(true);
+                }
+                // Probe cadence lives for as long as the widget does;
+                // `vizReady` fires the first sample once the page listens.
+                window::set_timer(self.control.hwnd(), super::TIMER_VIZ_PROBE, 2_500);
+            }
+            Err(e) => tracing::error!(error = %e, "visualizer widget failed"),
+        }
+    }
+
+    /// Soft restart for the visualizer widget: destroys it and respawns at
+    /// its *live* rect — the `.cde` theme-apply fail-safe and the widget's
+    /// 「تحديث」 context menu both run this.
+    pub(super) fn soft_restart_visualizer(&mut self) {
+        let Some(h) = self.visualizer_host.take() else {
+            return;
+        };
+        let r = window::window_rect(h.hwnd());
+        let live = [r.left, r.top, r.right - r.left, r.bottom - r.top];
+        if live[2] > 0 && live[3] > 0 {
+            let style = self.state.config.settings.visualizer_style.clone();
+            self.state
+                .config
+                .settings
+                .widget_params
+                .entry(style)
+                .or_default()
+                .bounds = Some(live);
+        }
+        // Right-click refresh is the modder's "pick up my edits" gesture.
+        merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
+        h.close();
+        let style = self.state.config.settings.visualizer_style.clone();
+        self.apply_visualizer_style(&style);
     }
 
     /// Soft restart for the widget: destroys it and respawns at its *live*
@@ -724,12 +838,40 @@ impl App {
         let Some(host) = &self.effects else {
             return;
         };
+        // Audio-reactive `le_*` effects draw from the visualizer engine's
+        // shared spectrum: arm WASAPI capture even with no widget shown, and
+        // feed the overlay the Windows accent as its adaptive tint (an
+        // explicit `primary_color` in the sidecar still wins).
+        if coredesk_core::is_live_audio_effect(&s.desktop_effect) {
+            let shared = {
+                let e = self
+                    .visualizer
+                    .get_or_insert_with(crate::visualizer_engine::VisualizerEngine::new);
+                e.set_active(true);
+                e.shared()
+            };
+            host.set_spectrum(Some(shared));
+        } else {
+            host.set_spectrum(None);
+        }
+        let accent = self.ctx.theme.borrow().accent_rgb8();
+        host.set_accent(Some(coredesk_render::ColorF {
+            r: accent[0] as f32 / 255.0,
+            g: accent[1] as f32 / 255.0,
+            b: accent[2] as f32 / 255.0,
+            a: 1.0,
+        }));
         let before = host.hwnd();
         host.apply(
             &s.desktop_effect,
             s.desktop_effect_intensity as f32 / 100.0,
             s.resolve_effect_params(&s.desktop_effect).as_ref(),
         );
+        // Switching off `le_*` with no widget armed drops capture entirely.
+        if !coredesk_core::is_live_audio_effect(&s.desktop_effect) && self.visualizer_host.is_none()
+        {
+            self.visualizer = None;
+        }
         let after = host.hwnd();
         if before == after {
             return;
@@ -783,6 +925,42 @@ impl App {
             &self.state.config.settings,
             Some(&sample),
         ));
+    }
+
+    /// Visualizer counterpart of `probe_clock_backdrop`: samples the region
+    /// under the widget on a worker thread; the boxed `Sample` returns via
+    /// `WM_APP_VIZ_PROBE`. No-ops without a host or with adaptive off.
+    pub(super) fn probe_viz_backdrop(&mut self) {
+        let Some(h) = &self.visualizer_host else {
+            return;
+        };
+        if !self.state.config.settings.visualizer_adaptive_color {
+            return;
+        }
+        let (rect, widget) = (window::window_rect(h.hwnd()), h.hwnd().0 as isize);
+        let control = self.control.hwnd().0 as isize;
+        std::thread::Builder::new()
+            .name("coredesk-viz-probe".into())
+            .spawn(move || {
+                let _com = coredesk_platform::com::MtaGuard::init();
+                let sample =
+                    backdrop_probe::sample(HWND(widget as _), rect, &monitors::enumerate());
+                let boxed = Box::into_raw(Box::new(sample));
+                window::post_message(HWND(control as _), WM_APP_VIZ_PROBE, 0, boxed as isize);
+            })
+            .ok();
+    }
+
+    /// A finished visualizer sample: push the palette rebasing message while
+    /// adaptive mode is still armed (a toggle-off since the probe wins).
+    pub(super) fn apply_viz_theme(&mut self, sample: backdrop_probe::Sample) {
+        let Some(h) = &self.visualizer_host else {
+            return;
+        };
+        if !self.state.config.settings.visualizer_adaptive_color {
+            return;
+        }
+        h.post_json(&viz_theme_json(&self.state.config.settings, Some(&sample)));
     }
 
     /// The dedicated ExplorerBlurMica editor (settings card's 高级设置 button):
@@ -1168,6 +1346,34 @@ impl App {
                     Some([get("x"), get("y"), get("w"), get("h")]);
                 self.schedule_save();
                 self.probe_clock_backdrop();
+            }
+            // The visualizer page is live: arm its design, then reveal.
+            Some("vizReady") => {
+                if let Some(h) = &self.visualizer_host {
+                    h.post_json(&viz_style_json(
+                        &self.state.config.settings.visualizer_style,
+                    ));
+                    h.post_json(&viz_theme_json(&self.state.config.settings, None));
+                    window::show_normal(h.hwnd());
+                }
+                self.probe_viz_backdrop();
+            }
+            // Drag/resize ended — the bounds are per design: the rect lands
+            // on the active style's `widget_params` entry.
+            Some("vizMoved") => {
+                let style = self.state.config.settings.visualizer_style.clone();
+                if coredesk_core::is_visualizer_widget_id(&style) {
+                    let get = |k: &str| v.get(k).and_then(|n| n.as_i64()).unwrap_or(0) as i32;
+                    self.state
+                        .config
+                        .settings
+                        .widget_params
+                        .entry(style)
+                        .or_default()
+                        .bounds = Some([get("x"), get("y"), get("w"), get("h")]);
+                    self.schedule_save();
+                    self.probe_viz_backdrop();
+                }
             }
             Some("feApply") => self.apply_fe_glass(&v),
             Some("feCancel") => {
@@ -1715,6 +1921,7 @@ impl App {
         self.state.config.settings.clock_style = new.clock_style.clone();
         self.state.config.settings.clock_adaptive_color = new.clock_adaptive_color;
         self.state.config.settings.clock_use_24_hour = new.clock_use_24_hour;
+        self.state.config.settings.visualizer_adaptive_color = new.visualizer_adaptive_color;
         self.state.config.settings.widget_params = new.widget_params.clone();
         if new.clock_style != old.clock_style {
             self.apply_clock_style(&new.clock_style);
@@ -1749,6 +1956,14 @@ impl App {
                 // Adaptive off → manual element colors take over; the page
                 // also falls back to its dark palette.
                 h.post_json(&clock_theme_json(&new, None));
+            }
+        }
+        if new.visualizer_adaptive_color != old.visualizer_adaptive_color {
+            if new.visualizer_adaptive_color {
+                self.probe_viz_backdrop();
+            } else if let Some(h) = &self.visualizer_host {
+                // Adaptive off → the page restores its fixed cyber palette.
+                h.post_json(&viz_theme_json(&new, None));
             }
         }
         // Global 12/24-hour toggle: same params-only push — the page

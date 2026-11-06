@@ -464,6 +464,12 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
           <div class="toggle" role="switch" tabindex="0" data-bind="clockUse24Hour"></div></div>
       </div>
       <div class="group">
+        <div class="card"><div class="l"><span class="ic">&#xE8D6;</span><div><div class="t">音频可视化小组件</div><div class="s">跟随系统音频律动的桌面可视化 — 拖动移动，从边缘调整大小；桌面被遮挡时捕获与渲染自动暂停至零占用</div></div></div>
+          <select id="visualizerStyleSel" data-bind="visualizerStyle" data-str></select></div>
+        <div class="card child"><div class="l"><div><div class="t">自动适配壁纸配色</div><div class="s">根据小组件背后壁纸的明暗与主色调自动调整频谱配色与对比度，在任何壁纸上都保持醒目</div></div></div>
+          <div class="toggle" role="switch" tabindex="0" data-bind="visualizerAdaptiveColor"></div></div>
+      </div>
+      <div class="group">
         <div class="card"><div class="l"><span class="ic">&#xE945;</span><div><div class="t">桌面动态效果</div><div class="s">原生 Direct2D 粒子与天气引擎 — 零 WebView2 开销；窗口最大化或进入游戏时自动暂停至零占用</div></div></div>
           <select id="desktopEffectSel" data-bind="desktopEffect" data-str></select></div>
         <div class="card child"><div class="l"><div><div class="t">效果强度</div><div class="s">粒子数量密度，10% – 100%</div></div></div>
@@ -1012,6 +1018,26 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     sel.value = String(state.settings.clockStyle ?? 'none');
   }
 
+  // 音频可视化: none + the ten reactive-spectrum designs (v1–v10).
+  const VISUALIZER_DESIGNS = [
+    ['none', '无（关闭）'],
+    ['v1', '粒子星河'], ['v2', '弧光反应环'], ['v3', '频谱缎带'],
+    ['v4', '霓虹地平线'], ['v5', '共鸣光球'], ['v6', '低音花绽'],
+    ['v7', '律动天际线'], ['v8', '螺旋音序'], ['v9', '彗星音轨'],
+    ['v10', '脉冲点阵'],
+  ];
+  function renderVisualizerStyles() {
+    const sel = document.getElementById('visualizerStyleSel');
+    if (!sel) return;
+    sel.replaceChildren(...VISUALIZER_DESIGNS.map(([v, name]) => {
+      const e = document.createElement('option');
+      e.value = v;
+      e.textContent = t(name);
+      return e;
+    }));
+    sel.value = String(state.settings.visualizerStyle ?? 'none');
+  }
+
   // 桌面动态效果: none + the native Direct2D effects.
   const DESKTOP_EFFECTS = [
     ['none', '无（关闭）'],
@@ -1034,6 +1060,9 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     ['repulsion_dust', '物理斥力尘埃'],
     ['bokeh', '梦幻光斑'], ['leaves', '秋叶飘零'], ['warp', '曲速星河'],
     ['pulse', '声呐脉冲'], ['meteors', '流星雨'],
+    ['le_rain', '共鸣雨幕（音频）'], ['le_grid', '声控霓虹地平线（音频）'],
+    ['le_bloom', '环境呼吸光（音频）'], ['le_aurora', '频谱极光（音频）'],
+    ['le_rings', '脉冲音环（音频）'],
   ];
   function renderDesktopEffects() {
     const sel = document.getElementById('desktopEffectSel');
@@ -1792,6 +1821,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       renderTaskbarStyles(m);
       renderNotificationCenterStyles(m);
       renderClockStyles();
+      renderVisualizerStyles();
       renderDesktopEffects();
       bindAll(); bindThemeStyle(); bindIconTint(); bindChameleonIntensity(); bindDesktopEffectIntensity(); renderDependents(); renderFences(); renderRules(); renderLayout(); updateKind(); renderAppearance(); renderDesktopIconsStatus();
       update = m.update; renderUpdate();
