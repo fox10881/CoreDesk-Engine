@@ -24,7 +24,7 @@
 CoreDesk Engine é uma suíte de organização de desktop e personalização do shell do Windows 11 de nova geração, escrita em Rust. Muito além de cercas simples de ícones, ela combina organização magnética, prateleiras em perspectiva 3D, papéis de parede de vídeo H.264 ao vivo, widgets de relógio adaptativos, personalização profunda do shell (barra de tarefas, menu Iniciar, central de notificações e Explorador de Arquivos Mica/Acrylic) e pacotes completos de tema `.cde` com um clique.
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-pt-BR.png)
 *> **[IMAGE PLACEHOLDER 1]:** Adicione uma captura completa da área de trabalho mostrando as cercas Invisible/Bookshelf, o widget de relógio e a barra de tarefas translúcida.*
 
 </div>
@@ -51,7 +51,7 @@ Vá além dos contêineres comuns com quatro paradigmas visuais:
 - **Localização árabe completa e UI RTL [NOVO]:** Interface árabe nativa (`العربية`) com layout da direita para a esquerda e troca de idioma instantânea.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Adicione uma captura da aba Geral mostrando os 4 estilos de tema (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) e a fusão Camaleão.*
 
 ---
@@ -68,7 +68,7 @@ Vá além dos contêineres comuns com quatro paradigmas visuais:
 - **Contraste adaptativo de fundo (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NOVO]:** O CoreDesk Engine amostra continuamente os pixels exatos atrás do widget. Fundo branco ofuscante ou preto absoluto, o widget inverte automaticamente o contraste de texto, vidro e destaques para que hora e data permaneçam 100% legíveis.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Adicione uma captura do widget de relógio no desktop com suas configurações e o interruptor de contraste adaptativo.*
 
 ---
@@ -84,7 +84,7 @@ Troque de tema em tempo real — aplicado imediatamente ao selecionar, sem rein�
 - **Estilos da central de notificações (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Adicione uma captura dos menus de seleção de tema do Iniciar, central de notificações e barra de tarefas em ação.*
 
 ### 🔍 Estúdio de vidro do Explorador e transparência unificada do app [NOVO]
@@ -94,7 +94,7 @@ Troque de tema em tempo real — aplicado imediatamente ao selecionar, sem rein�
 - **Atualizar aparência com um clique (`تحديث المظهر`) [NOVO]:** Reinicia o `explorer.exe` na hora e reconecta limpemente todas as cercas e seu papel de parede de vídeo ativo.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Adicione uma captura da janela de Configurações Avançadas do vidro do Explorador com a pré-visualização interativa e os controles RGBA.*
 
 ---
@@ -114,7 +114,7 @@ Cada cerca se ajusta ao pixel na aba **Cercas (`الأسوار`)**:
 - **Prateleira inclinada 3D e escala de perspectiva (`وضع الرف المائل` + `معامل التكبير`) [NOVO]:** Inclina a cerca em um paralelogramo 3D alinhado a papéis de parede de ambientes angulados! Ajuste o **fator de escala de perspectiva (`معامل التكبير`)** para os ícones diminuírem suavemente até a borda distante da prateleira.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Adicione uma captura da aba Cercas mostrando clonar configurações, molduras de ícone e seletores de cor, modo contíguo 2:3, controles de espaçamento e modo de prateleira inclinada.*
 
 ---
@@ -129,7 +129,7 @@ O motor de **regras de ordenação (`قواعد الفرز`)** foi reconstruído
 - **Presets rápidos de um clique (`إضافة سريعة`):** Gera na hora cercas e regras para *Imagens, Música, Vídeos, Arquivos, Instaladores* ou *Limpeza de desktop* (que varre apenas instaladores e arquivos intocados há 30+ dias sem apagar um único arquivo).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Adicione uma captura da aba Regras com os emblemas coloridos e o botão laranja de aplicação forçada.*
 
 ---
@@ -143,7 +143,7 @@ Esqueça os backups `.json` — a aba **Layout e backups (`التخطيط وال
 - **Autossalvamento diário (`حفظ تحديث الثيم تلقائياً كل يوم`) [NOVO]:** Atualiza seu `.cde` ativo uma vez ao dia no mesmo arquivo — suas últimas alterações ficam sempre preservadas sem duplicatas.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Adicione uma captura da galeria de temas com cartões visuais, botões Aplicar/Exportar .cde/Excluir e o interruptor de ajuste inteligente.*
 
 ---

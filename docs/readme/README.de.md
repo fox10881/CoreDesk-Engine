@@ -24,7 +24,7 @@
 CoreDesk Engine ist eine enorm aufgewertete Desktop-Organisation und Windows-11-Shell-Anpassungssuite der nächsten Generation, in Rust geschrieben. Weit über simple Icon-Fences hinaus vereint CoreDesk Engine magnetische Desktop-Organisation, 3D-Perspektivregale, Live-H.264-Videohintergründe, adaptive Desktop-Uhr-Widgets, tiefe Windows-11-Shell-Anpassung (Taskleiste, Startmenü, Info-Center und Datei-Explorer mit Mica/Acrylic) sowie `.cde`-Komplett-Theme-Pakete per Klick.
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-de.png)
 *> **[IMAGE PLACEHOLDER 1]:** Füge einen vollständigen Desktop-Screenshot mit den Invisible/Bookshelf-Fences, dem Desktop-Uhr-Widget und der durchsichtigen Taskleiste hinzu.*
 
 </div>
@@ -51,7 +51,7 @@ Gehe mit vier visuellen Paradigmen über Standard-Container hinaus:
 - **Vollständige Arabisch-Lokalisierung & RTL-UI [NEU]:** Native arabische Oberfläche (`العربية`) mit nahtlosem Rechts-nach-links-Layout und sofortigem Live-Sprachwechsel.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Füge einen Screenshot des Allgemein-Tabs mit den 4 Theme-Stilen (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) und der Chamäleon-Verschmelzung hinzu.*
 
 ---
@@ -68,7 +68,7 @@ Gehe mit vier visuellen Paradigmen über Standard-Container hinaus:
 - **Adaptiver Hintergrund-Kontrast (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NEU]:** CoreDesk Engine tastet kontinuierlich die exakten Hintergrundpixel hinter dem Widget ab. Ob gleißend weiß oder pechschwarz – das Widget dreht automatisch Text-, Glas- und Akzentkontrast um, damit Zeit und Datum immer zu 100 % scharf lesbar bleiben.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Füge einen Screenshot mit dem Desktop-Uhr-Widget samt Widget-Einstellungen und adaptivem Kontrast-Schalter hinzu.*
 
 ---
@@ -84,7 +84,7 @@ Wechsle Themes im laufenden Betrieb – sofort bei Auswahl, ohne Neustart:
 - **Info-Center-Stile (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Füge einen Screenshot der Startmenü-, Info-Center- und Taskleisten-Theme-Dropdowns im Einsatz hinzu.*
 
 ### 🔍 Explorer-Glas-Studio & einheitliche App-Transparenz [NEU]
@@ -94,7 +94,7 @@ Wechsle Themes im laufenden Betrieb – sofort bei Auswahl, ohne Neustart:
 - **Ein-Klick-Erscheinungsbild-Refresh (`تحديث المظهر`) [NEU]:** Startet `explorer.exe` sofort neu und verbindet alle Desktop-Fences sowie dein aktives Videohintergrund sauber wieder.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Füge einen Screenshot des Explorer-Glas-Editors mit Live-Vorschau und RGBA-Reglern hinzu.*
 
 ---
@@ -114,7 +114,7 @@ Jeder einzelne Fence lässt sich im Tab **Fences (`الأسوار`)** bis aufs P
 - **3D-Schrägstellungs-Regal & Perspektiv-Skalierung (`وضع الرف المائل` + `معامل التكبير`) [NEU]:** Kippt den Fence als 3D-Parallelogramm passend zu angeschrägten Raum-Hintergründen! Stelle den **Perspektiv-Skalierfaktor (`معامل التكبير`)** ein, damit Icons zum fernen Regalrand realistisch kleiner werden.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Füge einen Screenshot des Fences-Tabs mit Einstellungen klonen, Icon-Rahmen & Farbpickern, Contiguous-2:3-Modus, Abstandsreglern und Schrägregal-Modus hinzu.*
 
 ---
@@ -129,7 +129,7 @@ Die **Sortierregeln-Engine (`قواعد الفرز`)** wurde für Zuverlässigke
 - **Ein-Klick-Schnell-Presets (`إضافة سريعة`):** Erzeuge sofort fertige Fences und Regeln für *Bilder, Musik, Videos, Archive, Installer* oder *Desktop-Aufräumen* (kehrt nur Installer und Archive, die seit 30+ Tagen unberührt liegen, ohne eine einzige Datei zu löschen).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Füge einen Screenshot des Sortierregeln-Tabs mit den farbkodierten Fence-Badges und dem orangefarbenen Force-Apply-Button hinzu.*
 
 ---
@@ -143,7 +143,7 @@ Vergiss einfache `.json`-Backups – der Tab **Layout & Backups (`التخطيط
 - **Tägliches Auto-Speichern (`حفظ تحديث الثيم تلقائياً كل يوم`) [NEU]:** Aktualisiert dein aktives `.cde`-Theme einmal täglich an Ort und Stelle – deine neuesten Änderungen bleiben erhalten, ohne Duplikat-Chaos.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Füge einen Screenshot der Theme-Galerie mit visuellen Theme-Karten, Anwenden/Exportieren/Löschen-Buttons und dem Smart-Fit-Schalter hinzu.*
 
 ---

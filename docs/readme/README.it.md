@@ -24,7 +24,7 @@
 CoreDesk Engine è una suite di organizzazione del desktop e personalizzazione della shell di Windows 11 di nuova generazione, scritta in Rust. Molto oltre le semplici recinzioni di icone, unisce organizzazione magnetica, scaffali prospettici 3D, sfondi video H.264 live, widget orologio adattivi, personalizzazione profonda della shell (barra delle applicazioni, menu Start, centro notifiche ed Esplora file Mica/Acrylic) e pacchetti tema `.cde` completi con un clic.
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-it.png)
 *> **[IMAGE PLACEHOLDER 1]:** Aggiungi uno screenshot completo del desktop con le recinzioni Invisible/Bookshelf, il widget orologio e la barra delle applicazioni traslucida.*
 
 </div>
@@ -51,7 +51,7 @@ Vai oltre i contenitori standard con quattro paradigmi visivi:
 - **Localizzazione araba completa e UI RTL [NUOVO]:** Interfaccia araba nativa (`العربية`) con layout da destra a sinistra e cambio lingua istantaneo.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Aggiungi uno screenshot della scheda Generale con i 4 stili tema (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) e la fusione Camaleonte.*
 
 ---
@@ -68,7 +68,7 @@ Vai oltre i contenitori standard con quattro paradigmi visivi:
 - **Contrasto adattivo dello sfondo (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NUOVO]:** CoreDesk Engine campiona continuamente i pixel esatti dietro il widget. Sfondo bianco abbagliante o nero profondo, il widget inverte automaticamente il contrasto di testo, vetro e accenti per una leggibilità sempre perfetta.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Aggiungi uno screenshot del widget orologio sul desktop con le sue impostazioni e l'interruttore di contrasto adattivo.*
 
 ---
@@ -84,7 +84,7 @@ Cambia tema al volo — applicato subito alla selezione, senza riavvii:
 - **Stili centro notifiche (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Aggiungi uno screenshot dei menu a tendina dei temi di Start, centro notifiche e barra applicazioni in azione.*
 
 ### 🔍 Studio vetro di Esplora file e trasparenza unificata dell'app [NUOVO]
@@ -94,7 +94,7 @@ Cambia tema al volo — applicato subito alla selezione, senza riavvii:
 - **Aggiorna aspetto con un clic (`تحديث المظهر`) [NUOVO]:** Riavvia `explorer.exe` all'istante e riaggancia pulitamente tutte le recinzioni e lo sfondo video attivo.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Aggiungi uno screenshot della finestra Impostazioni avanzate del vetro di Esplora file con anteprima interattiva e controlli RGBA.*
 
 ---
@@ -114,7 +114,7 @@ Ogni recinzione si regola al pixel nella scheda **Recinzioni (`الأسوار`)*
 - **Scaffale inclinato 3D e scala prospettica (`وضع الرف المائل` + `معامل التكبير`) [NUOVO]:** Inclina la recinzione in un parallelogramma 3D allineato agli sfondi di stanze angolate! Regola il **fattore di scala prospettica (`معامل التكبير`)** per rimpicciolire le icone verso il bordo lontano dello scaffale.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Aggiungi uno screenshot della scheda Recinzioni con clona impostazioni, cornici icone e selettori colore, modalità contigua 2:3, cursori spaziatura e scaffale inclinato.*
 
 ---
@@ -129,7 +129,7 @@ Il motore delle **regole di ordinamento (`قواعد الفرز`)** è stato ric
 - **Preset rapidi con un clic (`إضافة سريعة`):** Genera subito recinzioni e regole per *Immagini, Musica, Video, Archivi, Installer* o *Pulizia desktop* (spazza solo installer e archivi intoccati da 30+ giorni senza eliminare un file).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Aggiungi uno screenshot della scheda Regole con i badge colorati e il pulsante arancione di applicazione forzata.*
 
 ---
@@ -143,7 +143,7 @@ Dimentica i backup `.json` — la scheda **Layout e backup (`التخطيط وا
 - **Salvataggio giornaliero automatico (`حفظ تحديث الثيم تلقائياً كل يوم`) [NUOVO]:** Aggiorna il `.cde` attivo una volta al giorno sul posto — le ultime modifiche restano salvate senza duplicati.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Aggiungi uno screenshot della galleria temi con schede visive, pulsanti Applica/Esporta .cde/Elimina e l'interruttore di adattamento smart.*
 
 ---

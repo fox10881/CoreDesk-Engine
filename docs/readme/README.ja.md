@@ -24,7 +24,7 @@
 CoreDesk Engine は Rust 製の次世代デスクトップ整理＆Windows 11 シェルカスタマイズスイート。単純なアイコンフェンスを遥かに超え、磁石式デスクトップ整理、3D パースペクティブ棚、ライブ H.264 動画壁紙、適応型デスクトップ時計ウィジェット、Windows 11 シェルの深いテーマ化（タスクバー、スタートメニュー、通知センター、エクスプローラーの Mica/Acrylic）、そしてワンクリック `.cde` フルテーマパッケージを統合する。
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-ja.png)
 *> **[IMAGE PLACEHOLDER 1]:** Invisible/Bookshelf フェンス、デスクトップ時計ウィジェット、半透明タスクバーを含むフルデスクトップのスクリーンショットを追加。*
 
 </div>
@@ -51,7 +51,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **完全アラビア語ローカライズと RTL UI [新規]：** ネイティブなアラビア語インターフェース（`العربية`）とシームレスな右から左レイアウト、即座のライブ言語切替。
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** 4 つのテーマスタイル（Fluent, Liquid Glass, Bookshelf, Invisible Canvas）とカメレオンブレンドを示す「全般」タブのスクリーンショットを追加。*
 
 ---
@@ -68,7 +68,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **適応型壁紙コントラスト（`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`）[新規]：** CoreDesk Engine は時計ウィジェットの真後ろの正確な壁紙ピクセルを継続サンプリング。壁紙が眩しい白でも真っ黒でも、テキスト・ガラス・アクセントのコントラストを自動反転し、時刻と日付が常に 100% 鮮明に読める。
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** デスクトップに浮かぶ時計ウィジェットと、その設定＆適応型コントラストトグルを示すスクリーンショットを追加。*
 
 ---
@@ -84,7 +84,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **通知センタースタイル（`نمط مركز الإشعارات`）：** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*。
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** カスタムスタートメニュー、通知センター、タスクバーのテーマドロップダウンが動作中のスクリーンショットを追加。*
 
 ### 🔍 エクスプローラーガラススタジオと統合アプリ透明化 [新規]
@@ -94,7 +94,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **ワンクリック外観リフレッシュ（`تحديث المظهر`）[新規]：** `explorer.exe` を即座に再起動し、すべてのデスクトップフェンスとアクティブな動画壁紙をクリーンに再フック。
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** インタラクティブなライブプレビューとカスタム RGBA コントロールを示すエクスプローラーガラス詳細設定ウィンドウのスクリーンショットを追加。*
 
 ---
@@ -114,7 +114,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **3D 傾斜棚モード＆パースペクティブスケール（`وضع الرف المائل` + `معامل التكبير`）[新規]：** フェンスを 3D パースペクティブ平行四辺形に傾け、角度のある 3D 部屋壁紙に合わせる！**パースペクティブスケール係数（`معامل التكبير`）**を調整してアイコンが棚の遠い端へ滑らかに縮小するリアルな奥行きを実現。
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** 複製設定、アイコンフレーム＆カラーピッカー、密着 2:3 モード、ギャップスライダー、傾斜棚モードを示す「フェンス」タブのスクリーンショットを追加。*
 
 ---
@@ -129,7 +129,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **ワンクリッククイックプリセット（`إضافة سريعة`）：** *画像、音楽、動画、アーカイブ、インストーラー*、または *デスクトップクリーンアップ*（30 日以上触れていないインストーラーとアーカイブのみを掃き集め、ファイルは一切削除しない）のフェンスとルールを即座に生成。
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** カラーコードフェンスバッジとオレンジの強制適用ボタンを強調したソートルールタブのスクリーンショットを追加。*
 
 ---
@@ -143,7 +143,7 @@ CoreDesk Engine のすべての層が再設計され、デスクトップアイ�
 - **毎日自動保存（`حفظ تحديث الثيم تلقائياً كل يوم`）[新規]：** アクティブな `.cde` テーマファイルを 1 日 1 回その場で自動更新 — 最新のデスクトップ調整が重複なしで常に保存される。
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** 適用/エクスポート .cde/削除ボタン付きのビジュアルテーマカードとスマート壁紙フィットトグルを示すテーマギャラリーのスクリーンショットを追加。*
 
 ---

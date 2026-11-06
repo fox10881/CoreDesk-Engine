@@ -24,7 +24,7 @@
 CoreDesk Engine 是一款用 Rust 打造的超強次世代桌面整理與 Windows 11 外殼客製套件。遠超基礎圖示圍欄，CoreDesk Engine 融合了磁性桌面整理、3D 透視書架、即時 H.264 影片桌布、自適應桌面時鐘小工具、Windows 11 外殼深度主題化（工作列、開始功能表、通知中心和檔案總管 Mica/Acrylic），以及一鍵式 `.cde` 完整主題套件。
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-zh-TW.png)
 *> **[IMAGE PLACEHOLDER 1]:** 新增一張完整桌面截圖，展示 Invisible/Bookshelf 圍欄、桌面時鐘小工具和半透明工作列。*
 
 </div>
@@ -51,7 +51,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **完整阿拉伯語本地化與 RTL 介面 [新]：** 原生阿拉伯語介面（`العربية`），無縫從右到左配置與即時語言切換。
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** 新增「一般」分頁截圖，展示 4 種主題樣式（Fluent、Liquid Glass、Bookshelf、Invisible Canvas）和變色龍融合。*
 
 ---
@@ -68,7 +68,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **自適應桌布對比度（`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`）[新]：** CoreDesk Engine 持續取樣時鐘小工具正後方的精確桌布像素。無論桌布是刺眼的純白還是純黑，小工具都會自動翻轉文字、玻璃和強調的對比度，使時間和日期始終 100% 清晰可讀。
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** 新增一張桌面時鐘小工具懸浮截圖及其設定與自適應對比度開關。*
 
 ---
@@ -84,7 +84,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **通知中心樣式（`نمط مركز الإشعارات`）：***Layer Mica UI、Translucent Shell、Matte、Unified、JumpLists 10、Better Control 11、Fluid、Liquid Glass、Borderless、Dense、Frosty Glass、OS26 Tahoe Glass、Command Center*。
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** 新增自訂開始功能表、通知中心和工作列主題下拉選單實際運行的截圖。*
 
 ### 🔍 檔案總管玻璃工作室與統一應用透明化 [新]
@@ -94,7 +94,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **一鍵外觀重新整理（`تحديث المظهر`）[新]：** 即時重啟 `explorer.exe` 並乾淨地重新掛鉤所有桌面圍欄和活動影片桌布。
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** 新增檔案總管玻璃進階設定視窗的截圖，展示互動式即時預覽和自訂 RGBA 控制項。*
 
 ---
@@ -114,7 +114,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **3D 傾斜書架模式與透視縮放（`وضع الرف المائل` + `معامل التكبير`）[新]：** 將圍欄傾斜成 3D 透視平行四邊形，與帶角度的 3D 房間桌布對齊！調整**透視縮放係數（`معامل التكبير`）**讓圖示向書架遠端平滑縮小，營造真實縱深感。
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** 新增「圍欄」分頁截圖，展示複製設定、圖示框架與顏色選擇器、貼邊 2:3 模式、間距滑桿和傾斜書架模式。*
 
 ---
@@ -129,7 +129,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **一鍵快速預設（`إضافة سريعة`）：** 立即為*圖片、音樂、影片、壓縮檔、安裝程式*或*桌面清理*（僅掃走 30 天以上未動的安裝程式和壓縮檔，不刪除任何檔案）產生預建圍欄和規則。
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** 新增排序規則分頁截圖，突出顏色編碼圍欄徽章和橙色強制套用按鈕。*
 
 ---
@@ -143,7 +143,7 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **每日自動儲存（`حفظ تحديث الثيم تلقائياً كل يوم`）[新]：** 每天自動就地更新你的活動 `.cde` 主題檔案——最新桌面調整始終儲存且無重複。
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** 新增主題庫截圖，展示帶套用/匯出 .cde/刪除按鈕的視覺化主題卡片和智慧桌布適配開關。*
 
 ---

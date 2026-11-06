@@ -24,7 +24,7 @@
 CoreDesk Engine est une suite d'organisation de bureau et de personnalisation du shell Windows 11 de nouvelle génération, écrite en Rust. Bien au-delà de simples clôtures d'icônes, elle réunit l'organisation magnétique, des étagères en perspective 3D, des fonds vidéo H.264 en direct, des widgets d'horloge adaptatifs, une personnalisation profonde du shell (barre des tâches, menu Démarrer, centre de notifications et Explorateur Mica/Acrylic) et des packs de thèmes `.cde` complets en un clic.
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-fr.png)
 *> **[IMAGE PLACEHOLDER 1]:** Ajoute une capture complète du bureau montrant les clôtures Invisible/Bookshelf, le widget d'horloge et la barre des tâches translucide.*
 
 </div>
@@ -51,7 +51,7 @@ Va au-delà des conteneurs classiques avec quatre paradigmes visuels :
 - **Localisation arabe complète et interface RTL [NOUVEAU] :** Interface arabe native (`العربية`) avec mise en page droite-à-gauche et changement de langue instantané.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Ajoute une capture de l'onglet Général montrant les 4 styles de thème (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) et la fusion Caméléon.*
 
 ---
@@ -68,7 +68,7 @@ Va au-delà des conteneurs classiques avec quatre paradigmes visuels :
 - **Contraste adaptatif du fond (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NOUVEAU] :** CoreDesk Engine échantillonne en continu les pixels exacts derrière le widget. Fond blanc éclatant ou noir profond, le widget inverse automatiquement le contraste du texte, du verre et des accents pour une lisibilité parfaite.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Ajoute une capture du widget d'horloge sur le bureau avec ses réglages et l'interrupteur de contraste adaptatif.*
 
 ---
@@ -84,7 +84,7 @@ Change de thème à la volée — appliqué immédiatement, sans redémarrage :
 - **Styles du centre de notifications (`نمط مركز الإشعارات`) :** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Ajoute une capture des listes déroulantes de thèmes du menu Démarrer, du centre de notifications et de la barre des tâches.*
 
 ### 🔍 Studio de verre de l'Explorateur et transparence unifiée de l'app [NOUVEAU]
@@ -94,7 +94,7 @@ Change de thème à la volée — appliqué immédiatement, sans redémarrage :
 - **Rafraîchir l'apparence en un clic (`تحديث المظهر`) [NOUVEAU] :** Redémarre `explorer.exe` instantanément et raccroche proprement toutes les clôtures et ton fond vidéo actif.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Ajoute une capture de la fenêtre Paramètres avancés du verre de l'Explorateur avec l'aperçu interactif et les contrôles RGBA.*
 
 ---
@@ -114,7 +114,7 @@ Chaque clôture se règle au pixel près dans l'onglet **Clôtures (`الأسو�
 - **Étagère inclinée 3D et échelle de perspective (`وضع الرف المائل` + `معامل التكبير`) [NOUVEAU] :** Incline la clôture en parallélogramme 3D aligné avec les fonds de pièces en angle ! Règle le **facteur d'échelle de perspective (`معامل التكبير`)** pour que les icônes rétrécissent vers le bord lointain de l'étagère.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Ajoute une capture de l'onglet Clôtures montrant le clonage de réglages, les cadres d'icônes et sélecteurs de couleur, le mode jointif 2:3, les curseurs d'écart et l'étagère inclinée.*
 
 ---
@@ -129,7 +129,7 @@ Le moteur de **règles de tri (`قواعد الفرز`)** a été entièrement r
 - **Presets rapides en un clic (`إضافة سريعة`) :** Génère instantanément des clôtures et règles pour *Images, Musique, Vidéos, Archives, Installateurs* ou *Nettoyage du bureau* (qui ne balaie que les installateurs et archives intacts depuis 30+ jours sans supprimer un seul fichier).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Ajoute une capture de l'onglet Règles de tri avec les badges colorés et le bouton orange d'application forcée.*
 
 ---
@@ -143,7 +143,7 @@ Oublie les sauvegardes `.json` — l'onglet **Disposition et sauvegardes (`ال�
 - **Sauvegarde quotidienne auto (`حفظ تحديث الثيم تلقائياً كل يوم`) [NOUVEAU] :** Met à jour ton `.cde` actif une fois par jour sur place — tes derniers réglages sont toujours préservés sans doublons.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Ajoute une capture de la galerie de thèmes avec cartes visuelles, boutons Appliquer/Exporter .cde/Supprimer et l'interrupteur d'ajustement intelligent.*
 
 ---

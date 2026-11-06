@@ -1,3 +1,18 @@
+<p align="center">
+  <strong>English</strong>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.ar.md">العربية</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.zh-CN.md">简体中文</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.zh-TW.md">繁體中文</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.ja.md">日本語</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.ko.md">한국어</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.de.md">Deutsch</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.fr.md">Français</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.es.md">Español</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.it.md">Italiano</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.pt-BR.md">Português (Brasil)</a>
+  &nbsp;·&nbsp;     <a href="docs/readme/README.ru.md">Русский</a>
+</p>
+
 https://youtu.be/S6GpiqPNnAo
 
 # 💠 CoreDesk Engine — Ultimate Desktop Customization & Organization Suite
@@ -8,7 +23,7 @@ CoreDesk Engine is a heavily supercharged, next-generation desktop organization 
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
 
-<img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/33abf85c-c9c9-45b4-b831-b76f9074b502" />
+<img width="3840" height="2160" alt="image" src="docs/assets/hero-en.png" />
 
 
 </div>

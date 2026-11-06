@@ -24,7 +24,7 @@
 CoreDesk는 Rust로 작성된 강력하게 업그레이드된 차세대 데스크톱 정리 및 Windows 11 셸 커스터마이징 스위트입니다. 기본적인 아이콘 펜스를 훨씬 넘어서, 자석식 데스크톱 정리, 3D 원근 선반, 라이브 H.264 비디오 배경화면, 적응형 데스크톱 시계 위젯, Windows 11 셸 심층 테마(작업 표시줄, 시작 메뉴, 알림 센터, 파일 탐색기 Mica/Acrylic), 원클릭 `.cde` 전체 테마 패키지를 하나로 묶었습니다.
 
 <!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](assets/hero-showcase.png)
+![CoreDesk Engine Hero Showcase](../assets/hero-ko.png)
 *> **[IMAGE PLACEHOLDER 1]:** Invisible/Bookshelf 펜스, 데스크톱 시계 위젯, 반투명 작업 표시줄이 보이는 전체 데스크톱 스크린샷을 추가하세요.*
 
 </div>
@@ -51,7 +51,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **완전한 아랍어 로컬라이제이션 및 RTL UI [신규]:** 네이티브 아랍어 인터페이스(`العربية`)와 원활한 오른쪽에서 왼쪽(RTL) 레이아웃, 즉각적인 라이브 언어 전환.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](assets/fence-styles.png)
+![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** 4가지 테마 스타일(Fluent, Liquid Glass, Bookshelf, Invisible Canvas)과 카멜레온 블렌딩을 보여주는 일반 탭 스크린샷을 추가하세요.*
 
 ---
@@ -68,7 +68,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **적응형 배경화면 대비 (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [신규]:** CoreDesk는 시계 위젯 뒤의 정확한 배경화면 픽셀을 지속적으로 샘플링합니다. 눈부신 흰색이든 칠흑 같은 검정이든, 위젯이 텍스트/유리/액센트 대비를 자동으로 반전시켜 시간과 날짜가 항상 100% 선명하게 유지됩니다.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](assets/clock-widgets.png)
+![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** 데스크톱 위젯과 해당 설정 및 적응형 대비 토글이 보이는 스크린샷을 추가하세요.*
 
 ---
@@ -84,7 +84,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **알림 센터 스타일 (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](assets/windows-shell-customization.png)
+![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** 커스텀 시작 메뉴, 알림 센터, 작업 표시줄 테마 드롭다운이 작동 중인 스크린샷을 추가하세요.*
 
 ### 🔍 파일 탐색기 유리 스튜디오 및 통합 앱 투명화 [신규]
@@ -94,7 +94,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **원클릭 외관 새로고침 (`تحديث المظهر`) [신규]:** `explorer.exe`를 즉시 재시작하고 모든 데스크톱 펜스와 활성 비디오 배경화면을 깔끔하게 재후킹합니다.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](assets/explorer-glass-editor.png)
+![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** 대화형 라이브 프리뷰와 커스텀 RGBA 컨트롤이 보이는 파일 탐색기 유리 고급 설정 창의 스크린샷을 추가하세요.*
 
 ---
@@ -114,7 +114,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **3D 기울임 선반 모드 & 원근 스케일 (`وضع الرف المائل` + `معامل التكبير`) [신규]:** 펜스를 각도진 3D 방 배경화면과 정렬되는 3D 원근 평행사변형으로 기울입니다! **원근 스케일 계수 (`معامل التكبير`)**를 조정해 아이콘이 선반 먼 가장자리로 부드럽게 축소되는 사실적 깊이를 구현.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](assets/fence-advanced-layout.png)
+![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** 설정 복제, 아이콘 프레임 & 컬러 피커, 밀착 2:3 모드, 간격 슬라이더, 기울임 선반 모드가 보이는 펜스 탭의 스크린샷을 추가하세요.*
 
 ---
@@ -129,7 +129,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **원클릭 퀵 프리셋 (`إضافة سريعة`):** *사진, 음악, 비디오, 아카이브, 인스톨러* 또는 *데스크톱 정리*(30일 이상 손대지 않은 인스톨러와 아카이브만 쓸어모으되 파일은 하나도 삭제하지 않음)용 펜스와 규칙을 즉시 생성.
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](assets/sorting-rules-colored.png)
+![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** 컬러 코드 펜스 배지와 주황색 강제 적용 버튼을 강조한 정렬 규칙 탭의 스크린샷을 추가하세요.*
 
 ---
@@ -143,7 +143,7 @@ CoreDesk의 모든 레이어가 재설계되어 데스크톱 아이콘과 Window
 - **매일 자동 저장 (`حفظ تحديث الثيم تلقائياً كل يوم`) [신규]:** 활성 `.cde` 테마 파일을 하루 한 번 제자리에서 자동 업데이트 — 최신 데스크톱 조정이 중복 없이 항상 보존됩니다.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](assets/themes-gallery.png)
+![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** 적용/내보내기 .cde/삭제 버튼이 있는 비주얼 테마 카드와 스마트 배경화면 피팅 토글을 보여주는 테마 갤러리의 스크린샷을 추가하세요.*
 
 ---
