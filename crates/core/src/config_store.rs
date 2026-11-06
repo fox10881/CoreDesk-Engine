@@ -980,6 +980,30 @@ pub fn split_config_json(text: &str) -> SplitConfigJson {
     }
 }
 
+/// Settings keys that are global user preferences, never theme content: a
+/// `.cde` export drops them entirely so a shared theme neither carries the
+/// author's machine-wide choices nor applies them on import.
+pub const THEME_GLOBAL_SETTINGS: &[&str] = &["language"];
+
+/// Returns `text` (a serialized config document) with every
+/// [`THEME_GLOBAL_SETTINGS`] key removed from `settings`. Unparseable input
+/// comes back unchanged — the caller decides whether that is fatal.
+pub fn strip_theme_globals(text: &str) -> String {
+    let Ok(mut doc) = serde_json::from_str::<serde_json::Value>(text) else {
+        return text.into();
+    };
+    let Some(settings) = doc
+        .get_mut("settings")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return text.into();
+    };
+    for key in THEME_GLOBAL_SETTINGS {
+        settings.remove(*key);
+    }
+    serde_json::to_string_pretty(&doc).unwrap_or_else(|_| text.into())
+}
+
 /// Merges each sidecar's dictionary into a parsed config document. Files
 /// are looked up *beside the config being read* — `%APPDATA%` on boot, an
 /// imported export's directory, or a `.cde`'s temp extraction. Entries are
@@ -2221,6 +2245,32 @@ mod tests {
         fs::write(store.primary_path(), bytes).unwrap();
         assert!(ConfigStore::parse_file(&store.primary_path()).is_ok());
         assert!(matches!(store.load(), LoadOutcome::Primary(_)));
+    }
+
+    #[test]
+    fn strip_theme_globals_removes_language_and_leaves_the_rest() {
+        let mut cfg = sample();
+        cfg.settings.language = crate::i18n::Language::Japanese;
+        let json = ConfigStore::to_json(&cfg).unwrap();
+        assert!(json.contains("\"language\""));
+
+        let stripped = strip_theme_globals(&json);
+        let doc: serde_json::Value = serde_json::from_str(&stripped).unwrap();
+        assert!(
+            doc["settings"].get("language").is_none(),
+            "a theme document must not carry the author's locale"
+        );
+        // Everything else survives — the round-trip parse still yields the
+        // same config apart from the defaulting language field.
+        let parsed: Config = serde_json::from_str(&stripped).unwrap();
+        assert_eq!(parsed.settings.icon_size, cfg.settings.icon_size);
+        assert_eq!(parsed.settings.theme, cfg.settings.theme);
+        assert_eq!(
+            parsed.settings.language,
+            crate::i18n::Language::legacy_default()
+        );
+        // Garbage in → garbage out unchanged (never a panic, never data loss).
+        assert_eq!(strip_theme_globals("not json"), "not json");
     }
 
     #[test]

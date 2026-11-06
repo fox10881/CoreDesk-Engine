@@ -13,6 +13,7 @@ fn main() {
             "tools/bindgen/store.txt".to_string(),
             "tools/bindgen/capture.txt".to_string(),
             "tools/bindgen/wmf.txt".to_string(),
+            "tools/bindgen/wasapi.txt".to_string(),
         ],
         v => v,
     };

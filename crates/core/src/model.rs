@@ -251,6 +251,12 @@ pub struct Settings {
     /// one (`js-ap`); other designs suffix it onto the time readout.
     #[serde(default = "default_true")]
     pub clock_use_24_hour: bool,
+    /// Desktop audio-visualizer widget design: `"none"`/`""` = hidden
+    /// (default); `"v1".."v5"` pick a reactive-spectrum design rendered off
+    /// the WASAPI loopback engine. Capture runs only while a design is armed
+    /// AND the desktop is visible (occlusion-gated). `.cde` themes carry it.
+    #[serde(default)]
+    pub visualizer_style: String,
     /// Native desktop particle/weather effect: `"none"` (default) or one of the
     /// 22 effect ids — `rain`, `thunderstorm`, `snow`, `fireflies`, `embers`,
     /// `sakura`, `mist`, `aurora`, `starfield`, `matrix`, `ripples`,
@@ -510,6 +516,15 @@ pub const CLOCK_WIDGET_IDS: &[&str] = &[
 /// `true` for a known clock-design id (`g1..g10`, `d1..d10`).
 pub fn is_clock_widget_id(id: &str) -> bool {
     CLOCK_WIDGET_IDS.contains(&id)
+}
+
+/// Audio-visualizer design ids — the five reactive-spectrum widgets.
+/// `visualizer_style` validates against this; `""`/`"none"` hide the widget.
+pub const VISUALIZER_WIDGET_IDS: &[&str] = &["v1", "v2", "v3", "v4", "v5"];
+
+/// `true` for a known visualizer-design id (`v1..v5`).
+pub fn is_visualizer_widget_id(id: &str) -> bool {
+    VISUALIZER_WIDGET_IDS.contains(&id)
 }
 
 /// English display names for clock-design ids — same strings the Settings
@@ -816,6 +831,7 @@ impl Default for Settings {
             clock_bounds: None,
             clock_adaptive_color: true,
             clock_use_24_hour: true,
+            visualizer_style: String::new(),
             desktop_effect: "none".to_string(),
             desktop_effect_intensity: 50,
             effect_params: BTreeMap::new(),
@@ -2562,6 +2578,14 @@ impl Config {
                     .is_some_and(|n| n.parse::<u8>().is_ok_and(|v| (1..=10).contains(&v))));
         if !clock_ok {
             s.clock_style = "none".into();
+        }
+        // Audio visualizer: same closed-catalog rule — `""`/`"none"` hide
+        // the widget; an unknown id can't spawn a renderer.
+        if !s.visualizer_style.is_empty()
+            && s.visualizer_style != "none"
+            && !is_visualizer_widget_id(&s.visualizer_style)
+        {
+            s.visualizer_style = "none".into();
         }
         // `[x, y, w, h]` physical pixels — x/y may be negative on multi-
         // monitor setups, only the size needs a sane range.

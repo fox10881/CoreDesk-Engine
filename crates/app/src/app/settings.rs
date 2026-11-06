@@ -464,6 +464,10 @@ impl App {
             // A plain config import/backup restore severs the link to whatever theme
             // described the old setup — never trust a path a foreign file carried.
             new_settings.active_theme_path = None;
+        } else {
+            // Language is a global user preference, not theme data: applying or
+            // re-fitting a `.cde` never changes the UI language.
+            new_settings.language = old_settings.language;
         }
         self.sync_desktop_if_available("config adopted");
         // `.cde` manifests bind fence contents to this desktop's actual files (names that
@@ -671,6 +675,22 @@ impl App {
             }
             Err(e) => tracing::error!(error = %e, "clock widget failed"),
         }
+    }
+
+    /// Desktop audio visualizer: `""`/`"none"` drops the engine (its capture
+    /// thread + WASAPI stream are joined); a `v1`…`v5` id lazily creates it
+    /// and arms the loopback — the engine itself pauses the stream whenever
+    /// the desktop is occluded, so an armed-but-hidden visualizer costs 0 %.
+    pub(super) fn apply_visualizer_style(&mut self, style: &str) {
+        let s = style.trim();
+        if s.is_empty() || s == "none" {
+            self.visualizer = None;
+            return;
+        }
+        let engine = self
+            .visualizer
+            .get_or_insert_with(crate::visualizer_engine::VisualizerEngine::new);
+        engine.set_active(true);
     }
 
     /// Soft restart for the widget: destroys it and respawns at its *live*
@@ -1699,6 +1719,10 @@ impl App {
         if new.clock_style != old.clock_style {
             self.apply_clock_style(&new.clock_style);
         }
+        if new.visualizer_style != old.visualizer_style {
+            self.state.config.settings.visualizer_style = new.visualizer_style.clone();
+            self.apply_visualizer_style(&new.visualizer_style);
+        }
         if new.clock_bounds != old.clock_bounds {
             // A live widget is moved in place; a theme without bounds returns
             // it to the default centred spot. Closed widgets pick bounds up
@@ -2623,7 +2647,10 @@ impl App {
             );
         }
         let config_json = coredesk_core::ConfigStore::to_json(&cfg).map_err(|e| e.to_string())?;
-        let split = coredesk_core::config_store::split_config_json(&config_json);
+        let mut split = coredesk_core::config_store::split_config_json(&config_json);
+        // Language is a global user preference, not theme content: the exported
+        // document drops it entirely (import preserves the user's regardless).
+        split.main = coredesk_core::config_store::strip_theme_globals(&split.main);
         let bg_ref = frame.as_ref().map(|(w, h, px)| (*w, *h, px.as_slice()));
         let preview_bgra =
             coredesk_core::cde_theme::render_layout_preview_bgra(&cfg, bg_ref, 640, 360);

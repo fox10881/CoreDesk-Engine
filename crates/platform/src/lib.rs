@@ -45,6 +45,20 @@ mod store_bindings;
 #[allow(clippy::useless_conversion)]
 mod capture_bindings;
 mod gpu_wallpaper;
+// Windows.Win32.Media.Audio — WASAPI loopback capture (tools/bindgen/wasapi.txt).
+#[allow(
+    non_snake_case,
+    non_upper_case_globals,
+    non_camel_case_types,
+    clippy::upper_case_acronyms,
+    clippy::missing_transmute_annotations,
+    clippy::useless_transmute,
+    clippy::useless_conversion,
+    clippy::too_many_arguments,
+    dead_code,
+    unused_imports
+)]
+mod wasapi_bindings;
 #[allow(
     non_snake_case,
     non_upper_case_globals,
@@ -105,6 +119,7 @@ pub mod theme;
 pub mod tooltip;
 pub mod tray;
 pub mod wallpaper;
+pub mod wasapi;
 pub mod watcher;
 pub mod wide;
 pub mod window;

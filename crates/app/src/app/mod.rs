@@ -295,6 +295,10 @@ pub struct App {
     /// Native D2D/DComp desktop effects overlay; the window exists only while
     /// `settings.desktop_effect` names a real effect (`"none"` = zero resources).
     effects: Option<crate::effects_host::EffectsHost>,
+    /// WASAPI loopback → spectrum engine backing the `v1`…`v5` visualizer
+    /// widgets; `None` while `visualizer_style` is `""`/`"none"` — and the
+    /// engine itself stops the stream whenever the desktop is occluded.
+    visualizer: Option<crate::visualizer_engine::VisualizerEngine>,
     /// Signature of the last `feState` pushed to the glass editor — repeat
     /// pushes are skipped so its unsaved draft is never clobbered (empty
     /// forces a push: fresh page, or after close).
@@ -1342,6 +1346,7 @@ impl App {
                 stack.clone(),
                 queue.clone(),
             )),
+            visualizer: None,
             fe_glass_pushed: RefCell::new(String::new()),
             settings_focus_fence: None,
             feedback: Default::default(),
@@ -1421,6 +1426,9 @@ impl App {
         // Restores a previously armed clock widget (a no-op while the
         // style is ""/"none").
         app.apply_clock_style(&app.state.config.settings.clock_style.clone());
+        // Same for a persisted audio visualizer ("none"/"" leaves the
+        // engine and its WASAPI stream uncreated).
+        app.apply_visualizer_style(&app.state.config.settings.visualizer_style.clone());
         // Restores a persisted desktop effect ("none" is a no-op that never
         // creates the overlay window).
         let fx = app.state.config.settings.clone();
