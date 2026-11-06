@@ -960,6 +960,11 @@ impl App {
         if !self.state.config.settings.visualizer_adaptive_color {
             return;
         }
+        tracing::debug!(
+            luminance = sample.luminance,
+            accent = ?sample.accent,
+            "viz theme: backdrop sample applied"
+        );
         h.post_json(&viz_theme_json(&self.state.config.settings, Some(&sample)));
     }
 
