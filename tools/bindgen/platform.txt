@@ -75,8 +75,10 @@
     GetForegroundWindow
     SetForegroundWindow
     GetAncestor
+    GA_PARENT
     GA_ROOT
     GA_ROOTOWNER
+    GetPropW
 
     // ---- window styles
     WS_POPUP
@@ -110,6 +112,7 @@
     WM_CREATE
     WM_DESTROY
     WM_NCDESTROY
+    WM_NCLBUTTONUP
     WM_CLOSE
     WM_QUIT
     WM_SIZE
@@ -544,6 +547,9 @@
     SIGDN_PARENTRELATIVEPARSING
     SIGDN_NORMALDISPLAY
     SIGDN_FILESYSPATH
+    SIGDN_DESKTOPABSOLUTEPARSING
+    SHGetPathFromIDListW
+    SHCreateItemFromIDList
     ShellExecuteExW
     SHELLEXECUTEINFOW
     SEE_MASK_INVOKEIDLIST

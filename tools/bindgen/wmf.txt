@@ -92,6 +92,17 @@
     MF_MT_FRAME_SIZE
     MF_MT_FRAME_RATE
     MF_MT_DEFAULT_STRIDE
+    MF_MT_AVG_BITRATE
+    MF_MT_INTERLACE_MODE
+    MF_MT_PIXEL_ASPECT_RATIO
+    MF_SOURCE_READER_MEDIASOURCE
+    MF_SINK_WRITER_STATISTICS
+    MFCreateMFByteStreamOnStream
+    MFCreateSourceReaderFromByteStream
+    MFCreateSinkWriterFromURL
+    IMFByteStream
+    IMFSinkWriter
+    SHCreateMemStream
     MFMediaType_Video
     IWICBitmapEncoder
     IWICBitmapFrameEncode

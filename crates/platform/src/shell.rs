@@ -1537,19 +1537,8 @@ fn lnk_target_pidl(path: &Path) -> Option<LPITEMIDLIST> {
 /// records live). `None` for filesystem targets — the link-context route
 /// handles those.
 fn namespace_activation_name(pidl: LPITEMIDLIST) -> Option<String> {
-    let mut raw: *mut core::ffi::c_void = core::ptr::null_mut();
     // SAFETY: `pidl` is a valid absolute PIDL for the call's duration.
-    unsafe {
-        SHCreateItemFromIDList(pidl as *const ITEMIDLIST, &IShellItem::IID, &mut raw)
-            .ok()
-            .ok()?;
-    }
-    if raw.is_null() {
-        return None;
-    }
-    // SAFETY: `raw` is a live IShellItem reference we now own; GetDisplayName
-    // returns a shell-allocated string `take_string` frees.
-    let item: IShellItem = unsafe { windows_core::Interface::from_raw(raw) };
+    let item: IShellItem = unsafe { SHCreateItemFromIDList(pidl as *const ITEMIDLIST).ok()? };
     let name = unsafe { item.GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING) }
         .ok()
         .map(take_string)
@@ -2005,7 +1994,12 @@ mod shortcut_tests {
         let target = dir.join("Game.exe");
         std::fs::write(&target, "x").unwrap();
         let link = create_shortcut(&target, &dir).unwrap();
-        assert_eq!(resolved_shortcut_target(&link), Some(target));
+        // `GetPath` may report an 8.3 alias (e.g. `RUNNER~1` on boxes with
+        // short names enabled); compare canonical identities, not strings.
+        assert_eq!(
+            resolved_shortcut_target(&link).and_then(|p| std::fs::canonicalize(p).ok()),
+            std::fs::canonicalize(&target).ok()
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
@@ -2448,15 +2442,10 @@ mod lnk_probe {
                                     "  idlist={pidl:?} path={ok3:?} -> {:?}",
                                     crate::wide::from_wide(&buf3)
                                 );
-                                let mut item: *mut core::ffi::c_void = core::ptr::null_mut();
-                                let hr = SHCreateItemFromIDList(
-                                    pidl as *const ITEMIDLIST,
-                                    &IShellItem::IID,
-                                    &mut item,
-                                );
+                                let hr =
+                                    SHCreateItemFromIDList::<IShellItem>(pidl as *const ITEMIDLIST);
                                 eprintln!("  item={hr:?}");
-                                if hr.is_ok() && !item.is_null() {
-                                    let item: IShellItem = windows_core::Interface::from_raw(item);
+                                if let Ok(item) = hr {
                                     for (name, sigdn) in [
                                         ("parse", SIGDN_DESKTOPABSOLUTEPARSING),
                                         ("fspath", SIGDN_FILESYSPATH),

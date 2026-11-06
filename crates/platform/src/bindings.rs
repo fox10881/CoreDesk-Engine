@@ -683,11 +683,6 @@ pub unsafe fn GdiFlush() -> windows_core::BOOL {
     unsafe { GdiFlush() }
 }
 #[inline]
-pub unsafe fn GetPropW(hwnd: HWND, lpstring: windows_core::PCWSTR) -> HANDLE {
-    windows_core::link!("user32.dll" "system" fn GetPropW(hwnd : HWND, lpstring : windows_core::PCWSTR) -> HANDLE);
-    unsafe { GetPropW(hwnd, lpstring) }
-}
-#[inline]
 pub unsafe fn GetAncestor(hwnd: HWND, gaflags: u32) -> HWND {
     windows_core::link!("user32.dll" "system" fn GetAncestor(hwnd : HWND, gaflags : u32) -> HWND);
     unsafe { GetAncestor(hwnd, gaflags) }
@@ -976,6 +971,14 @@ pub unsafe fn GetProcessMemoryInfo(
 ) -> windows_core::BOOL {
     windows_core::link!("kernel32.dll" "system" "K32GetProcessMemoryInfo" fn GetProcessMemoryInfo(process : HANDLE, ppsmemcounters : *mut PROCESS_MEMORY_COUNTERS, cb : u32) -> windows_core::BOOL);
     unsafe { GetProcessMemoryInfo(process, ppsmemcounters as _, cb) }
+}
+#[inline]
+pub unsafe fn GetPropW<P1>(hwnd: HWND, lpstring: P1) -> HANDLE
+where
+    P1: windows_core::Param<windows_core::PCWSTR>,
+{
+    windows_core::link!("user32.dll" "system" fn GetPropW(hwnd : HWND, lpstring : windows_core::PCWSTR) -> HANDLE);
+    unsafe { GetPropW(hwnd, lpstring.param().abi()) }
 }
 #[inline]
 pub unsafe fn GetRawInputData(
@@ -1850,6 +1853,18 @@ where
     }
 }
 #[inline]
+pub unsafe fn SHCreateItemFromIDList<T>(pidl: *const ITEMIDLIST) -> windows_core::Result<T>
+where
+    T: windows_core::Interface,
+{
+    windows_core::link!("shell32.dll" "system" fn SHCreateItemFromIDList(pidl : *const ITEMIDLIST, riid : *const windows_core::GUID, ppv : *mut *mut core::ffi::c_void) -> windows_core::HRESULT);
+    let mut result__ = core::ptr::null_mut();
+    unsafe {
+        SHCreateItemFromIDList(pidl, &T::IID, &mut result__)
+            .and_then(|| windows_core::imp::Type::from_abi(result__))
+    }
+}
+#[inline]
 pub unsafe fn SHCreateItemFromParsingName<P0, P1, T>(
     pszpath: P0,
     pbc: P1,
@@ -1996,6 +2011,14 @@ pub unsafe fn SHGetKnownFolderPath(
     }
 }
 #[inline]
+pub unsafe fn SHGetPathFromIDListW(
+    pidl: *const ITEMIDLIST,
+    pszpath: windows_core::PWSTR,
+) -> windows_core::BOOL {
+    windows_core::link!("shell32.dll" "system" fn SHGetPathFromIDListW(pidl : *const ITEMIDLIST, pszpath : windows_core::PWSTR) -> windows_core::BOOL);
+    unsafe { SHGetPathFromIDListW(pidl, pszpath) }
+}
+#[inline]
 pub unsafe fn SHGetSetSettings(lpss: Option<*mut SHELLSTATEA>, dwmask: u32, bset: bool) {
     windows_core::link!("shell32.dll" "system" fn SHGetSetSettings(lpss : *mut SHELLSTATEA, dwmask : u32, bset : windows_core::BOOL));
     unsafe {
@@ -2005,23 +2028,6 @@ pub unsafe fn SHGetSetSettings(lpss: Option<*mut SHELLSTATEA>, dwmask: u32, bset
             bset.into(),
         )
     }
-}
-#[inline]
-pub unsafe fn SHGetPathFromIDListW(
-    pidl: *const ITEMIDLIST,
-    pszpath: windows_core::PWSTR,
-) -> windows_core::BOOL {
-    windows_core::link!("shell32.dll" "system" fn SHGetPathFromIDListW(pidl : *const ITEMIDLIST, pszpath : windows_core::PWSTR) -> windows_core::BOOL);
-    unsafe { SHGetPathFromIDListW(pidl, pszpath) }
-}
-#[inline]
-pub unsafe fn SHCreateItemFromIDList(
-    pidl: *const ITEMIDLIST,
-    riid: *const windows_core::GUID,
-    ppv: *mut *mut core::ffi::c_void,
-) -> windows_core::HRESULT {
-    windows_core::link!("shell32.dll" "system" fn SHCreateItemFromIDList(pidl : *const ITEMIDLIST, riid : *const windows_core::GUID, ppv : *mut *mut core::ffi::c_void) -> windows_core::HRESULT);
-    unsafe { SHCreateItemFromIDList(pidl, riid, ppv) }
 }
 #[inline]
 pub unsafe fn SHParseDisplayName<P0, P1>(
@@ -3871,10 +3877,10 @@ pub struct HPALETTE(pub *mut core::ffi::c_void);
 pub struct HRAWINPUT(pub *mut core::ffi::c_void);
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct HRSRC(pub *mut core::ffi::c_void);
+pub struct HRGN(pub *mut core::ffi::c_void);
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct HRGN(pub *mut core::ffi::c_void);
+pub struct HRSRC(pub *mut core::ffi::c_void);
 pub const HTBOTTOM: i32 = 15;
 pub const HTBOTTOMLEFT: i32 = 16;
 pub const HTBOTTOMRIGHT: i32 = 17;
@@ -15925,7 +15931,7 @@ pub struct SID_AND_ATTRIBUTES {
     pub Attributes: u32,
 }
 pub type SIGDN = i32;
-pub const SIGDN_DESKTOPABSOLUTEPARSING: SIGDN = -2147434496;
+pub const SIGDN_DESKTOPABSOLUTEPARSING: SIGDN = -2147319808;
 pub const SIGDN_FILESYSPATH: SIGDN = -2147123200;
 pub const SIGDN_NORMALDISPLAY: SIGDN = 0;
 pub const SIGDN_PARENTRELATIVEEDITING: SIGDN = -2147282943;

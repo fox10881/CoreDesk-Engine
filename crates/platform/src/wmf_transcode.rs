@@ -15,12 +15,20 @@ use crate::wide::to_wide;
 use crate::wmf_bindings::{
     IMFAttributes, IMFMediaType, IMFSourceReader, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE,
     MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_PIXEL_ASPECT_RATIO,
-    MF_MT_SUBTYPE, MF_PD_DURATION, MF_SOURCE_READER_ALL_STREAMS,
-    MF_SOURCE_READER_FIRST_VIDEO_STREAM, MF_SOURCE_READER_MEDIASOURCE,
-    MF_SOURCE_READERF_ENDOFSTREAM, MF_SOURCE_READERF_ERROR, MFCreateAttributes, MFCreateMediaType,
-    MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL, MFMediaType_Video,
-    MFVIDEOINTERLACE_PROGRESSIVE,
+    MF_MT_SUBTYPE, MF_SOURCE_READER_ALL_STREAMS, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
+    MF_SOURCE_READER_MEDIASOURCE, MF_SOURCE_READERF_ENDOFSTREAM, MF_SOURCE_READERF_ERROR,
+    MFCreateAttributes, MFCreateMediaType, MFCreateSinkWriterFromURL, MFCreateSourceReaderFromURL,
+    MFMediaType_Video,
 };
+
+/// `MF_PD_DURATION` presentation-duration attribute GUID. Not emitted by
+/// windows-bindgen 0.100 (absent from the bundled metadata), so the SDK
+/// GUID is declared here instead.
+pub(crate) const MF_PD_DURATION: windows_core::GUID =
+    windows_core::GUID::from_u128(0x6c990d33_bb8e_477a_8598_0d5d96fcd88a);
+
+/// `MFVideoInterlace_Progressive` — progressive scan frames.
+pub(crate) const MFVIDEOINTERLACE_PROGRESSIVE: u32 = 2;
 use crate::wmf_wallpaper::{
     ComThreadGuard, MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS,
     MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING,
@@ -385,7 +393,7 @@ unsafe fn transcode_inner(
     }
     let out_url = to_wide(&tmp.to_string_lossy());
     let sink = unsafe {
-        MFCreateSinkWriterFromURL(PCWSTR(out_url.as_ptr()), core::ptr::null_mut(), &wattrs)
+        MFCreateSinkWriterFromURL(PCWSTR(out_url.as_ptr()), None, &wattrs)
             .map_err(|e| format!("MFCreateSinkWriterFromURL: {e}"))?
     };
     let out_type = video_media_type(
@@ -412,8 +420,10 @@ unsafe fn transcode_inner(
     }?;
     unsafe {
         sink.SetInputMediaType(stream, &in_type, None)
+            .ok()
             .map_err(|e| format!("SetInputMediaType: {e}"))?;
         sink.BeginWriting()
+            .ok()
             .map_err(|e| format!("BeginWriting: {e}"))?;
     }
 
@@ -448,10 +458,11 @@ unsafe fn transcode_inner(
                 .ok()
                 .map_err(|e| format!("SetSampleTime: {e}"))?;
             sink.WriteSample(stream, &s)
+                .ok()
                 .map_err(|e| format!("WriteSample: {e}"))?;
         }
     }
-    unsafe { sink.Finalize().map_err(|e| format!("Finalize: {e}")) }
+    unsafe { sink.Finalize().ok().map_err(|e| format!("Finalize: {e}")) }
 }
 
 #[cfg(test)]

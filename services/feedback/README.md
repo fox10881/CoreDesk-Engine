@@ -1,7 +1,7 @@
 # Feedback service
 
 Receives reports from the settings page's 「反馈」 page and files each one as an issue in the
-private repository `DayuanJiang/CoreDesk-feedback`; GitHub then notifies the maintainer.
+private repository `fox10881/CoreDesk-feedback`; GitHub then notifies the maintainer.
 Live at `https://api.coredesk.jiang.jp/feedback` (Cloudflare Worker `coredesk-feedback`).
 
 - `POST /feedback` with a JSON report (`kind`, `message`, optional `email`, `app`, and, when

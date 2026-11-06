@@ -271,11 +271,10 @@ fn open_sw_reader(path: &Path, mem: Option<&[u8]>) -> std::result::Result<Reader
 /// returned reader's life (the caller owns them for the whole playback loop).
 unsafe fn open_mem_reader(mem: &[u8], attrs: &IMFAttributes) -> Result<IMFSourceReader> {
     unsafe {
-        let stream = SHCreateMemStream(mem.as_ptr(), mem.len() as u32)?;
-        let byte_stream = MFCreateMFByteStreamOnStream(windows_core::Interface::as_raw(&stream));
-        byte_stream.and_then(|bs| {
-            MFCreateSourceReaderFromByteStream(windows_core::Interface::as_raw(&bs), attrs)
-        })
+        let stream = SHCreateMemStream(Some(mem))
+            .ok_or_else(|| windows_core::Error::from_hresult(windows_core::HRESULT(-1)))?;
+        let byte_stream = MFCreateMFByteStreamOnStream(&stream);
+        byte_stream.and_then(|bs| MFCreateSourceReaderFromByteStream(&bs, attrs))
     }
 }
 

@@ -8,7 +8,7 @@ workers_dev = false
 routes = [{ pattern = "api.coredesk.jiang.jp", custom_domain = true }]
 
 [vars]
-GITHUB_REPO = "DayuanJiang/CoreDesk-feedback"
+GITHUB_REPO = "fox10881/CoreDesk-feedback"
 
 # Three reports per minute per client IP (per Cloudflare location).
 [[ratelimits]]

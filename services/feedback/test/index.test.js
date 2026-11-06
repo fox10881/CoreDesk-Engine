@@ -31,7 +31,7 @@ async function run(request, { github = () => new Response('{}', { status: 201 })
   };
   const limiterKeys = [];
   const env = {
-    GITHUB_REPO: 'fox10881/CoreDesk-Engine',
+    GITHUB_REPO: 'fox10881/CoreDesk-feedback',
     GITHUB_TOKEN: 'test-token',
     LIMITER: { limit: async ({ key }) => (limiterKeys.push(key), { success: !limited }) },
   };
@@ -49,7 +49,7 @@ test('a valid report becomes an issue in the private repository', async () => {
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), '*');
   assert.deepEqual(limiterKeys, ['203.0.113.7']);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://api.github.com/repos/fox10881/CoreDesk-Engine/issues');
+  assert.equal(calls[0].url, 'https://api.github.com/repos/fox10881/CoreDesk-feedback/issues');
   assert.equal(calls[0].init.headers.Authorization, 'Bearer test-token');
   const { title, body, labels } = calls[0].issue;
   assert.equal(title, '[0.1.4] Fences vanish after sleep');
