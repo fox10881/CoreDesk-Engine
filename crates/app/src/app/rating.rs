@@ -128,7 +128,7 @@ impl App {
     pub(super) fn on_notice(&mut self, event: crate::notice::NoticeEvent) {
         if self.welcome.take().is_some() {
             if event == crate::notice::NoticeEvent::Action {
-                self.open_manual();
+                self.open_styles_folder();
             }
             return;
         }
