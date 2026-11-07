@@ -1,0 +1,172 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+  canvas { display: block; }
+  /* While the desktop is occluded the host stops pushing frames and the page
+     freezes on the last draw — this class is only the edge-case fallback for a
+     paused frame that did arrive (e.g. occlusion raced a live packet). */
+  body.paused canvas { filter: saturate(0.4) brightness(0.55); }
+</style>
+<!-- cde-meta {"id": "v8", "label": "螺旋音序", "author": "CoreDesk Engine", "version": 1} -->
+</head>
+<body>
+<canvas id="cv"></canvas>
+<script>
+'use strict';
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const wv = window.chrome && chrome.webview;
+
+const BANDS = 24;
+const TAU = Math.PI * 2;
+
+let W = 0, H = 0, DPR = 1;
+let R = null, style = 'v8', raf = 0, last = performance.now();
+let frozen = false; // drew one dimmed paused frame and halted
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cv.width = Math.max(1, Math.round(W * DPR));
+  cv.height = Math.max(1, Math.round(H * DPR));
+  cv.style.width = W + 'px';
+  cv.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (R && R.resize) R.resize();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// Latest pushed snapshot — the host's 33 ms feed.
+const snap = { bands: new Array(BANDS).fill(0), level: 0, peak: 0, paused: false };
+
+// Wallpaper-adaptive palette: `vizTheme` pushes the backdrop probe's accent
+// hue + luminance; every renderer rebases its hues on `TH.hue` via `col()`.
+// On bright backdrops strokes deepen (LL) and glow gains alpha (AL) so the
+// neon stays readable; adaptive off restores the fixed cyber-cyan palette.
+const DEF_HUE = 190;
+const TH = { adaptive: true, hue: DEF_HUE, light: false };
+const hue = off => (TH.adaptive ? TH.hue : DEF_HUE) + off;
+const AL = a => Math.min(1, a * (TH.light ? 1.3 : 1));
+const LL = l => Math.max(10, l - (TH.light ? 18 : 0));
+const col = (off, s, l, a) => `hsla(${hue(off)}, ${s}%, ${LL(l)}%, ${AL(a)})`;
+function hexHue(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return null;
+  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (d < 0.02) return DEF_HUE; // grey wallpaper → keep the cyber default
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+
+// Per-design factory: { draw(ctx, w, h, s, dt), reset() }.
+const BUILDS = {
+    v8() {
+    let rot = 0;
+    return {
+      draw(c, w, h, s, dt) {
+        rot += dt * (0.15 + s.level * 0.9);
+        const cx = w / 2, cy = h / 2, Rm = Math.min(w, h) * 0.42, LOOPS = TAU * 3.2;
+        c.clearRect(0, 0, w, h);
+        c.globalCompositeOperation = 'lighter';
+        c.strokeStyle = col(20, 80, 60, 0.10);
+        c.beginPath();
+        for (let i = 0; i < 120; i++) {
+          const t = (i / 120) * LOOPS, r = Rm * (t / LOOPS);
+          const x = cx + Math.cos(t + rot) * r, y = cy + Math.sin(t + rot) * r;
+          i ? c.lineTo(x, y) : c.moveTo(x, y);
+        }
+        c.stroke();
+        for (let i = 0; i < BANDS; i++) {
+          const t = (i / BANDS) * LOOPS, r = Rm * (0.15 + (t / LOOPS) * 0.85);
+          const e = s.bands[i];
+          const x = cx + Math.cos(t + rot) * r, y = cy + Math.sin(t + rot) * r;
+          const rad = 1.5 + e * 7 + s.peak * 1.5, hoff = (i / BANDS) * 130;
+          const g = c.createRadialGradient(x, y, 0, x, y, rad * 3);
+          g.addColorStop(0, col(hoff, 95, 70, 0.25 + e * 0.7));
+          g.addColorStop(1, col(hoff, 90, 50, 0));
+          c.fillStyle = g; c.beginPath(); c.arc(x, y, rad * 3, 0, TAU); c.fill();
+          c.fillStyle = col(hoff, 100, 82, 0.5 + e * 0.5);
+          c.beginPath(); c.arc(x, y, rad, 0, TAU); c.fill();
+        }
+        c.globalCompositeOperation = 'source-over';
+      },
+      reset() { rot = 0; },
+    };
+  },
+
+  /* v9 — Comet Trails: 24 lanes of comet streaks; energy drives speed,
+     length and girth; peaks scatter a meteor shower. */
+};
+
+function avg(b, a, z) { let s = 0; for (let i = a; i <= z; i++) s += b[i]; return s / (z - a + 1); }
+function roundTop(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  c.beginPath();
+  c.moveTo(x, y + h);
+  c.lineTo(x, y + r);
+  c.arcTo(x, y, x + w / 2, y - r * 0.15, r);
+  c.arcTo(x + w / 2, y - r * 0.15, x + w, y + r, r);
+  c.lineTo(x + w, y + h);
+  c.closePath();
+}
+
+R = BUILDS[style]();
+
+function frame(now) {
+  raf = requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (snap.paused) {
+    // Freeze + dim once, then stop the loop entirely — the engine's stream is
+    // stopped so nothing will change until the next unpause message anyway.
+    if (!frozen) { document.body.classList.add('paused'); frozen = true; }
+    raf = 0;
+    return;
+  }
+  if (frozen) { document.body.classList.remove('paused'); frozen = false; }
+  R.draw(ctx, W, H, snap, dt);
+}
+
+if (wv) {
+  wv.addEventListener('message', (e) => {
+    const m = e.data || {};
+    if (m.t === 'vizSpectrum') {
+      if (Array.isArray(m.bands) && m.bands.length === BANDS) {
+        for (let i = 0; i < BANDS; i++) snap.bands[i] = m.bands[i] || 0;
+      }
+      snap.level = m.level || 0; snap.peak = m.peak || 0;
+      const was = snap.paused;
+      snap.paused = !!m.paused;
+      // Wake the halted loop when the stream resumes.
+      if (!snap.paused && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+      else if (!was && snap.paused) { /* let the running frame draw the freeze */ }
+    }
+    else if (m.t === 'vizStyle') {
+      R = BUILDS[style]();
+      document.body.classList.remove('paused');
+      frozen = false;
+      if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+    }
+    else if (m.t === 'vizTheme') {
+      TH.adaptive = m.adaptive !== false;
+      if (!TH.adaptive) { TH.hue = DEF_HUE; TH.light = false; }
+      else {
+        const h = hexHue(m.accent);
+        if (h !== null) TH.hue = h;
+        TH.light = m.isLightBackdrop === true;
+      }
+    }
+  });
+  wv.postMessage({ type: 'vizReady' });
+}
+
+raf = requestAnimationFrame(frame);
+</script>
+</body>
+</html>

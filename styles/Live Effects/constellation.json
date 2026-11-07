@@ -1,0 +1,15 @@
+{
+  "id": "constellation",
+  "label": "星链网络",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "constellation",
+  "params": {
+    "particleCount": 90,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

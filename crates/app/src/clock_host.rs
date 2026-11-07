@@ -1,6 +1,8 @@
-//! Desktop clock widget: a third single-instance WebView2 composition
-//! host — `WS_POPUP | WS_EX_TOOLWINDOW`, no chrome at all — rendering
-//! `ui/clock.html` (the design gallery lives entirely in the page).
+//! Desktop clock widget: a single-instance WebView2 composition host —
+//! `WS_POPUP | WS_EX_TOOLWINDOW`, no chrome at all — rendering one
+//! self-contained design document per file from `Styles\Clock Widget\`
+//! (two-layer resolution: `<exe>` factory first, the user layer in
+//! `<config>\Styles` shadows it).
 //!
 //! Interaction: `WM_NCHITTEST` gives the 8 px perimeter edge/corner
 //! resize codes and makes every interior point `HTCAPTION` (full-body
@@ -13,6 +15,7 @@
 use crate::commands::{Command, CommandQueue};
 use crate::settings_host::WebEnvironment;
 use crate::webview_comp::CompWebview;
+use crate::widget_doc;
 use coredesk_platform::window::{
     self, ClassOptions, MessageHandler, Window, WindowBuilder, WindowClass, style,
 };
@@ -22,8 +25,9 @@ use std::rc::Rc;
 use windows_core::Result;
 
 pub const CLOCK_CLASS: &str = "CoreDeskEngine.Clock";
-const CLOCK_HTML: &str = include_str!("../../../ui/clock.html");
-const I18N_JS: &str = include_str!("../../../ui/i18n.js");
+/// Inlined into every widget document's `<script src="i18n.js">` marker —
+/// shared by the visualizer's documents too.
+pub(crate) const I18N_JS: &str = include_str!("../../../ui/i18n.js");
 /// The widget's only context-menu entry (「تحديث」 = soft restart).
 const MENU_CLOCK_REFRESH: u32 = 1;
 
@@ -34,6 +38,9 @@ const DEFAULT_H_DIP: i32 = 220;
 struct HostState {
     comp: Option<CompWebview>,
     mouse_tracked: Cell<bool>,
+    /// The design file currently navigated — a style swap to a *different*
+    /// file re-navigates; same-file re-posts just re-arm the params.
+    design_id: RefCell<String>,
 }
 
 pub struct ClockHost {
@@ -49,15 +56,18 @@ impl ClockHost {
     /// Creates the widget hidden (revealed on the page's `clockReady`).
     /// `saved` = persisted `[x, y, w, h]` in physical pixels; `None`
     /// centres `DEFAULT_W_DIP × DEFAULT_H_DIP` on the primary monitor.
+    /// `style_id` names the `Styles\Clock Widget\<id>.html` design file.
     pub fn open(
         class: &WindowClass,
         env: &WebEnvironment,
         saved: Option<[i32; 4]>,
         queue: CommandQueue,
+        style_id: &str,
     ) -> Result<Self> {
         let state = Rc::new(RefCell::new(HostState {
             comp: None,
             mouse_tracked: Cell::new(false),
+            design_id: RefCell::new(String::new()),
         }));
 
         let (x, y, w, h) = match saved {
@@ -205,18 +215,14 @@ impl ClockHost {
         let hwnd = window.hwnd();
         tracing::debug!(?hwnd, x, y, w, h, "clock widget host created");
 
-        let payload = coredesk_core::i18n::ui_payload()
-            .to_string()
-            .replace('<', "\\u003c");
-        let document = CLOCK_HTML
-            .replace(
-                "<!-- COREDESK_LOCALE -->",
-                &format!("<script>window.COREDESK_LOCALE={payload};</script>"),
-            )
-            .replace(
-                "<script src=\"i18n.js\"></script>",
-                &format!("<script>{I18N_JS}</script>"),
-            );
+        let Some(document) =
+            widget_doc::build_widget_document(coredesk_core::styles_fs::CLOCK_WIDGET_DIR, style_id)
+        else {
+            tracing::warn!(style_id, "clock design file missing — widget not spawned");
+            return Err(windows_core::Error::from_hresult(windows_core::HRESULT(
+                -2147024894, // HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)
+            )));
+        };
 
         let (cw, ch) = window.client_size();
         let comp = {
@@ -227,11 +233,42 @@ impl ClockHost {
                 window::dpi_of(hwnd),
                 (cw, ch),
                 &document,
-                move |json| queue.push(Command::SettingsMessage(json)),
+                move |json| {
+                    if widget_doc::widget_message_allowed(&json, &["clockReady"]) {
+                        queue.push(Command::SettingsMessage(json));
+                    }
+                },
             )?
         };
+        *state.borrow_mut().design_id.borrow_mut() = style_id.to_string();
         state.borrow_mut().comp = Some(comp);
         Ok(Self { window, state })
+    }
+
+    /// Live design swap: navigates the running WebView to the design's
+    /// file. The fresh page's `clockReady` re-arms style/params/theme —
+    /// `false` when the file can't be resolved (caller keeps or closes the
+    /// widget per its own policy).
+    pub fn set_design(&self, style_id: &str) -> bool {
+        if *self.state.borrow().design_id.borrow() == style_id {
+            return true;
+        }
+        let Some(document) =
+            widget_doc::build_widget_document(coredesk_core::styles_fs::CLOCK_WIDGET_DIR, style_id)
+        else {
+            tracing::warn!(style_id, "clock design file missing — swap ignored");
+            return false;
+        };
+        let ok = self
+            .state
+            .borrow()
+            .comp
+            .as_ref()
+            .is_some_and(|c| c.navigate_to_string(&document).is_ok());
+        if ok {
+            *self.state.borrow().design_id.borrow_mut() = style_id.to_string();
+        }
+        ok
     }
 
     pub fn hwnd(&self) -> HWND {

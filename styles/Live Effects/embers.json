@@ -1,0 +1,15 @@
+{
+  "id": "embers",
+  "label": "升腾余烬",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "embers",
+  "params": {
+    "particleCount": 180,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

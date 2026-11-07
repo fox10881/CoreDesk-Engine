@@ -1,0 +1,15 @@
+{
+  "id": "magic_trail",
+  "label": "魔法霓虹轨迹",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "magic_trail",
+  "params": {
+    "particleCount": 260,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "bokeh",
+  "label": "梦幻光斑",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "bokeh",
+  "params": {
+    "particleCount": 26,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

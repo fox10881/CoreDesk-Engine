@@ -689,6 +689,8 @@ mod tests {
         ("storage", "state.storage_kind()"), // fixed names of the config folder's kind
         ("style", "?style"),            // backdrop style enum
         ("style", "%fe.style"),         // File Explorer theme catalog id (fixed set)
+        ("style", "s"),                 // widget design file-catalog id — same class as %fe.style
+        ("style_id", "style_id"),       // widget design file id — user-visible in the dropdown
         ("id", "%id"),                  // File Explorer theme catalog id (fixed set)
         ("hwnd", "hwnd.0 as usize"),    // window handle (not user data)
         ("ok", "ok"),                   // delivery success bool

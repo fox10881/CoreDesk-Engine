@@ -1008,18 +1008,27 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     ['g11', '霓虹电路面板'], ['g12', '极简竖排'], ['g13', '复古翻牌'],
     ['g14', '几何轨道'], ['g15', '古典指针'],
   ];
+  // Options arrive file-backed from the backend (`state.clockDesigns`:
+  // {id, label, custom} per `Styles\Clock Widget\<id>.html`); the hardcoded
+  // CLOCK_DESIGNS array is only the pre-first-push fallback.
   function renderClockStyles() {
     const sel = document.getElementById('clockStyleSel');
     if (!sel) return;
-    // Options must exist before bindAll assigns .value — and rebuilding them
-    // must not clobber it: a select whose value has no option shows index 0
-    // ("none"), which is exactly the reset-to-off users saw.
-    sel.replaceChildren(...CLOCK_DESIGNS.map(([v, name]) => {
-      const e = document.createElement('option');
-      e.value = v;
-      e.textContent = t(name);
-      return e;
-    }));
+    const opts = (state.clockDesigns && state.clockDesigns.length)
+      ? state.clockDesigns
+      : CLOCK_DESIGNS.map(([v, name]) => ({ id: v, label: name }));
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
+    if (sel.dataset.opts !== sig) {
+      sel.dataset.opts = sig;
+      sel.replaceChildren(...opts.map(o => {
+        const e = document.createElement('option');
+        e.value = o.id;
+        e.textContent = t(o.label) + (o.custom ? ' (' + t('自定义') + ')' : '');
+        return e;
+      }));
+    }
+    // Reassign after the rebuild — a .value set before the options existed
+    // leaves the select displaying index 0 ("none") while state says otherwise.
     sel.value = String(state.settings.clockStyle ?? 'none');
   }
 
@@ -1034,12 +1043,19 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   function renderVisualizerStyles() {
     const sel = document.getElementById('visualizerStyleSel');
     if (!sel) return;
-    sel.replaceChildren(...VISUALIZER_DESIGNS.map(([v, name]) => {
-      const e = document.createElement('option');
-      e.value = v;
-      e.textContent = t(name);
-      return e;
-    }));
+    const opts = (state.visualizerDesigns && state.visualizerDesigns.length)
+      ? state.visualizerDesigns
+      : VISUALIZER_DESIGNS.map(([v, name]) => ({ id: v, label: name }));
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
+    if (sel.dataset.opts !== sig) {
+      sel.dataset.opts = sig;
+      sel.replaceChildren(...opts.map(o => {
+        const e = document.createElement('option');
+        e.value = o.id;
+        e.textContent = t(o.label) + (o.custom ? ' (' + t('自定义') + ')' : '');
+        return e;
+      }));
+    }
     sel.value = String(state.settings.visualizerStyle ?? 'none');
   }
 
@@ -1072,12 +1088,19 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   function renderDesktopEffects() {
     const sel = document.getElementById('desktopEffectSel');
     if (!sel) return;
-    sel.replaceChildren(...DESKTOP_EFFECTS.map(([v, name]) => {
-      const e = document.createElement('option');
-      e.value = v;
-      e.textContent = t(name);
-      return e;
-    }));
+    const opts = (state.desktopEffects && state.desktopEffects.length)
+      ? state.desktopEffects
+      : DESKTOP_EFFECTS.map(([v, name]) => ({ id: v, label: name }));
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
+    if (sel.dataset.opts !== sig) {
+      sel.dataset.opts = sig;
+      sel.replaceChildren(...opts.map(o => {
+        const e = document.createElement('option');
+        e.value = o.id;
+        e.textContent = t(o.label) + (o.custom ? ' (' + t('自定义') + ')' : '');
+        return e;
+      }));
+    }
     // Reassign after the rebuild — a .value set before the options existed
     // leaves the select displaying index 0 ("none") while state says otherwise.
     sel.value = String(state.settings.desktopEffect ?? 'none');

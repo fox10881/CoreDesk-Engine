@@ -1,0 +1,15 @@
+{
+  "id": "repulsion_dust",
+  "label": "物理斥力尘埃",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "repulsion_dust",
+  "params": {
+    "particleCount": 2048,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

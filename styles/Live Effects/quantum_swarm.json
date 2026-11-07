@@ -1,0 +1,15 @@
+{
+  "id": "quantum_swarm",
+  "label": "量子磁力虫群",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "quantum_swarm",
+  "params": {
+    "particleCount": 100,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

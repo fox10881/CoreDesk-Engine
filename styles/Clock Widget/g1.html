@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- cde-meta {"id": "g1", "label": "玻璃翻页", "author": "CoreDesk Engine", "version": 1} -->
+<!-- COREDESK_LOCALE -->
+<title data-i18n="桌面时钟小组件">桌面时钟小组件</title>
+<script src="i18n.js"></script>
+<style>
+  :root {
+    --accent: #38bdf8;
+    --accent-glow: rgba(56, 189, 248, 0.45);
+    --accent-deep: var(--accent);
+    --glass-bg: rgba(18, 22, 30, 0.55);
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --text-main: #f8fafc;
+    --text-muted: rgba(248, 250, 252, 0.65);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body {
+    width: 100vw; height: 100vh; overflow: hidden;
+    background: transparent !important;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text-main);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #widget-root {
+    width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center; position: relative;
+    /* fitToBounds() sets this once the design's natural extent is measured */
+    transform-origin: center;
+  }
+    /* G1 — الساعة القلابة الزجاجية */
+    .style-g1 { display: flex; flex-direction: column; align-items: center; gap: 4vmin; width: 100%; }
+    .g1-cards { display: flex; align-items: center; gap: 3vmin; direction: ltr; }
+    .g1-card {
+      position: relative;
+      background: linear-gradient(180deg, rgba(35,42,56,0.78) 0%, rgba(18,22,30,0.85) 100%);
+      border: 1px solid var(--glass-border); border-radius: 4vmin;
+      padding: 4vmin 5vmin; font-size: 24vmin; font-weight: 800; line-height: 1;
+      box-shadow: 0 2vmin 5vmin rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.22);
+    }
+    .g1-card::after {
+      content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px;
+      background: rgba(0, 0, 0, 0.55); box-shadow: 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .g1-ampm { position: absolute; top: 2.2vmin; right: 2.5vmin; font-size: 4.2vmin; font-weight: 700; color: var(--accent); }
+    .g1-meta {
+      display: flex; align-items: center; gap: 3vmin; background: var(--glass-bg);
+      border: 1px solid var(--glass-border); padding: 2vmin 5vmin; border-radius: 99vmin;
+      font-size: 5.5vmin; font-weight: 600;
+    }
+    .g1-meta .day { color: var(--accent); font-weight: 700; }
+  /* ============ Adaptive backdrop palette ============
+     `body.light-backdrop` flips every design to a dark-on-light palette
+     when the sampler reports a bright region behind the widget. :where()
+     keeps the transition at zero specificity so each design's own
+     `transition` still wins where it sets one. */
+  :where(#widget-root, #widget-root *) {
+    transition: color .35s ease, background-color .35s ease, border-color .35s ease, text-shadow .35s ease;
+  }
+  body.light-backdrop {
+    --text-main: #0f172a;
+    --text-muted: rgba(15, 23, 42, 0.72);
+    --glass-bg: rgba(255, 255, 255, 0.62);
+    --glass-border: rgba(15, 23, 42, 0.18);
+    --accent-deep: color-mix(in srgb, var(--accent), #0f172a 45%);
+  }  /* Accent-coloured TEXT needs the deepened accent on bright backdrops;
+     fills/rings/dots keep the raw accent hue. */
+
+  body.light-backdrop .g1-ampm,
+    body.light-backdrop .g1-meta .day { color: var(--accent-deep); }
+    body.light-backdrop .g1-card::after { background: rgba(15,23,42,.22); box-shadow: 0 1px 0 rgba(255,255,255,.6); }
+</style>
+</head>
+<body>
+<div id="widget-root"></div>
+<script>
+(() => {
+  const root = document.getElementById('widget-root');
+  const wv = window.chrome && window.chrome.webview;
+  let locale = (window.COREDESK_LOCALE && COREDESK_LOCALE.locale) || 'en';
+  let dayFmt, monFmt, ampmFmt;
+  function applyLocale(tag) {
+    locale = tag || 'en';
+    dayFmt = new Intl.DateTimeFormat(locale, { weekday: 'long' });
+    monFmt = new Intl.DateTimeFormat(locale, { month: 'long' });
+    ampmFmt = new Intl.DateTimeFormat(locale, { hour: 'numeric', hour12: true });
+  }
+  applyLocale(locale);
+  const TAU = Math.PI * 2;
+  const pad = (n) => String(n).padStart(2, '0');
+  const ampm = (d) => {
+    const p = ampmFmt.formatToParts(d).find((x) => x.type === 'dayPeriod');
+    return p ? p.value : '';
+  };
+  // ring circumference helpers for SVG progress strokes
+  const circ = (r) => 2 * Math.PI * r;
+  const dash = (frac, r) => `${circ(r) * frac} ${circ(r)}`;
+
+  const DESIGN_ID = 'g1';
+  const BUILDS = {
+    g1: () => `
+      <div class="g1-cards">
+        <div class="g1-card"><span class="g1-ampm js-ap"></span><span class="js-hh"></span></div>
+        <div class="g1-card"><span class="js-mm"></span></div>
+      </div>
+      <div class="g1-meta"><span class="day js-day"></span><span class="js-date"></span></div>`
+  };
+
+  let style = '';
+  const $ = (sel) => root.querySelector(sel);
+  const $$ = (sel) => root.querySelectorAll(sel);
+
+  /* ---- Sub-element modding (Widget_config.json `elements`) ----
+     `elsCfg` = resolved per-design params pushed by the host; `adaptiveOn`
+     is the master toggle — while adaptive color is armed the wallpaper
+     palette owns every text color and manual `color` fields are ignored. */
+  let elsCfg = {}, adaptiveOn = false;
+  /* `use24Hour` — true (default) renders HH:mm; false renders h:mm with a
+     localized AM/PM marker on designs that carry .js-ap, else suffixed
+     onto the hour readout. */
+  let fmt24 = true;
+  const EL_SELS = {
+    time: '.js-t,.js-hh,.js-mm,.js-ss,.js-ap',
+    day: '.js-day',
+    date: '.js-date,.js-dom,.js-mon,.js-year',
+  };
+  function applyEls() {
+    for (const name in EL_SELS) {
+      const p = elsCfg[name] || {};
+      const sc = (typeof p.scale === 'number' && isFinite(p.scale) && p.scale > 0) ? p.scale : 1;
+      const dx = (typeof p.offsetX === 'number' && isFinite(p.offsetX)) ? p.offsetX : 0;
+      const dy = (typeof p.offsetY === 'number' && isFinite(p.offsetY)) ? p.offsetY : 0;
+      $$(EL_SELS[name]).forEach((el) => {
+        // Reset → read the design's *current* computed size → multiply:
+        // fresh on every apply (vmin scales with widget resizes) and
+        // idempotent no matter how often params re-post.
+        el.style.fontSize = '';
+        const base = parseFloat(getComputedStyle(el).fontSize) || 0;
+        el.style.fontSize = sc !== 1 ? base * sc + 'px' : '';
+        // Adaptive palette owns color while armed — clear any manual inline.
+        el.style.color = adaptiveOn ? '' : (typeof p.color === 'string' ? p.color : '');
+        el.style.transform = (dx || dy) ? `translate(${dx}px, ${dy}px)` : '';
+        // Inline elements ignore transforms — give them a box when offset.
+        el.style.display = (dx || dy) ? 'inline-block' : '';
+      });
+    }
+  }
+
+  /* Fit the design to the actual bounds: vmin units only ever reach the
+     *smaller* viewport dimension, so a wide/tall bounds box used to leave
+     dead space around a square-ish layout. Measure the children's real
+     extent and uniformly scale the root so the content fills the box
+     (uniform scale keeps each design's aspect — overflow-safe via 0.97
+     headroom, shrink-to-fit when content already overflows). */
+  function fitToBounds() {
+    const kids = root.children;
+    if (!kids.length) return;
+    root.style.transform = '';
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const k of kids) {
+      const r = k.getBoundingClientRect();
+      if (r.width <= 0 && r.height <= 0) continue;
+      if (r.left < minX) minX = r.left;
+      if (r.top < minY) minY = r.top;
+      if (r.right > maxX) maxX = r.right;
+      if (r.bottom > maxY) maxY = r.bottom;
+    }
+    const natW = maxX - minX, natH = maxY - minY;
+    if (!(natW > 0) || !(natH > 0)) return;
+    let s = Math.min(root.clientWidth / natW, root.clientHeight / natH);
+    if (s > 1) s *= 0.97;
+    s = Math.min(Math.max(s, 0.4), 6);
+    root.style.transform = `scale(${s.toFixed(4)})`;
+  }
+
+  let fitQueued = false;
+  function refit() {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => { fitQueued = false; fitToBounds(); });
+  }
+
+  function setDesign(id) {
+    style = id;
+    root.className = 'style-' + id + (id === 'd10' ? ' style-d10-wrap' : '');
+    root.innerHTML = BUILDS[id] ? BUILDS[id]() : '';
+    tick();
+    applyEls();
+    refit();
+  }
+
+  function tick() {
+    const d = new Date();
+    const h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+    const hh = fmt24 ? pad(h) : pad(h % 12 || 12), mm = pad(m), ss = pad(s);
+    const day = dayFmt.format(d), date = d.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+    const setText = (sel, txt) => $$('.js-' + sel).forEach((e) => (e.textContent = txt));
+    // Meridiem: a design's own .js-ap node wins; otherwise suffix the tail
+    // readout (.js-t > .js-ss > .js-mm) so 12h never loses AM/PM.
+    const ap = fmt24 ? '' : ampm(d);
+    const tail = !fmt24 && !$('.js-ap')
+      ? ($('.js-t') ? 't' : $('.js-ss') ? 'ss' : 'mm')
+      : '';
+    setText('t', hh + ':' + mm + (tail === 't' ? ' ' + ap : ''));
+    setText('hh', hh);
+    setText('mm', mm + (tail === 'mm' ? ' ' + ap : ''));
+    setText('ss', ss + (tail === 'ss' ? ' ' + ap : ''));
+    setText('ap', ap); setText('day', day); setText('date', date);
+    setText('dom', d.getDate()); setText('mon', monFmt.format(d)); setText('year', d.getFullYear());
+    refit(); // text width shifts (digit/day/meridiem changes) re-fit the box
+    const sf = s / 60;
+    $$('.js-secfill').forEach((e) => { e.style.width = sf * 100 + '%'; e.style.height = sf * 100 + '%'; });
+    const pulse = $('.js-pulse'); if (pulse) pulse.style.height = sf * 100 + '%';
+    // g2 concentric rings: hour/12, minute, second
+    const g2h = $('#g2h'); if (g2h) {
+      g2h.setAttribute('stroke-dasharray', dash((h % 12) / 12, 150));
+      $('#g2m').setAttribute('stroke-dasharray', dash(m / 60, 132));
+      $('#g2s').setAttribute('stroke-dasharray', dash(sf, 114));
+      return;
+    }
+    // g6 analog hands
+    const gh = $('#g6h'); if (gh) {
+      const rot = (el, a) => el.setAttribute('transform', `rotate(${a} 160 160)`);
+      rot(gh, (h % 12) * 30 + m * 0.5); rot($('#g6m'), m * 6 + s * 0.1); rot($('#g6s'), s * 6);
+      return;
+    }
+    // g8 sun arc (day) / moon (night): position along the semicircle
+    const orb = $('#g8orb'); if (orb) {
+      const day = h >= 6 && h < 18;
+      const frac = day ? (h - 6 + m / 60) / 12 : ((h + 24 - 18) % 24 + m / 60) / 12;
+      const a = Math.PI - Math.PI * Math.min(Math.max(frac, 0), 1);
+      const el = day ? orb : $('#g8moon');
+      const other = day ? $('#g8moon') : orb;
+      el.style.display = ''; other.style.display = 'none';
+      el.setAttribute('cx', 160 + 140 * Math.cos(a)); el.setAttribute('cy', 100 - 90 * Math.sin(a));
+      if (!day) el.setAttribute('fill', '#cbd5e1');
+      return;
+    }
+    // d3 orbiting second dot + ghost trail
+    const dot = $('#d3dot'); if (dot) {
+      const a = (s / 60) * TAU;
+      dot.setAttribute('cx', 160 + 144 * Math.sin(a)); dot.setAttribute('cy', 160 - 144 * Math.cos(a));
+      const a2 = ((s - 2 + 60) / 60) % 60 * TAU / 1;
+      $('#d3trail').setAttribute('cx', 160 + 144 * Math.sin(a2)); $('#d3trail').setAttribute('cy', 160 - 144 * Math.cos(a2));
+      return;
+    }
+    // d5 gauges: minutes + seconds
+    const d5m = $('#d5m'); if (d5m) {
+      d5m.setAttribute('stroke-dasharray', dash((m + s / 60) / 60, 146));
+      $('#d5s').setAttribute('stroke-dasharray', dash(sf, 128));
+    }
+    // g14 orbiting satellite dot on the outer ring
+    const g14sat = $('#g14sat'); if (g14sat) {
+      const a = sf * TAU;
+      g14sat.setAttribute('cx', 160 + 140 * Math.sin(a));
+      g14sat.setAttribute('cy', 160 - 140 * Math.cos(a));
+    }
+    // g15 analog hands (slim elegant variant)
+    const g15h = $('#g15h'); if (g15h) {
+      const rot = (el, a) => el.setAttribute('transform', `rotate(${a} 160 160)`);
+      rot(g15h, (h % 12) * 30 + m * 0.5); rot($('#g15m'), m * 6 + s * 0.1); rot($('#g15s'), s * 6);
+      return;
+    }
+  }
+
+  if (wv) {
+    wv.addEventListener('message', (e) => {
+      const m = e.data || {};
+      if (m.t === 'clockStyle') {
+        if (m.els) elsCfg = m.els;
+        if (m.adaptive !== undefined) adaptiveOn = m.adaptive !== false;
+        if (m.use24Hour !== undefined) fmt24 = m.use24Hour !== false;
+        setDesign(DESIGN_ID);
+        applyEls();
+      }
+      else if (m.t === 'clockTheme') {
+        const on = m.adaptive !== false;
+        adaptiveOn = on;
+        if (m.els) elsCfg = m.els;
+        if (m.use24Hour !== undefined && fmt24 !== (m.use24Hour !== false)) {
+          fmt24 = m.use24Hour !== false;
+          tick();
+        }
+        // Palette fields only move when the probe actually sends them —
+        // params-only pushes (adaptive/els) must not flash the backdrop.
+        if (m.isLightBackdrop !== undefined)
+          document.body.classList.toggle('light-backdrop', on && !!m.isLightBackdrop);
+        else if (!on)
+          document.body.classList.remove('light-backdrop');
+        if (!on || m.accent !== undefined) {
+          const root = document.documentElement.style;
+          const accent = on && /^#[0-9a-fA-F]{6}$/.test(m.accent || '') ? m.accent : '#38bdf8';
+          root.setProperty('--accent', accent);
+          const r = parseInt(accent.slice(1, 3), 16), g = parseInt(accent.slice(3, 5), 16), b = parseInt(accent.slice(5, 7), 16);
+          root.setProperty('--accent-glow', `rgba(${r}, ${g}, ${b}, 0.45)`);
+        }
+        applyEls();
+      }
+      else if (m.t === 'clockLocale') {
+        window.COREDESK_LOCALE = { locale: m.locale, translations: m.translations };
+        if (window.CoreDeskI18n) CoreDeskI18n.set(m.locale, m.translations);
+        applyLocale(m.locale);
+        tick();
+      }
+    });
+    wv.postMessage({ type: 'clockReady' });
+  }
+  // Bounds drags resize the WebView: vmin bases change → re-derive the
+  // element font bases, then re-fit the content into the new box.
+  window.addEventListener('resize', () => { applyEls(); refit(); });
+  setInterval(tick, 500);
+})();
+</script>
+</body>
+</html>

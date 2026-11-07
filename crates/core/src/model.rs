@@ -560,11 +560,83 @@ pub fn is_visualizer_widget_id(id: &str) -> bool {
 /// `true` for audio-reactive Live-Effect ids (`le_*`): the native overlay
 /// draws them, the visualizer engine's shared spectrum snapshot feeds them —
 /// selecting one arms WASAPI capture even with no visualizer widget shown.
+/// Preset-file ids resolve through [`resolve_effect_base`] first — a preset
+/// on a `le_*` base is audio-reactive too.
 pub fn is_live_audio_effect(id: &str) -> bool {
     matches!(
-        id,
+        resolve_effect_base(id).as_str(),
         "le_rain" | "le_grid" | "le_bloom" | "le_aurora" | "le_rings"
     )
+}
+
+/// The compiled [`crate::Effect`] id a `desktop_effect` setting renders as.
+/// `Styles\Live Effects\<id>.json` presets win first (a user file shadows a
+/// builtin id — the modding shadow rule), then the id itself if it names a
+/// compiled effect. Empty string = unknown (the host tears the overlay
+/// down, same as `"none"`).
+pub fn resolve_effect_base(id: &str) -> String {
+    if let Some(doc) = crate::styles_fs::load_theme(crate::styles_fs::LIVE_EFFECTS_DIR, id) {
+        match doc["base"].as_str() {
+            Some(b) if EFFECT_IDS.contains(&b) => return b.to_string(),
+            Some(b) => {
+                tracing::warn!(
+                    id,
+                    base = b,
+                    "live-effect preset has an unknown base — ignored"
+                );
+            }
+            None => {
+                tracing::warn!(id, "live-effect preset has no base — ignored");
+            }
+        }
+    }
+    if EFFECT_IDS.contains(&id) {
+        id.to_string()
+    } else {
+        String::new()
+    }
+}
+
+/// The preset file's authored `params` for `id` — deserialized as
+/// [`EffectParams`] (the field names are identical to the sidecar dict) and
+/// sanitized. `None` when no preset file exists or its params don't parse;
+/// callers then start from the compiled defaults.
+pub fn effect_preset_params(id: &str) -> Option<EffectParams> {
+    let doc = crate::styles_fs::load_theme(crate::styles_fs::LIVE_EFFECTS_DIR, id)?;
+    let params = doc.get("params")?.clone();
+    let mut p: EffectParams = serde_json::from_value(params).ok()?;
+    p.sanitize();
+    Some(p)
+}
+
+/// The Live-Effects dropdown for the settings state: `"none"` first, then
+/// preset files from both layers (`custom` marks user files), then any
+/// compiled effect whose file is absent — a builtin can never be deleted
+/// off the list, only re-labeled/re-tuned by shadowing its file.
+pub fn live_effect_options_json() -> serde_json::Value {
+    let mut arr = vec![serde_json::json!({
+        "id": "none",
+        "label": "无（关闭）",
+        "custom": false,
+    })];
+    let file_opts = crate::styles_fs::style_options(crate::styles_fs::LIVE_EFFECTS_DIR);
+    arr.extend(file_opts.iter().map(|o| {
+        serde_json::json!({
+            "id": o.id,
+            "label": o.label,
+            "custom": o.custom,
+        })
+    }));
+    for id in EFFECT_IDS {
+        if !file_opts.iter().any(|o| o.id == *id) {
+            arr.push(serde_json::json!({
+                "id": id,
+                "label": effect_display_name(id),
+                "custom": false,
+            }));
+        }
+    }
+    serde_json::Value::Array(arr)
 }
 
 /// English display names for clock-design ids — same strings the Settings
@@ -2622,25 +2694,31 @@ impl Config {
         {
             s.notification_center_style.clear();
         }
-        // Clock design: `"none"`/`""` hide it; `"g1".."g10"`/`"d1".."d10"`
-        // are the designs. Unknown ids used to slip through and the widget
-        // host silently spawned nothing.
+        // Clock design: `"none"`/`""` hide it; any other well-formed id is
+        // a `Styles\Clock Widget\<id>.html` file (factory or user mod).
+        // Missing files keep the setting — the widget just stays hidden
+        // until the file returns (same rule as the surface styles).
         let clock_ok = s.clock_style.is_empty()
             || s.clock_style == "none"
-            || (s.clock_style.len() <= 3
-                && s.clock_style
-                    .strip_prefix(|c| c == 'g' || c == 'd')
-                    .is_some_and(|n| n.parse::<u8>().is_ok_and(|v| (1..=10).contains(&v))));
+            || crate::styles_fs::is_valid_style_id(&s.clock_style);
         if !clock_ok {
             s.clock_style = "none".into();
         }
-        // Audio visualizer: same closed-catalog rule — `""`/`"none"` hide
-        // the widget; an unknown id can't spawn a renderer.
+        // Audio visualizer: same file-catalog rule — the id names a
+        // `Styles\Visualizer Widget\<id>.html` document.
         if !s.visualizer_style.is_empty()
             && s.visualizer_style != "none"
-            && !is_visualizer_widget_id(&s.visualizer_style)
+            && !crate::styles_fs::is_valid_style_id(&s.visualizer_style)
         {
             s.visualizer_style = "none".into();
+        }
+        // Live desktop effect: `none`/`""` or a `Live Effects` preset id —
+        // file ids resolve through `resolve_effect_base` at apply time.
+        if !s.desktop_effect.is_empty()
+            && s.desktop_effect != "none"
+            && !crate::styles_fs::is_valid_style_id(&s.desktop_effect)
+        {
+            s.desktop_effect = "none".into();
         }
         // `[x, y, w, h]` physical pixels — x/y may be negative on multi-
         // monitor setups, only the size needs a sane range.
@@ -2650,21 +2728,21 @@ impl Config {
             s.clock_bounds = None;
         }
         s.desktop_effect_intensity = s.desktop_effect_intensity.clamp(10, 100);
-        // Effect-tuning overrides: unknown effect ids drop out (the engine
-        // is a closed enum), populated fields clamp to safe ranges.
+        // Effect-tuning overrides: file-catalog ids — a `Live Effects`
+        // preset's entry must survive even when its file is absent (it
+        // springs back when the file returns); charset is the only gate.
         s.effect_params.retain(|id, p| {
-            let known = EFFECT_IDS.contains(&id.as_str());
+            let known = crate::styles_fs::is_valid_style_id(id);
             if known {
                 p.sanitize();
             }
             known
         });
-        // Same closed-catalog rule for the widget dictionary: unknown
-        // design ids drop, known entries get field-level clamps. Both the
-        // clock gallery and the `v1`…`v5` visualizers live here — a theme
-        // carrying a design's remembered rect must survive the clean-up.
+        // Same file-catalog rule for the widget dictionary: `Clock Widget`/
+        // `Visualizer Widget` file ids keep their remembered rect/element
+        // params; only malformed ids drop.
         s.widget_params.retain(|id, p| {
-            let known = is_clock_widget_id(id) || is_visualizer_widget_id(id);
+            let known = crate::styles_fs::is_valid_style_id(id);
             if known {
                 p.sanitize();
             }
@@ -3836,8 +3914,9 @@ mod tests {
         cfg.sanitize_external();
         assert!(cfg.settings.effect_params.is_empty());
 
-        // Unknown effect ids drop out (closed engine enum); known entries
-        // get field-level clamps.
+        // File-catalog ids keep their entries — a `Live Effects` preset
+        // whose file is absent may still be re-created later; only
+        // charset-invalid ids drop. Populated fields get field-level clamps.
         cfg.settings.effect_params.insert(
             "rain".into(),
             EffectParams {
@@ -3847,14 +3926,21 @@ mod tests {
             },
         );
         cfg.settings.effect_params.insert(
-            "bogus_effect".into(),
+            "My Preset".into(),
+            EffectParams {
+                particle_count: Some(50),
+                ..Default::default()
+            },
+        );
+        cfg.settings.effect_params.insert(
+            "bad/effect".into(),
             EffectParams {
                 particle_count: Some(50),
                 ..Default::default()
             },
         );
         cfg.sanitize_external();
-        assert_eq!(cfg.settings.effect_params.len(), 1);
+        assert_eq!(cfg.settings.effect_params.len(), 2);
         let p = &cfg.settings.effect_params["rain"];
         assert_eq!(p.particle_count, Some(EFFECT_MAX_PARTICLES));
         assert_eq!(p.primary_color.as_deref(), Some("#112233"));
@@ -4037,7 +4123,10 @@ mod theme_portable_tests {
         c.settings.taskbar_style = "NonexistentStyle".into();
         c.settings.start_menu_style = "Down Aero".into(); // valid — kept
         c.settings.notification_center_style = "???".into();
+        // `g99` is a well-formed file-catalog id (a `Clock Widget\g99.html`
+        // mod could exist) — kept; charset-invalid ids normalize to none.
         c.settings.clock_style = "g99".into();
+        c.settings.visualizer_style = "bad/viz".into();
         c.settings.clock_bounds = Some([0, 0, -5, 99999]);
         c.settings.desktop_effect_intensity = 0;
         c.layouts.push(layout_with(vec![Fence::new(
@@ -4057,7 +4146,8 @@ mod theme_portable_tests {
         assert_eq!(s.taskbar_style, "NonexistentStyle");
         assert_eq!(s.start_menu_style, "Down Aero");
         assert_eq!(s.notification_center_style, "");
-        assert_eq!(s.clock_style, "none");
+        assert_eq!(s.clock_style, "g99");
+        assert_eq!(s.visualizer_style, "none");
         assert_eq!(s.clock_bounds, None);
         assert_eq!(s.desktop_effect_intensity, 10);
         // Degenerate geometry falls back to a visible rect, not a 0 speck.

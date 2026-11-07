@@ -1,0 +1,15 @@
+{
+  "id": "starfield",
+  "label": "星空尘埃",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "starfield",
+  "params": {
+    "particleCount": 160,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

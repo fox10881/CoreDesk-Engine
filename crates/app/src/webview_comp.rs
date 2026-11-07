@@ -1336,6 +1336,13 @@ impl CompWebview {
         }
     }
 
+    /// Loads a fresh HTML document in place — the widget hosts' design-swap
+    /// path (the new page re-posts its ready handshake on load).
+    pub fn navigate_to_string(&self, html: &str) -> Result<()> {
+        unsafe { self.webview.NavigateToString(&HSTRING::from(html))? };
+        Ok(())
+    }
+
     /// `WM_DESTROY`: close the WebView first, then detach the root visual and
     /// commit — reversing the attach order keeps DComp from holding a dead
     /// WebView visual.

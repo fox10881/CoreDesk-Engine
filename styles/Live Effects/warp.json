@@ -1,0 +1,15 @@
+{
+  "id": "warp",
+  "label": "曲速星河",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "warp",
+  "params": {
+    "particleCount": 190,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

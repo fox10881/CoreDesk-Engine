@@ -49,6 +49,15 @@ use std::sync::RwLock;
 pub const TASKBAR_DIR: &str = "Taskbar style";
 pub const START_MENU_DIR: &str = "Start Menu style";
 pub const NOTIFICATION_CENTER_DIR: &str = "Notification Center style";
+/// Self-contained WebView2 design documents — one `<id>.html` per clock
+/// face / audio-visualizer renderer. The host `NavigateToString`s the
+/// resolved file after swapping its `<!-- COREDESK_LOCALE -->` /
+/// `<script src="i18n.js">` markers for the live payload.
+pub const CLOCK_WIDGET_DIR: &str = "Clock Widget";
+pub const VISUALIZER_WIDGET_DIR: &str = "Visualizer Widget";
+/// Live-desktop-effect presets — one `<id>.json` per entry
+/// (`{base, label, params}` composing a compiled `Effect` variant).
+pub const LIVE_EFFECTS_DIR: &str = "Live Effects";
 
 /// A hand-edited style bigger than this is a mistake (the shipped set tops
 /// out near 65 KB); refuse rather than stall the UI thread parsing it.
@@ -217,10 +226,22 @@ pub fn load_in(factory: &Path, user: Option<&Path>, category: &str, id: &str) ->
 /// broken override can't silently behave like the factory theme), then the
 /// shipped file.
 fn resolve_path(factory: &Path, user: Option<&Path>, category: &str, id: &str) -> Option<PathBuf> {
+    resolve_path_ext(factory, user, category, id, "json")
+}
+
+/// [`resolve_path`] parameterized by file extension — `.json` style files
+/// and `.html` widget documents share the resolution/shadowing rules.
+fn resolve_path_ext(
+    factory: &Path,
+    user: Option<&Path>,
+    category: &str,
+    id: &str,
+    ext: &str,
+) -> Option<PathBuf> {
     if !is_valid_style_id(id) {
         return None;
     }
-    let name = format!("{id}.json");
+    let name = format!("{id}.{ext}");
     if let Some(user) = user {
         let path = user.join(category).join(&name);
         if path.is_file() {
@@ -231,10 +252,9 @@ fn resolve_path(factory: &Path, user: Option<&Path>, category: &str, id: &str) -
     path.is_file().then_some(path)
 }
 
-/// Reads + parses one style file: object JSON, UTF-8, BOM tolerated
-/// (Notepad writes it), size-capped. `None` on any failure — callers warn
-/// or treat the file as absent.
-fn read_theme(path: &Path) -> Option<Value> {
+/// Reads one file as UTF-8 text: size-capped, BOM tolerated (Notepad writes
+/// it). `None` on any failure — callers warn or treat the file as absent.
+fn read_text(path: &Path) -> Option<String> {
     let meta = std::fs::metadata(path).ok()?;
     if meta.len() > MAX_STYLE_FILE_BYTES {
         tracing::warn!(
@@ -246,8 +266,118 @@ fn read_theme(path: &Path) -> Option<Value> {
     }
     let bytes = std::fs::read(path).ok()?;
     let text = std::str::from_utf8(&bytes).ok()?;
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let doc: Value = serde_json::from_str(text).ok()?;
+    Some(text.strip_prefix('\u{feff}').unwrap_or(text).to_string())
+}
+
+/// The WebView2 design document (`<id>.html`) for `id` in `category`
+/// ([`CLOCK_WIDGET_DIR`]/[`VISUALIZER_WIDGET_DIR`]) — user layer first.
+/// The host navigates to the returned text after injecting the locale
+/// payload markers; `None` when the id is absent or the file is unreadable.
+pub fn load_widget_document(category: &str, id: &str) -> Option<String> {
+    read_text(&resolve_path_ext(
+        &factory_styles_root(),
+        user_styles_root().as_deref(),
+        category,
+        id,
+        "html",
+    )?)
+}
+
+/// Every widget design document in `category`, same option contract as
+/// [`style_options`]: id = file stem, `custom` marks user-layer files,
+/// label comes from the document's `<!-- cde-meta {"label": …} -->` header
+/// comment, falling back to the stem. Unparseable HTML is not rejected —
+/// the meta scan is best-effort so a hand-edited file always stays
+/// selectable (a broken document just renders nothing when applied).
+pub fn widget_options(category: &str) -> Vec<StyleOption> {
+    let mut by_id: BTreeMap<String, StyleOption> = BTreeMap::new();
+    collect_widget_dir(&factory_styles_root().join(category), false, &mut by_id);
+    if let Some(user) = user_styles_root() {
+        collect_widget_dir(&user.join(category), true, &mut by_id);
+    }
+    let mut opts: Vec<_> = by_id.into_values().collect();
+    opts.sort_by_key(|a| a.label.to_lowercase());
+    opts
+}
+
+fn collect_widget_dir(dir: &Path, custom: bool, out: &mut BTreeMap<String, StyleOption>) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in rd.flatten() {
+        let path = entry.path();
+        if !path.is_file()
+            || !path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("html"))
+        {
+            continue;
+        }
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !is_valid_style_id(id) {
+            tracing::warn!(file = %path.display(), "widget file has an invalid id — skipped");
+            continue;
+        }
+        let label = read_text(&path)
+            .and_then(|doc| widget_meta_label(&doc))
+            .unwrap_or_else(|| id.to_string());
+        out.insert(
+            id.to_string(),
+            StyleOption {
+                id: id.to_string(),
+                label,
+                custom,
+            },
+        );
+    }
+}
+
+/// `<!-- cde-meta {"id":"g5","label":"流光胶囊",…} -->` — the optional
+/// header comment carrying a design's display metadata. Scanned from the
+/// document head only (first 8 KB) so giant modded files still enumerate
+/// cheaply; the JSON is parsed loosely — `label` is all we consume.
+fn widget_meta_label(doc: &str) -> Option<String> {
+    let head = &doc[..doc.len().min(8192)];
+    let start = head.find("<!--")?;
+    let rest = &head[start + 4..];
+    let rest = rest.trim_start();
+    let rest = rest.strip_prefix("cde-meta")?;
+    let end = rest.find("-->")?;
+    let meta: Value = serde_json::from_str(rest[..end].trim()).ok()?;
+    meta["label"]
+        .as_str()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+}
+
+/// The option list as a JSON value for the settings state payload —
+/// `{id, label, custom}` per file plus the synthesized `none` entry the
+/// widget dropdowns lead with (label = the source-language key the UI
+/// localizes through `t()`).
+pub fn widget_options_json(category: &str, none_label: &str) -> serde_json::Value {
+    let mut arr = vec![serde_json::json!({
+        "id": "none",
+        "label": none_label,
+        "custom": false,
+    })];
+    arr.extend(widget_options(category).into_iter().map(|o| {
+        serde_json::json!({
+            "id": o.id,
+            "label": o.label,
+            "custom": o.custom,
+        })
+    }));
+    serde_json::Value::Array(arr)
+}
+
+/// Reads + parses one style file: object JSON, UTF-8, BOM tolerated
+/// (Notepad writes it), size-capped. `None` on any failure — callers warn
+/// or treat the file as absent.
+fn read_theme(path: &Path) -> Option<Value> {
+    let doc: Value = serde_json::from_str(&read_text(path)?).ok()?;
     doc.is_object().then_some(doc)
 }
 
@@ -392,7 +522,12 @@ mod tests {
         if !root.is_dir() {
             return; // packaged source trees may not carry it
         }
-        for category in [TASKBAR_DIR, START_MENU_DIR, NOTIFICATION_CENTER_DIR] {
+        for category in [
+            TASKBAR_DIR,
+            START_MENU_DIR,
+            NOTIFICATION_CENTER_DIR,
+            LIVE_EFFECTS_DIR,
+        ] {
             let opts = enumerate_in(&root, None, category);
             assert!(
                 !opts.is_empty(),
@@ -403,6 +538,52 @@ mod tests {
                 assert!(
                     load_in(&root, None, category, id).is_some(),
                     "{category}/{id} must load"
+                );
+            }
+        }
+        // Live-Effects presets must name a compiled `base` and carry a
+        // parseable `params` object — a preset without either is a broken
+        // factory file.
+        let fx = enumerate_in(&root, None, LIVE_EFFECTS_DIR);
+        for o in &fx {
+            let doc = load_in(&root, None, LIVE_EFFECTS_DIR, &o.id).unwrap();
+            let base = doc["base"].as_str().expect("preset needs a base");
+            assert!(
+                crate::EFFECT_IDS.contains(&base),
+                "preset {} has unknown base {base}",
+                o.id
+            );
+            assert!(
+                doc["params"].is_object(),
+                "preset {} needs a params object",
+                o.id
+            );
+        }
+    }
+
+    #[test]
+    fn shipped_widget_documents_enumerate() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../styles");
+        if !root.is_dir() {
+            return;
+        }
+        for category in [CLOCK_WIDGET_DIR, VISUALIZER_WIDGET_DIR] {
+            let mut by_id = BTreeMap::new();
+            collect_widget_dir(&root.join(category), false, &mut by_id);
+            assert!(
+                !by_id.is_empty(),
+                "factory category {category} must ship designs"
+            );
+            for (id, opt) in &by_id {
+                // Every shipped design loads as text and carries a label
+                // (cde-meta) distinct from its bare id.
+                let path = root.join(category).join(format!("{id}.html"));
+                let doc = read_text(&path).expect("{category}/{id} must read");
+                assert!(doc.contains("<html"), "{category}/{id} is not a document");
+                assert_eq!(
+                    widget_meta_label(&doc).as_deref(),
+                    Some(opt.label.as_str()),
+                    "{category}/{id} label must come from its cde-meta"
                 );
             }
         }

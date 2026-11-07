@@ -28,6 +28,7 @@ mod state;
 mod visualizer_engine;
 mod visualizer_host;
 mod webview_comp;
+mod widget_doc;
 
 use coredesk_platform::com::OleGuard;
 use coredesk_platform::window;

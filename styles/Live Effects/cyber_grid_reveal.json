@@ -1,0 +1,15 @@
+{
+  "id": "cyber_grid_reveal",
+  "label": "赛博网格显影",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "cyber_grid_reveal",
+  "params": {
+    "particleCount": 0,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

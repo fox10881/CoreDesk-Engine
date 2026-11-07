@@ -908,11 +908,14 @@ pub fn split_config_json(text: &str) -> SplitConfigJson {
             effects_dict = m;
         }
         // Active design: write the live placement/flag into its dict slot.
+        // Any well-formed file-catalog id qualifies — modded `Clock Widget`
+        // designs remember their bounds the same as factory ones.
         if let Some(style) = settings
             .get("clockStyle")
             .and_then(serde_json::Value::as_str)
             .map(str::to_owned)
-            && crate::is_clock_widget_id(&style)
+            && crate::styles_fs::is_valid_style_id(&style)
+            && style != "none"
         {
             let entry = widget_dict
                 .entry(style)
@@ -2061,7 +2064,7 @@ mod tests {
         // Out-of-range values and a bogus id — load clamps/drops, no crash.
         fs::write(
             store.dir().join(LIVE_EFFECTS_CONFIG_FILE),
-            r#"{"rain":{"particleCount":999999,"primaryColor":"not-a-color"},"bogus_fx":{"speed":9}}"#,
+            r#"{"rain":{"particleCount":999999,"primaryColor":"not-a-color"},"bogus/fx":{"speed":9},"My Preset":{"speed":9}}"#,
         )
         .unwrap();
         match store.load() {
@@ -2070,10 +2073,13 @@ mod tests {
                 let p = c.settings.resolve_effect_params("rain").unwrap();
                 assert_eq!(p.particle_count, Some(crate::EFFECT_MAX_PARTICLES));
                 assert_eq!(p.primary_color, None);
-                // sanitize_external (the adopt boundary) drops unknown ids.
+                // sanitize_external (the adopt boundary) drops
+                // charset-invalid ids only — a well-formed preset id keeps
+                // its entry even with no file on disk (it may return later).
                 let mut adopted = c.clone();
                 adopted.sanitize_external();
-                assert!(!adopted.settings.effect_params.contains_key("bogus_fx"));
+                assert!(!adopted.settings.effect_params.contains_key("bogus/fx"));
+                assert!(adopted.settings.effect_params.contains_key("My Preset"));
                 // Missing entries resolve to None → compiled engine defaults.
                 assert!(c.settings.resolve_effect_params("snow").is_none());
             }

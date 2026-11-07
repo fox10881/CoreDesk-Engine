@@ -681,6 +681,14 @@ impl App {
             return;
         }
         if let Some(h) = &self.clock {
+            // Different design file → navigate; same file → re-arm params.
+            // A missing file keeps the current design (never a dead widget).
+            if !h.set_design(s) {
+                tracing::warn!(
+                    style = s,
+                    "clock design file missing — keeping current design"
+                );
+            }
             h.post_json(&clock_style_json(&self.state.config.settings));
             // Re-assert the transparent surface — cheap insurance for the
             // alpha-loss case the soft restart also covers.
@@ -697,6 +705,7 @@ impl App {
             self.web_env.as_ref().unwrap(),
             bounds,
             self.queue.clone(),
+            s,
         ) {
             Ok(host) => {
                 self.clock = Some(host);
@@ -728,8 +737,14 @@ impl App {
             return;
         }
         if let Some(h) = &self.visualizer_host {
-            // Style swap on a live widget: repost the design and snap to
-            // that design's remembered rect (each keeps its own spot).
+            // Style swap on a live widget: different design file → navigate;
+            // same file → repost. Then snap to that design's remembered rect.
+            if !h.set_design(s) {
+                tracing::warn!(
+                    style = s,
+                    "visualizer design file missing — keeping current design"
+                );
+            }
             h.post_json(&viz_style_json(s));
             if let Some(b) = self
                 .state
@@ -767,6 +782,7 @@ impl App {
             bounds,
             self.queue.clone(),
             shared,
+            s,
         ) {
             Ok(host) => {
                 self.visualizer_host = Some(host);
@@ -861,11 +877,18 @@ impl App {
             b: accent[2] as f32 / 255.0,
             a: 1.0,
         }));
+        // `Live Effects\<id>.json` presets resolve to a compiled base effect
+        // with their authored params under the user's `effect_params` entry.
+        let base = coredesk_core::resolve_effect_base(&s.desktop_effect);
+        let mut merged = coredesk_core::effect_preset_params(&s.desktop_effect).unwrap_or_default();
+        if let Some(user) = s.resolve_effect_params(&s.desktop_effect) {
+            merged.merge_disk(&user);
+        }
         let before = host.hwnd();
         host.apply(
-            &s.desktop_effect,
+            &base,
             s.desktop_effect_intensity as f32 / 100.0,
-            s.resolve_effect_params(&s.desktop_effect).as_ref(),
+            Some(&merged),
         );
         // Switching off `le_*` with no widget armed drops capture entirely.
         if !coredesk_core::is_live_audio_effect(&s.desktop_effect) && self.visualizer_host.is_none()
@@ -1182,6 +1205,20 @@ impl App {
             "taskbarStyles": coredesk_core::taskbar_themes::style_options_json(),
             // Notification Center Style dropdown — same isolation again.
             "notificationCenterStyles": coredesk_core::notification_center_themes::style_options_json(),
+            // Clock Widget dropdown — one `<id>.html` per design under
+            // `Styles\Clock Widget` (factory + user mods; `custom` marks
+            // user-layer files; `label` rides the file's `cde-meta` header).
+            "clockDesigns": coredesk_core::styles_fs::widget_options_json(
+                coredesk_core::styles_fs::CLOCK_WIDGET_DIR,
+                "无（关闭）",
+            ),
+            // Visualizer Widget dropdown — `Styles\Visualizer Widget\*.html`.
+            "visualizerDesigns": coredesk_core::styles_fs::widget_options_json(
+                coredesk_core::styles_fs::VISUALIZER_WIDGET_DIR,
+                "无（关闭）",
+            ),
+            // Live Effects dropdown — preset files ∪ compiled builtins.
+            "desktopEffects": coredesk_core::live_effect_options_json(),
         })
         .to_string()
     }
@@ -1367,7 +1404,7 @@ impl App {
             // on the active style's `widget_params` entry.
             Some("vizMoved") => {
                 let style = self.state.config.settings.visualizer_style.clone();
-                if coredesk_core::is_visualizer_widget_id(&style) {
+                if style != "none" && coredesk_core::styles_fs::is_valid_style_id(&style) {
                     let get = |k: &str| v.get(k).and_then(|n| n.as_i64()).unwrap_or(0) as i32;
                     self.state
                         .config
@@ -1795,7 +1832,9 @@ impl App {
         // runtime fields so the bounds/adaptive diffs below see user-layer
         // values. A same-style dict change (import/theme) resolves without
         // the mirror — the file's entry wins, not the live state.
-        if new.clock_style != old.clock_style && coredesk_core::is_clock_widget_id(&old.clock_style)
+        if new.clock_style != old.clock_style
+            && old.clock_style != "none"
+            && coredesk_core::styles_fs::is_valid_style_id(&old.clock_style)
         {
             let mut mirrored = coredesk_core::WidgetParams::from_runtime(&old);
             // `from_runtime` has no live element state — keep the incoming

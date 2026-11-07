@@ -1,0 +1,15 @@
+{
+  "id": "pulse",
+  "label": "声呐脉冲",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "pulse",
+  "params": {
+    "particleCount": 14,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

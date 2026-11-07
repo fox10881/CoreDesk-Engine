@@ -1,0 +1,15 @@
+{
+  "id": "shatter_clicks",
+  "label": "点击玻璃碎裂",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "shatter_clicks",
+  "params": {
+    "particleCount": 220,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "le_rings",
+  "label": "脉冲音环（音频）",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "le_rings",
+  "params": {
+    "particleCount": 0,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}

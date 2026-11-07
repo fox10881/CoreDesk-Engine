@@ -1,0 +1,15 @@
+{
+  "id": "matrix",
+  "label": "数码矩阵",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "base": "matrix",
+  "params": {
+    "particleCount": 120,
+    "speed": 1.0,
+    "wind": 0.0,
+    "gravity": 0.0,
+    "primaryColor": null,
+    "glowRadius": 1.0
+  }
+}
