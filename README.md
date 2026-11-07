@@ -13,7 +13,7 @@
   &nbsp;·&nbsp;     <a href="docs/readme/README.ru.md">Русский</a>
 </p>
 
-https://youtu.be/S6GpiqPNnAo
+
 
 # 💠 CoreDesk Engine — Ultimate Desktop Customization & Organization Suite
 
