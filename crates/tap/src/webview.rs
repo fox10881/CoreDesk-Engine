@@ -327,17 +327,42 @@ pub fn resolve(diagnostics: &IXamlDiagnostics, handle: u64) -> Option<WebView> {
     }
     // Other WebView2 elements (mux flavour) — `CoreWebView2` → classic
     // `ICoreWebView2`; `None` while the core is still initializing.
-    let wv = Interface::cast::<IMuxWebView2>(&obj)
-        .inspect_err(|e| crate::tap_log!("webview: IWebView2 cast hr={e:?}"))
+    if let Ok(wv) = Interface::cast::<IMuxWebView2>(&obj) {
+        let cwv_obj = wv
+            .core_webview2()
+            .inspect_err(|e| crate::tap_log!("webview: get_CoreWebView2 hr={e:?}"))
+            .ok()?;
+        return Interface::cast::<ICoreWebView2>(&cwv_obj)
+            .inspect_err(|e| crate::tap_log!("webview: ICoreWebView2 cast hr={e:?}"))
+            .ok()
+            .map(WebView::Core);
+    }
+    // `HostedWebView2Control` wraps the real `WebView2Standalone.Controls.
+    // WebView2` in a subtree the diagnostics session never reports — the
+    // wrapper itself QIs for neither control interface, so walk its visual
+    // subtree (in-proc; callers run on the element's UI thread).
+    let root = Interface::cast::<crate::bindings::DependencyObject>(&obj)
+        .inspect_err(|e| crate::tap_log!("webview: DependencyObject cast hr={e:?}"))
         .ok()?;
-    let cwv_obj = wv
-        .core_webview2()
-        .inspect_err(|e| crate::tap_log!("webview: get_CoreWebView2 hr={e:?}"))
-        .ok()?;
-    Interface::cast::<ICoreWebView2>(&cwv_obj)
-        .inspect_err(|e| crate::tap_log!("webview: ICoreWebView2 cast hr={e:?}"))
-        .ok()
-        .map(WebView::Core)
+    let mut stack = vec![root];
+    let mut budget = 512usize;
+    while let Some(cur) = stack.pop() {
+        if budget == 0 {
+            break;
+        }
+        budget -= 1;
+        if let Ok(wv) = cur.cast::<IStandaloneWebView2>() {
+            return Some(WebView::Standalone(wv));
+        }
+        if let Ok(n) = crate::bindings::VisualTreeHelper::GetChildrenCount(&cur) {
+            for i in 0..n.min(64) {
+                if let Ok(c) = crate::bindings::VisualTreeHelper::GetChild(&cur, i) {
+                    stack.push(c);
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Install `css`. Standalone: `ExecuteScriptAsync` now + on every

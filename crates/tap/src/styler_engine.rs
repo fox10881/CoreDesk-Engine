@@ -122,9 +122,10 @@ struct State {
     /// Injected WebView2 handle -> what `inject` left behind (script id /
     /// nav token) for `uninject` on resync/reset.
     web_injected: BTreeMap<u64, crate::webview::InjectState>,
-    /// WebView2 handles whose `CoreWebView2` wasn't initialized yet —
-    /// retried on later visual-tree traffic.
-    web_pending: std::collections::BTreeSet<u64>,
+    /// WebView2 handles whose core wasn't ready yet — retried on later
+    /// visual-tree traffic (value = retry count, capped so dead-tree
+    /// handles don't thrash forever).
+    web_pending: std::collections::BTreeMap<u64, u8>,
 }
 unsafe impl Send for State {}
 
@@ -144,7 +145,7 @@ fn state() -> std::sync::MutexGuard<'static, State> {
         readvising: false,
         web_css: None,
         web_injected: BTreeMap::new(),
-        web_pending: std::collections::BTreeSet::new(),
+        web_pending: std::collections::BTreeMap::new(),
     });
     STATE.lock().unwrap_or_else(|p| p.into_inner())
 }
@@ -4004,13 +4005,27 @@ fn webview_maybe_inject(diagnostics: &IXamlDiagnostics, handle: u64) {
     webview_maybe_inject_ui(diagnostics, handle, &css);
 }
 
+/// Park `handle` for retry — bounded: dead-tree handles would otherwise
+/// re-resolve and churn on every element event forever.
+fn webview_park(handle: u64, why: &str) {
+    let mut eng = state();
+    let first = !eng.web_pending.contains_key(&handle);
+    let n = eng.web_pending.entry(handle).or_insert(0);
+    if first {
+        crate::tap_log!("webview: {why} handle={handle}");
+    }
+    *n = n.saturating_add(1);
+    if *n > 64 {
+        crate::tap_log!("webview: giving up on handle={handle}");
+        eng.web_pending.remove(&handle);
+    }
+}
+
 fn webview_maybe_inject_ui(diagnostics: &IXamlDiagnostics, handle: u64, css: &str) {
     let Some(wv) = crate::webview::resolve(diagnostics, handle) else {
         // One log per element — enough to tell "element seen, core not
         // ready" from "element never reported" in the field.
-        if state().web_pending.insert(handle) {
-            crate::tap_log!("webview: element seen but CoreWebView2 unavailable handle={handle}");
-        }
+        webview_park(handle, "element seen but CoreWebView2 unavailable");
         return;
     };
     state().web_pending.remove(&handle);
@@ -4020,9 +4035,7 @@ fn webview_maybe_inject_ui(diagnostics: &IXamlDiagnostics, handle: u64, css: &st
     } else {
         // Resolved but the core refused the script (still initializing) —
         // keep retrying on later visual-tree traffic.
-        if state().web_pending.insert(handle) {
-            crate::tap_log!("webview: element resolved but injection refused handle={handle}");
-        }
+        webview_park(handle, "element resolved but injection refused");
     }
 }
 
@@ -4307,12 +4320,15 @@ pub fn on_element(
     // wasn't initialized yet, then check the reported element itself.
     // `maybe_inject` early-outs when no CSS is armed.
     if !state().web_pending.is_empty() {
-        let retry: Vec<u64> = state().web_pending.iter().copied().collect();
+        let retry: Vec<u64> = state().web_pending.keys().copied().collect();
         for h in retry {
             webview_maybe_inject(diagnostics, h);
         }
     }
-    if reported_type.ends_with("WebView2") {
+    // `*.WebView2` elements resolve directly; `HostedWebView2Control` wraps
+    // the real `WebView2Standalone.Controls.WebView2` in a subtree the
+    // session never reports — `resolve` walks it.
+    if reported_type.ends_with("WebView2") || reported_type.ends_with("HostedWebView2Control") {
         webview_maybe_inject(diagnostics, element.Handle.0);
     }
     if storm_limited() {
