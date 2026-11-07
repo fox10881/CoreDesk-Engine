@@ -693,7 +693,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
         <div><div class="name">CoreDesk Engine <span id="ver"></span></div><div class="s">开源的 Windows 桌面整理工具</div><div class="s">Apache 2.0 许可证</div><div class="s" id="memDetail">—</div></div>
       </div>
       <div class="card" id="updateCard" hidden><div class="l"><span class="ic">&#xE895;</span><div><div class="t">更新</div><div class="s" id="updateStatus"></div></div></div><button id="updateAction"></button></div>
-      <div class="card"><div class="l"><span class="ic">&#xE897;</span><div><div class="t">使用手册</div><div class="s">每个功能都有动画演示</div></div></div><button id="openManual">打开</button></div>
+      <div class="card"><div class="l"><span class="ic">&#xEA86;</span><div><div class="t">模组</div><div class="s">使用外部文件自定义主题、小组件与动态效果</div></div></div><button id="openStylesFolder">打开样式文件夹</button></div>
       <div class="card"><div class="l"><span class="ic">&#xE734;</span><div><div class="t">喜欢 CoreDesk Engine 吗？</div><div class="s">你的支持能让更多人发现它。</div></div></div>
         <div class="actions"><button id="rateStore" hidden>在 Microsoft Store 评分</button><button id="starRepo">在 GitHub 点 Star</button></div></div>
       <h3 id="feedbackHeading">反馈</h3>
@@ -1708,7 +1708,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   });
   document.getElementById('rateStore').onclick = () => send({ type: 'action', name: 'rateInStore' });
   document.getElementById('starRepo').onclick = () => send({ type: 'action', name: 'openRepository' });
-  document.getElementById('openManual').onclick = () => send({ type: 'action', name: 'openManual' });
+  document.getElementById('openStylesFolder').onclick = () => send({ type: 'action', name: 'openStylesFolder' });
   document.getElementById('repairIcons').onclick = () => send({ type: 'action', name: 'repairIcons' });
   document.getElementById('restartExplorer').onclick = () => send({ type: 'action', name: 'restartExplorer' });
   document.getElementById('refreshAppearance').onclick = () => send({ type: 'action', name: 'restartExplorer' });

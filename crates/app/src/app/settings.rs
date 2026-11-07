@@ -1733,7 +1733,19 @@ impl App {
                 Some("repairIcons") => self.set_desktop_icons_hidden(false),
                 Some("hideDesktopIcons") => self.set_desktop_icons_hidden(true),
                 Some("rateInStore") => self.open_store_rating(),
-                Some("openManual") => self.open_manual(),
+                Some("openStylesFolder") => {
+                    // The user's mod layer — created so Explorer has a
+                    // target even before the first file is dropped in.
+                    let dir = coredesk_core::styles_fs::user_styles_root().unwrap_or_else(|| {
+                        self.state
+                            .config_path_on_disk()
+                            .parent()
+                            .unwrap_or_else(|| Path::new("."))
+                            .join("Styles")
+                    });
+                    let _ = std::fs::create_dir_all(&dir);
+                    let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
+                }
                 Some("openRepository") => {
                     let url = coredesk_core::brand::REPOSITORY_URL;
                     let _ = shell::shell_execute(std::path::Path::new(url), None, None);

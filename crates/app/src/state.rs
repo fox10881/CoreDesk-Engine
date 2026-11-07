@@ -111,6 +111,7 @@ impl AppState {
         // shadowing the shipped set under <exe>\Styles — portable puts both
         // layers next to the exe.
         coredesk_core::styles_fs::set_user_styles_root(directory.join("Styles"));
+        coredesk_core::styles_fs::ensure_modding_guide();
         let store = ConfigStore::new(&directory);
         let (outcome, unreadable_moved_to) = store.load_reporting();
         let (config, first_run, recovered_from) = match outcome {

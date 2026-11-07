@@ -116,6 +116,92 @@ pub fn user_styles_root() -> Option<PathBuf> {
     USER_ROOT.read().unwrap_or_else(|p| p.into_inner()).clone()
 }
 
+/// `MODDING_GUIDE.txt` — dropped at the user layer's root so the folder
+/// explains itself the moment a modder opens it. Refreshed on every boot
+/// when the shipped text drifts (new categories, new rules), so upgrades
+/// carry the current contract.
+const MODDING_GUIDE: &str = "\
+CoreDesk Engine — Styles Folder (Modding Guide)
+================================================
+
+This folder is YOUR layer of the style catalog. It mirrors the factory
+set shipped at <install>\\Styles — a file dropped here appears in the
+matching Settings dropdown automatically. No restart, no registration.
+
+Folders
+-------
+  Taskbar style              Windows 11 taskbar visuals — one .json per style
+  Start Menu style           Start menu visuals — one .json per style
+  Notification Center style  Notification center visuals — one .json per style
+  Clock Widget               Desktop clock designs — one .html per design
+  Visualizer Widget          Audio visualizer designs — one .html per design
+  Live Effects               Direct2D overlay presets — one .json per effect
+
+File name = id
+--------------
+The file's name without its extension is what the engine saves, what .cde
+themes reference, and what the dropdown lists. Name files like the
+dropdown shows them (\"Orbital Geometry.html\", \"Neon Rain.json\").
+Widget files may carry <!-- cde-meta {\"id\",\"label\"} --> at the top —
+\"label\" overrides the dropdown text; without it the file name is shown.
+
+Shadowing
+---------
+A file here OVERRIDES the factory file with the same name. Drop
+\"Cyber Glass Flip.html\" into Clock Widget\\ and your version replaces
+the stock design — delete it and the factory original returns.
+Your files are never touched by installs or factory resets.
+
+Formats
+-------
+- Shell styles (.json): the Windhawk-style theme document
+  {\"id\",\"label\",\"targetStyles\",\"styleConstants\"}. Copy a factory
+  file from <install>\\Styles and edit it — the schema is unchanged.
+- Live Effects (.json): a preset over a compiled effect —
+  {\"id\",\"label\",\"base\",\"params\"}. \"base\" must name a built-in
+  effect (rain, snow, fireflies, matrix, …); \"params\" accepts
+  particleCount, speed, wind, gravity, primaryColor, glowRadius.
+- Widgets (.html): one self-contained page per design — inline your CSS,
+  JS and assets (data URIs; there is no base URL for relative paths).
+  After loading, post {\"type\":\"clockReady\"} or {\"type\":\"vizReady\"}
+  so the host arms it; the host then drives the page with the design's
+  messages (clockStyle/clockTheme/clockLocale, vizStyle/vizTheme and the
+  33 ms vizSpectrum audio feed). A page may only post its own ready
+  message — other channels are ignored.
+
+Failure behavior
+----------------
+- A broken or unparseable .json style falls back to Windows Default when
+  applied — a mistake can't wedge the shell.
+- A missing or broken widget file keeps the current design; armed at a
+  cold start it simply shows nothing until fixed.
+- No file watching: dropdowns refresh when Settings opens or state is
+  pushed; a file is read once when applied.
+- Edit copies in THIS folder only — the factory set under <install>\\Styles
+  is wiped by reinstalls, upgrades and factory resets.
+
+.cde themes
+-----------
+A .cde theme stores only ids — never file contents. A theme referencing
+\"Neon Rain\" needs \"Neon Rain.json\" present on the target machine, or
+that slot silently falls back to the default.
+";
+
+/// Drops [`MODDING_GUIDE`] into the user layer root (creating the folder
+/// so the About-page shortcut always has somewhere to land). Rewrites
+/// only when the on-disk text differs — a user edit holds until the
+/// shipped guide itself changes.
+pub fn ensure_modding_guide() {
+    let Some(root) = user_styles_root() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(&root);
+    let path = root.join("MODDING_GUIDE.txt");
+    if std::fs::read_to_string(&path).ok().as_deref() != Some(MODDING_GUIDE) {
+        let _ = std::fs::write(&path, MODDING_GUIDE);
+    }
+}
+
 /// Every selectable style in `category`, sorted by label: the union of both
 /// layers, user files shadowing factory ids. Files that don't parse
 /// (mid-save, typos) are skipped — a broken file stays invisible rather
