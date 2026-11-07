@@ -1,9 +1,9 @@
 """Check that every README translation mirrors the English README.
 
-Verifies that each language has a README under docs/readme/, a hero image under
-docs/assets/, a ten-entry language bar, the same number of headings, tables,
-images and <details> blocks as README.md, and that every relative link and
-in-page anchor resolves. Exit status is non-zero on any problem.
+Verifies that each language has a README under docs/readme/, a ten-entry
+language bar, the same number of headings, tables, images and <details>
+blocks as README.md, and that every relative link and in-page anchor
+resolves. Exit status is non-zero on any problem.
 """
 import re
 import sys
@@ -33,12 +33,10 @@ def shape(text):
     }
 
 
-def check(path, expected_shape, hero, problems):
+def check(path, expected_shape, problems):
     text = path.read_text(encoding="utf-8")
     if text.startswith("﻿") or "\r" in text:
         problems.append(f"{path.name}: BOM or CRLF line endings")
-    if hero and f"hero-{hero}.png" not in text:
-        problems.append(f"{path.name}: does not reference hero-{hero}.png")
     if text.count("&nbsp;·&nbsp;") < 11:
         problems.append(f"{path.name}: language bar seems incomplete")
     actual = shape(text)
@@ -67,15 +65,13 @@ def check(path, expected_shape, hero, problems):
 def main():
     problems = []
     english = ROOT / "README.md"
-    expected = check(english, None, "en", problems)
+    expected = check(english, None, problems)
     for language in LANGUAGES:
         path = README_DIR / f"README.{language}.md"
         if not path.exists():
             problems.append(f"missing docs/readme/README.{language}.md")
             continue
-        check(path, expected, language, problems)
-        if not (ROOT / "docs/assets" / f"hero-{language}.png").exists():
-            problems.append(f"missing docs/assets/hero-{language}.png")
+        check(path, expected, problems)
     for problem in problems:
         print(problem)
     print(f"{len(LANGUAGES) + 1} READMEs checked, {len(problems)} problem(s)")

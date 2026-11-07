@@ -23,10 +23,6 @@
 
 CoreDesk Engine 是一款用 Rust 打造的超强次世代桌面整理与 Windows 11 外壳定制套件。远超基础图标围栏，CoreDesk Engine 融合了磁性桌面整理、3D 透视书架、实时 H.264 视频壁纸、自适应桌面时钟小部件、Windows 11 外壳深度主题化（任务栏、开始菜单、通知中心和文件资源管理器 Mica/Acrylic），以及一键式 `.cde` 完整主题包。
 
-<!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](../assets/hero-zh-CN.png)
-*> **[IMAGE PLACEHOLDER 1]:** 添加一张完整桌面截图，展示 Invisible/Bookshelf 围栏、桌面时钟小部件和半透明任务栏。*
-
 </div>
 
 ---

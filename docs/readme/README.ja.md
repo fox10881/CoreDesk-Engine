@@ -23,10 +23,6 @@
 
 CoreDesk Engine は Rust 製の次世代デスクトップ整理＆Windows 11 シェルカスタマイズスイート。単純なアイコンフェンスを遥かに超え、磁石式デスクトップ整理、3D パースペクティブ棚、ライブ H.264 動画壁紙、適応型デスクトップ時計ウィジェット、Windows 11 シェルの深いテーマ化（タスクバー、スタートメニュー、通知センター、エクスプローラーの Mica/Acrylic）、そしてワンクリック `.cde` フルテーマパッケージを統合する。
 
-<!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](../assets/hero-ja.png)
-*> **[IMAGE PLACEHOLDER 1]:** Invisible/Bookshelf フェンス、デスクトップ時計ウィジェット、半透明タスクバーを含むフルデスクトップのスクリーンショットを追加。*
-
 </div>
 
 ---

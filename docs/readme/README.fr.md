@@ -23,10 +23,6 @@
 
 CoreDesk Engine est une suite d'organisation de bureau et de personnalisation du shell Windows 11 de nouvelle génération, écrite en Rust. Bien au-delà de simples clôtures d'icônes, elle réunit l'organisation magnétique, des étagères en perspective 3D, des fonds vidéo H.264 en direct, des widgets d'horloge adaptatifs, une personnalisation profonde du shell (barre des tâches, menu Démarrer, centre de notifications et Explorateur Mica/Acrylic) et des packs de thèmes `.cde` complets en un clic.
 
-<!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](../assets/hero-fr.png)
-*> **[IMAGE PLACEHOLDER 1]:** Ajoute une capture complète du bureau montrant les clôtures Invisible/Bookshelf, le widget d'horloge et la barre des tâches translucide.*
-
 </div>
 
 ---

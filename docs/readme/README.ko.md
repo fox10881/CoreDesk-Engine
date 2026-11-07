@@ -23,10 +23,6 @@
 
 CoreDesk는 Rust로 작성된 강력하게 업그레이드된 차세대 데스크톱 정리 및 Windows 11 셸 커스터마이징 스위트입니다. 기본적인 아이콘 펜스를 훨씬 넘어서, 자석식 데스크톱 정리, 3D 원근 선반, 라이브 H.264 비디오 배경화면, 적응형 데스크톱 시계 위젯, Windows 11 셸 심층 테마(작업 표시줄, 시작 메뉴, 알림 센터, 파일 탐색기 Mica/Acrylic), 원클릭 `.cde` 전체 테마 패키지를 하나로 묶었습니다.
 
-<!-- TODO: ADD IMAGE 1 (Hero Desktop Showcase) -->
-![CoreDesk Engine Hero Showcase](../assets/hero-ko.png)
-*> **[IMAGE PLACEHOLDER 1]:** Invisible/Bookshelf 펜스, 데스크톱 시계 위젯, 반투명 작업 표시줄이 보이는 전체 데스크톱 스크린샷을 추가하세요.*
-
 </div>
 
 ---
