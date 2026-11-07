@@ -232,6 +232,11 @@ pub struct Settings {
     /// place with the current layout — no versions, no extra files.
     #[serde(default)]
     pub theme_auto_update_daily: bool,
+    /// When on, applying a theme (gallery Apply, import, double-click) also restarts
+    /// Explorer so the new visuals land on a clean shell. Global preference, never
+    /// part of a `.cde` archive (see `THEME_GLOBAL_SETTINGS`).
+    #[serde(default)]
+    pub explorer_refresh_on_theme: bool,
     /// Desktop clock widget design: `"none"` = hidden (default);
     /// `"g1".."g10"` and `"d1".."d10"` pick a design. `.cde` themes
     /// carry it (with `clock_bounds`).
@@ -872,6 +877,7 @@ impl Default for Settings {
             stretch_tolerance_pct: 0,
             active_theme_path: None,
             theme_auto_update_daily: false,
+            explorer_refresh_on_theme: false,
             clock_style: "none".to_string(),
             clock_bounds: None,
             clock_adaptive_color: true,

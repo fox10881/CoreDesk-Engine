@@ -1686,12 +1686,12 @@ impl App {
                 }
                 Some("openFeGlass") => self.open_fe_glass(),
                 Some("restartExplorer") => {
-                    // Failsafe for a stuck shell (no UI button — refresh is the
-                    // daily action). Kill the shell and let Windows' own
-                    // respawn (or our detached spawn) bring it back; the video
-                    // player's pending-reattach loop rides out the gap.
+                    // Manual refresh (Themes page + the General-page card). The
+                    // coalescer refuses a second kill while the shell is still
+                    // coming back; the video player's pending-reattach loop and
+                    // the TaskbarCreated recovery ride out the gap.
                     self.settings_toast(coredesk_core::i18n::text("正在重启资源管理器…"));
-                    std::thread::spawn(coredesk_platform::tap::restart_explorer);
+                    self.request_shell_restart("manual refresh");
                 }
                 Some("repairIcons") => self.set_desktop_icons_hidden(false),
                 Some("hideDesktopIcons") => self.set_desktop_icons_hidden(true),
@@ -3974,6 +3974,12 @@ impl App {
         // The apply's own writes do not count as user edits: whatever the incoming theme
         // normalized is the new baseline the dirty flag measures against.
         self.theme_dirty.set(false);
+        // Auto-refresh: the new theme lands on a fresh shell so armed surface
+        // styles and the Task View wedge never carry over. The coalescer skips
+        // this when the cold-boot restart already fired this run.
+        if self.state.config.settings.explorer_refresh_on_theme {
+            self.request_shell_restart("theme applied (auto-refresh)");
+        }
     }
 
     pub(super) fn refresh_language(&mut self) {

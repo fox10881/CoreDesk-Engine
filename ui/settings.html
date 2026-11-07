@@ -674,6 +674,9 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       </div>
       <div class="card"><div class="l"><span class="ic">&#xE91B;</span><div><div class="t">无论屏幕比例都完整显示背景</div><div class="s">开启：等比缩放完整居中，边缘用模糊填充；关闭：等比放大铺满屏幕，超出部分裁掉</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="containBackground" aria-label="无论屏幕比例都完整显示背景"></div></div>
       <div class="card"><div class="l"><span class="ic">&#xE946;</span><div><div class="t">每天自动更新当前主题</div><div class="s">每日把当前布局写回正在使用的主题文件本身；只覆盖原文件，不新建版本或副本</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="themeAutoUpdateDaily"></div></div>
+      <div class="card"><div class="l"><span class="ic">&#xE777;</span><div><div class="t">更新外观</div><div class="s">重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。</div></div></div>
+        <div class="actions"><button id="refreshAppearance">刷新</button></div></div>
+      <div class="card"><div class="l"><span class="ic">&#xE895;</span><div><div class="t">更换主题后自动刷新外观</div><div class="s">应用主题时自动重启资源管理器，确保新外观干净生效</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="explorerRefreshOnTheme"></div></div>
       <div class="theme-grid" id="galleryGrid"></div>
       <h3 id="swapHeading">多显示器</h3>
       <div class="card" id="swapCard"><div class="l"><span class="ic">&#xE7F8;</span><div><div class="t">交换两个显示器上的栅栏</div><div class="s">把一个显示器上的全部栅栏搬到另一个，反之亦然</div></div></div>
@@ -1678,6 +1681,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   document.getElementById('openManual').onclick = () => send({ type: 'action', name: 'openManual' });
   document.getElementById('repairIcons').onclick = () => send({ type: 'action', name: 'repairIcons' });
   document.getElementById('restartExplorer').onclick = () => send({ type: 'action', name: 'restartExplorer' });
+  document.getElementById('refreshAppearance').onclick = () => send({ type: 'action', name: 'restartExplorer' });
 
   // 关于 → 更新: an installed copy downloads and runs the new setup, a ZIP opens the release page.
   let update = null;

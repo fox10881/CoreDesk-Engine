@@ -767,5 +767,9 @@
   "脉冲音环（音频）": "Pulsrings (Audio)",
   "CoreDesk Engine | 设置": "CoreDesk Engine | Einstellungen",
   "CoreDesk Engine 主题 (*.cde;*.peco)": "CoreDesk-Engine-Design (*.cde;*.peco)",
-  "CoreDesk Engine 主题 (*.cde)": "CoreDesk-Engine-Design (*.cde)"
+  "CoreDesk Engine 主题 (*.cde)": "CoreDesk-Engine-Design (*.cde)",
+  "更新外观": "Darstellung aktualisieren",
+  "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Startet den Explorer für einen sauberen Zustand neu — Effekte und Videohintergrund werden automatisch wiederhergestellt. Die Aktualisierung ist für die Systemstabilität nötig und kann bis zu 30 Sekunden dauern.",
+  "更换主题后自动刷新外观": "Darstellung bei Themenwechsel automatisch aktualisieren",
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Startet den Explorer beim Anwenden eines Themas neu, damit das neue Erscheinungsbild sauber greift"
 }

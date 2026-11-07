@@ -767,5 +767,9 @@
   "脉冲音环（音频）": "脈衝音環（音訊）",
   "CoreDesk Engine | 设置": "CoreDesk Engine | 設定",
   "CoreDesk Engine 主题 (*.cde;*.peco)": "CoreDesk Engine 主題 (*.cde;*.peco)",
-  "CoreDesk Engine 主题 (*.cde)": "CoreDesk Engine 主題 (*.cde)"
+  "CoreDesk Engine 主题 (*.cde)": "CoreDesk Engine 主題 (*.cde)",
+  "更新外观": "更新外觀",
+  "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "重新啟動檔案總管以獲得乾淨狀態 — 特效和影片桌布會自動恢復。重新整理對系統穩定性很必要，可能需要 30 秒。",
+  "更换主题后自动刷新外观": "更換主題後自動更新外觀",
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "套用主題時自動重新啟動檔案總管，確保新外觀乾淨生效"
 }

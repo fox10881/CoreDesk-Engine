@@ -767,5 +767,9 @@
   "脉冲音环（音频）": "Anneaux pulsés (audio)",
   "CoreDesk Engine | 设置": "CoreDesk Engine | Paramètres",
   "CoreDesk Engine 主题 (*.cde;*.peco)": "Thème CoreDesk Engine (*.cde;*.peco)",
-  "CoreDesk Engine 主题 (*.cde)": "Thème CoreDesk Engine (*.cde)"
+  "CoreDesk Engine 主题 (*.cde)": "Thème CoreDesk Engine (*.cde)",
+  "更新外观": "Actualiser l'apparence",
+  "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Redémarre l'Explorateur pour un état propre — les effets et le fond d'écran vidéo sont restaurés automatiquement. L'actualisation est nécessaire à la stabilité du système et peut prendre 30 secondes.",
+  "更换主题后自动刷新外观": "Actualiser l'apparence à chaque changement de thème",
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Redémarre l'Explorateur à l'application d'un thème pour un rendu propre"
 }

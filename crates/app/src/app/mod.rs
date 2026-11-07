@@ -432,6 +432,11 @@ pub struct App {
     /// 退出 only. `shutdown()` restarts the shell after unloading the
     /// injected pieces so Explorer comes back vanilla.
     restart_shell_on_exit: bool,
+    /// When this run last queued a shell restart (cold boot, manual refresh,
+    /// auto-refresh after a theme apply). A second kill while Explorer is
+    /// still coming back would leave a half-dead shell, so callers coalesce
+    /// through `request_shell_restart`.
+    shell_restart_at: Option<std::time::Instant>,
 }
 
 pub type AppCell = Rc<RefCell<Option<App>>>;
@@ -1428,6 +1433,7 @@ impl App {
             cut_clip_seq: 0,
             cut_paste: None,
             restart_shell_on_exit: false,
+            shell_restart_at: None,
             wallpaper_sig: None,
             wallpaper_cache: BackdropCache::default(),
             live_wallpaper: live_wallpaper::LiveBackdrop::default(),
@@ -1583,19 +1589,14 @@ impl App {
         if let Some(a) = app.anchor.borrow_mut().as_mut() {
             a.reanchor("startup");
         }
-        // Cold-boot lifecycle hook — the ONLY point in the lifecycle where
-        // the daemon may restart explorer.exe. An armed ExplorerBlurMica
-        // wants a fresh process so DllMain hooks land cleanly; a resident
-        // still answering means a previous run died uncleanly and injected
-        // code is alive in the shell — a restart scrubs both at once.
-        // Neither applies → the shell is left alone. Settings-UI opens
-        // never reach here: the single-instance gate exits in main().
-        let fe_armed = !app.state.config.settings.fe_effect.is_empty();
-        let stale_resident =
-            args.instance.is_none() && !coredesk_platform::tap::resident_windows_all().is_empty();
-        if fe_armed || stale_resident {
-            tracing::info!(fe_armed, stale_resident, "cold boot: restarting Explorer");
-            std::thread::spawn(coredesk_platform::tap::restart_explorer);
+        // Cold-boot lifecycle hook — every main-instance startup gets one fresh
+        // shell: the reliable cure for the Task View wedge the armed styler can
+        // leave behind, and stylers/effects/video re-attach via the
+        // TaskbarCreated recovery (`on_shell_recovery`). Named test instances
+        // and timed test runs leave the shell alone; Settings-UI opens never
+        // reach here (the single-instance gate exits in main()).
+        if args.instance.is_none() && args.exit_after_ms.is_none() {
+            app.request_shell_restart("cold boot");
         }
         // Saved surface styles — each apply() stores the selection either
         // way, and the periodic ensure() delivers it when the hosts
@@ -2374,6 +2375,22 @@ impl App {
             a.reanchor("shell respawn");
         }
         tracing::info!("shell recovery poke: stylers + desktop layer re-ensured");
+    }
+
+    /// One shell restart at a time (~90 s covers kill + respawn + the recovery
+    /// poke): a second kill while Explorer is still coming back would leave a
+    /// half-dead shell. `true` when a restart was actually queued.
+    pub(crate) fn request_shell_restart(&mut self, reason: &'static str) -> bool {
+        if let Some(at) = self.shell_restart_at
+            && at.elapsed() < std::time::Duration::from_secs(90)
+        {
+            tracing::debug!(reason, "shell restart skipped: one already in progress");
+            return false;
+        }
+        self.shell_restart_at = Some(std::time::Instant::now());
+        tracing::info!(reason, "restarting Explorer");
+        std::thread::spawn(coredesk_platform::tap::restart_explorer);
+        true
     }
 
     /// (Re)adds the notification icon; false while the taskbar does not take it.
