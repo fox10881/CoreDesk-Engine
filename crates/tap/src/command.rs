@@ -697,6 +697,12 @@ fn unload(hwnd: HWND) {
         let _ = KillTimer(hwnd, RETRY_TIMER_ID);
     }
     unstamp_host_props(hwnd);
+    // Drop the protocol stamp too — an inert resident must not keep
+    // advertising a live `Build` version or the host's discovery treats it
+    // as serviceable and latches wires onto a window that drops them.
+    unsafe {
+        let _ = crate::win32::RemovePropW(hwnd, pcwstr(build_prop_name()));
+    }
     crate::tap_log!("unload: inert — timer killed, CmdHwnd unstamped");
     crate::styler::wux::shutdown();
     crate::styler::mux::shutdown();

@@ -580,6 +580,7 @@ fn inject(tap: &mut Tap, taskbar: HWND, min_version: usize) -> bool {
     // authoritative channel once stamped; `FindWindowW`+owner is the
     // fallback for residents that predate stamping.
     let mut stale_seen = false;
+    let mut foreign_poked: Option<HWND> = None;
     for _ in 0..80 {
         let prop_cmd = cmd_prop(taskbar);
         let prop_live = !prop_cmd.0.is_null()
@@ -588,7 +589,12 @@ fn inject(tap: &mut Tap, taskbar: HWND, min_version: usize) -> bool {
         // Prefer the stamped prop only while it is ours — a stale resident
         // keeps re-stamping its HWND from its own WM_TIMER, so the prop can
         // point at an old build while a fresh co-loaded resident (unique
-        // module name) sits beside it.
+        // module name) sits beside it. Only `resident_usable` candidates
+        // count as a discovery: a live foreign-class resident sharing the
+        // protocol version must never satisfy `found` — adopting it latches
+        // `tap.cmd_hwnd` to a resident that isn't ours, the sweep then
+        // evicts the fresh one as "foreign", and `deliver` wires an engine
+        // that silently drops them.
         let found = if resident_usable(prop_cmd, tid_pid, min_version) {
             Some(prop_cmd)
         } else {
@@ -596,25 +602,38 @@ fn inject(tap: &mut Tap, taskbar: HWND, min_version: usize) -> bool {
             all.iter()
                 .copied()
                 .find(|h| resident_usable(*h, tid_pid, min_version))
-                .or(if prop_live {
-                    Some(prop_cmd)
-                } else {
-                    all.into_iter().next()
-                })
         };
         if let Some(cmd) = found {
-            if resident_version(cmd) >= min_version {
-                tap.cmd_hwnd = cmd;
-                // One resident per process — unwind stale co-loaded builds.
-                unload_foreign_residents(tid_pid, cmd);
-                return true;
+            tap.cmd_hwnd = cmd;
+            // One resident per process — unwind stale co-loaded builds.
+            unload_foreign_residents(tid_pid, cmd);
+            // The prop can still name a foreign resident the enumeration
+            // can't see (a window mid-teardown drops out of the sibling
+            // chain while its `CmdHwnd` stamp survives). Evict it directly
+            // or its stale stamp keeps winning `found` on the next inject.
+            if prop_live
+                && prop_cmd != cmd
+                && resident_class_name(prop_cmd) != expected_resident_class("CoreDeskTAP")
+            {
+                let _ = send_cmd(prop_cmd, tap.msg_unload, 0, 0);
             }
-            // A resident from an older build — IXDEx pins it in Explorer so
-            // re-injection can't replace it. Keep polling briefly: if it was
-            // unpinned our `disarm` may have unloaded it (its window dies and
-            // a fresh bootstrap creates a stamped one).
-            stale_seen = true;
+            return true;
         }
+        // A live prop-holder or enumerable resident that isn't our build —
+        // an older protocol, or a sibling image carrying the code being
+        // replaced. Both are co-loadable, so keep polling for ours rather
+        // than adopting them; and poke the prop-holder out once so its
+        // stale `CmdHwnd` stamp stops shadowing discovery (its `Build` prop
+        // is stamped before `CmdHwnd`, so a foreign prop-holder is always
+        // evictable — never ours mid-boot).
+        if prop_live
+            && foreign_poked != Some(prop_cmd)
+            && resident_class_name(prop_cmd) != expected_resident_class("CoreDeskTAP")
+        {
+            let _ = send_cmd(prop_cmd, tap.msg_unload, 0, 0);
+            foreign_poked = Some(prop_cmd);
+        }
+        stale_seen = stale_seen || prop_live || !resident_windows_for_pid(tid_pid).is_empty();
         unsafe { Sleep(50) };
     }
     if stale_seen && min_version > 0 {
@@ -669,6 +688,13 @@ fn ensure_resident_locked(
             t.explorer_pid != pid
                 || unsafe { IsWindow(t.cmd_hwnd) }.0 == 0
                 || resident_version(t.cmd_hwnd) < min_version
+                // A latched foreign-class resident — a sibling image sharing
+                // the protocol version — must read as stale too. Its window
+                // stays alive and passes the version gate, so without the
+                // class check every tick keeps "finding" it while it
+                // silently drops our wires.
+                || resident_class_name(t.cmd_hwnd)
+                    != expected_resident_class("CoreDeskTAP")
         })
         .unwrap_or(true);
     if stale && let Some(mut tap) = guard.take() {
@@ -696,7 +722,10 @@ fn ensure_resident_locked(
             } else {
                 find_cmd_for_pid(pid).unwrap_or(HWND(core::ptr::null_mut()))
             };
-            if !cmd.0.is_null() && resident_owner(cmd) == pid && resident_version(cmd) < min_version
+            if !cmd.0.is_null()
+                && resident_owner(cmd) == pid
+                && (resident_version(cmd) < min_version
+                    || resident_class_name(cmd) != expected_resident_class("CoreDeskTAP"))
             {
                 return None;
             }
