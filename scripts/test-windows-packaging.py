@@ -31,20 +31,26 @@ PAYLOAD = {
     "GPL-ExplorerBlurMica.txt", "LICENSE-ExplorerBlurMica.txt",
     "README-ExplorerBlurMica.txt",
     "UPGRADING.md", "SKILL.md", "DESKTOP_CONTAINERS.md", "GLASS_RENDERING.md",
-    "WALLPAPER_ENGINE.md", "assets",
+    "WALLPAPER_ENGINE.md", "assets", "Styles",
 }
 WALLPAPERS = {
     f"assets/wallpapers/{p.name}"
     for p in (ROOT / "assets" / "wallpapers").iterdir()
 }
-ZIP_PAYLOAD = (PAYLOAD - {"assets"}) | WALLPAPERS
+# The factory style tree (styles/<category>/<file>) installs as Styles/<category>/<file>.
+STYLES = {
+    "Styles/" + p.relative_to(ROOT / "styles").as_posix()
+    for p in (ROOT / "styles").rglob("*")
+    if p.is_file()
+}
+ZIP_PAYLOAD = (PAYLOAD - {"assets", "Styles"}) | WALLPAPERS | STYLES
 # The installer skips the three design docs and the ExplorerBlurMica set —
 # the app embeds that DLL and self-deploys it to AppData at runtime, so the
 # installed dir only needs coredesk_tap.dll — but keeps the wallpaper pack.
-INSTALLED = (PAYLOAD - {"assets", "DESKTOP_CONTAINERS.md", "GLASS_RENDERING.md",
+INSTALLED = (PAYLOAD - {"assets", "Styles", "DESKTOP_CONTAINERS.md", "GLASS_RENDERING.md",
                         "WALLPAPER_ENGINE.md", "ExplorerBlurMica.dll",
                         "GPL-ExplorerBlurMica.txt", "LICENSE-ExplorerBlurMica.txt",
-                        "README-ExplorerBlurMica.txt"}) | WALLPAPERS
+                        "README-ExplorerBlurMica.txt"}) | WALLPAPERS | STYLES
 HIDDEN = subprocess.STARTUPINFO()
 HIDDEN.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 HIDDEN.wShowWindow = 0
