@@ -993,20 +993,23 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   // File Explorer glass (ExplorerBlurMica): the effect select is a plain
   // data-bind dropdown — no catalog arrives from the backend.
 
-  // 桌面时钟小组件: none + g1..g10 + d1..d10 — the option label is ONLY the
-  // localized design name; the g/d ids stay internal values.
+  // 桌面时钟小组件: none + the shipped designs — design id = file stem =
+  // English display name (`Styles\Clock Widget\<id>.html`).
   const CLOCK_DESIGNS = [
     ['none', '无（关闭）'],
-    ['g1', '玻璃翻页'], ['g2', '霓虹时环'], ['g3', '瑞士粗体'],
-    ['g4', '点阵数码'], ['g5', '流光胶囊'], ['g6', '奢华指针'],
-    ['g7', '分割网格'], ['g8', '日月地平线'], ['g9', '立体堆叠'],
-    ['g10', '禅意缎带'],
-    ['d1', '极光霜面'], ['d2', '霓虹终端'], ['d3', '时间轨道'],
-    ['d4', '衬线卡片'], ['d5', '柔和表盘'], ['d6', '全息面板'],
-    ['d7', '日历页'], ['d8', '渐变块'], ['d9', '日期海报'],
-    ['d10', '紧凑胶囊'],
-    ['g11', '霓虹电路面板'], ['g12', '极简竖排'], ['g13', '复古翻牌'],
-    ['g14', '几何轨道'], ['g15', '古典指针'],
+    ['Cyber Glass Flip', 'Cyber Glass Flip'], ['Neon Chrono Rings', 'Neon Chrono Rings'],
+    ['Swiss Bauhaus', 'Swiss Bauhaus'], ['Dot-Matrix Cyber LED', 'Dot-Matrix Cyber LED'],
+    ['Liquid Morphic Pill', 'Liquid Morphic Pill'], ['Luxury Skeleton Analog', 'Luxury Skeleton Analog'],
+    ['Brutalist Split Grid', 'Brutalist Split Grid'], ['Horizon Sun-Moon', 'Horizon Sun-Moon'],
+    ['Isometric 3D Stack', 'Isometric 3D Stack'], ['Zen Minimal Ribbon', 'Zen Minimal Ribbon'],
+    ['Aurora Frost', 'Aurora Frost'], ['Neon Terminal', 'Neon Terminal'],
+    ['Chrono Orbit', 'Chrono Orbit'], ['Editorial Serif', 'Editorial Serif'],
+    ['Soft Gauge Dial', 'Soft Gauge Dial'], ['HUD Brackets', 'HUD Brackets'],
+    ['Calendar Page', 'Calendar Page'], ['Gradient Slab', 'Gradient Slab'],
+    ['Date Poster', 'Date Poster'], ['Compact Chip', 'Compact Chip'],
+    ['Neon Circuit HUD', 'Neon Circuit HUD'], ['Swiss Mono Column', 'Swiss Mono Column'],
+    ['Retro Split-Flap', 'Retro Split-Flap'], ['Orbital Geometry', 'Orbital Geometry'],
+    ['Regent Classic Analog', 'Regent Classic Analog'],
   ];
   // Options arrive file-backed from the backend (`state.clockDesigns`:
   // {id, label, custom} per `Styles\Clock Widget\<id>.html`); the hardcoded
@@ -1032,13 +1035,15 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     sel.value = String(state.settings.clockStyle ?? 'none');
   }
 
-  // 音频可视化: none + the ten reactive-spectrum designs (v1–v10).
+  // 音频可视化: none + the shipped reactive-spectrum designs — same
+  // id = file stem = English name rule (`Styles\Visualizer Widget\<id>.html`).
   const VISUALIZER_DESIGNS = [
     ['none', '无（关闭）'],
-    ['v1', '粒子星河'], ['v2', '弧光反应环'], ['v3', '频谱缎带'],
-    ['v4', '霓虹地平线'], ['v5', '共鸣光球'], ['v6', '低音花绽'],
-    ['v7', '律动天际线'], ['v8', '螺旋音序'], ['v9', '彗星音轨'],
-    ['v10', '脉冲点阵'],
+    ['Particle Field', 'Particle Field'], ['Arc Reactor Ring', 'Arc Reactor Ring'],
+    ['Spectrum Ribbons', 'Spectrum Ribbons'], ['Neon Terrain', 'Neon Terrain'],
+    ['Resonance Orbs', 'Resonance Orbs'], ['Bass Bloom', 'Bass Bloom'],
+    ['Equalizer Skyline', 'Equalizer Skyline'], ['Spiral Sequencer', 'Spiral Sequencer'],
+    ['Comet Trails', 'Comet Trails'], ['Pulse Lattice', 'Pulse Lattice'],
   ];
   function renderVisualizerStyles() {
     const sel = document.getElementById('visualizerStyleSel');

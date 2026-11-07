@@ -237,9 +237,9 @@ pub struct Settings {
     /// part of a `.cde` archive (see `THEME_GLOBAL_SETTINGS`).
     #[serde(default)]
     pub explorer_refresh_on_theme: bool,
-    /// Desktop clock widget design: `"none"` = hidden (default);
-    /// `"g1".."g10"` and `"d1".."d10"` pick a design. `.cde` themes
-    /// carry it (with `clock_bounds`).
+    /// Desktop clock widget design: `"none"` = hidden (default); otherwise
+    /// the design name — `Styles\Clock Widget\<style>.html`, factory or
+    /// user mod. `.cde` themes carry it (with `clock_bounds`).
     #[serde(default = "clock_style_default")]
     pub clock_style: String,
     /// Widget window bounds in physical pixels `[x, y, w, h]`; `None` until
@@ -257,9 +257,10 @@ pub struct Settings {
     #[serde(default = "default_true")]
     pub clock_use_24_hour: bool,
     /// Desktop audio-visualizer widget design: `"none"`/`""` = hidden
-    /// (default); `"v1".."v10"` pick a reactive-spectrum design rendered off
-    /// the WASAPI loopback engine. Capture runs only while a design is armed
-    /// AND the desktop is visible (occlusion-gated). `.cde` themes carry it.
+    /// (default); otherwise the design name — `Styles\Visualizer Widget\
+    /// <style>.html` — a reactive-spectrum design rendered off the WASAPI
+    /// loopback engine. Capture runs only while a design is armed AND the
+    /// desktop is visible (occlusion-gated). `.cde` themes carry it.
     #[serde(default)]
     pub visualizer_style: String,
     /// Adaptive backdrop coloring for the visualizer: samples the wallpaper
@@ -290,11 +291,12 @@ pub struct Settings {
     /// Serialized to `Live_Effects_config.json` at the file boundary.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub effect_params: BTreeMap<String, EffectParams>,
-    /// Per-design widget tuning, keyed by clock design id (`"g10"`, `"d4"`…
-    /// — `CLOCK_WIDGET_IDS`). Serialized to `Widget_config.json`. The
-    /// active design's entry resolves onto `clock_bounds`/
-    /// `clock_adaptive_color` at apply time; ids the catalog doesn't know
-    /// are dropped by `Config::sanitize_external`.
+    /// Per-design widget tuning, keyed by clock design id (`"Zen Minimal
+    /// Ribbon"`, `"Aurora Frost"`… — `CLOCK_WIDGET_IDS`, user-mod names
+    /// included). Serialized to `Widget_config.json`. The active design's
+    /// entry resolves onto `clock_bounds`/`clock_adaptive_color` at apply
+    /// time; ids failing the style-id charset are dropped by
+    /// `Config::sanitize_external`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub widget_params: BTreeMap<String, WidgetParams>,
 }
@@ -535,27 +537,54 @@ impl EffectParams {
     }
 }
 
-/// Clock designs the widget host implements — `Widget_config.json` is a
-/// dictionary keyed by these ids; `"none"` is not a widget and is absent.
+/// Shipped clock-design ids — `Styles\Clock Widget\<id>.html` carries one
+/// file per entry and the id is the English display name itself, so the
+/// config value, the file stem, and the dropdown label stay in lockstep.
+/// `Widget_config.json` seeds a tuning entry per id; `"none"` is not a
+/// widget and is absent.
 pub const CLOCK_WIDGET_IDS: &[&str] = &[
-    "g1", "g2", "g3", "g4", "g5", "g6", "g7", "g8", "g9", "g10", //
-    "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "d10", "g11", "g12", "g13", "g14", "g15",
+    "Cyber Glass Flip",
+    "Neon Chrono Rings",
+    "Swiss Bauhaus",
+    "Dot-Matrix Cyber LED",
+    "Liquid Morphic Pill",
+    "Luxury Skeleton Analog",
+    "Brutalist Split Grid",
+    "Horizon Sun-Moon",
+    "Isometric 3D Stack",
+    "Zen Minimal Ribbon",
+    "Aurora Frost",
+    "Neon Terminal",
+    "Chrono Orbit",
+    "Editorial Serif",
+    "Soft Gauge Dial",
+    "HUD Brackets",
+    "Calendar Page",
+    "Gradient Slab",
+    "Date Poster",
+    "Compact Chip",
+    "Neon Circuit HUD",
+    "Swiss Mono Column",
+    "Retro Split-Flap",
+    "Orbital Geometry",
+    "Regent Classic Analog",
 ];
 
-/// `true` for a known clock-design id (`g1..g10`, `d1..d10`).
-pub fn is_clock_widget_id(id: &str) -> bool {
-    CLOCK_WIDGET_IDS.contains(&id)
-}
-
-/// Audio-visualizer design ids — the ten reactive-spectrum widgets.
-/// `visualizer_style` validates against this; `""`/`"none"` hide the widget.
-pub const VISUALIZER_WIDGET_IDS: &[&str] =
-    &["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"];
-
-/// `true` for a known visualizer-design id (`v1..v10`).
-pub fn is_visualizer_widget_id(id: &str) -> bool {
-    VISUALIZER_WIDGET_IDS.contains(&id)
-}
+/// Shipped visualizer-design ids — one `Styles\Visualizer Widget\<id>.html`
+/// per entry, same id-is-the-name rule as the clock designs.
+/// `""`/`"none"` hide the widget.
+pub const VISUALIZER_WIDGET_IDS: &[&str] = &[
+    "Particle Field",
+    "Arc Reactor Ring",
+    "Spectrum Ribbons",
+    "Neon Terrain",
+    "Resonance Orbs",
+    "Bass Bloom",
+    "Equalizer Skyline",
+    "Spiral Sequencer",
+    "Comet Trails",
+    "Pulse Lattice",
+];
 
 /// `true` for audio-reactive Live-Effect ids (`le_*`): the native overlay
 /// draws them, the visualizer engine's shared spectrum snapshot feeds them —
@@ -639,56 +668,12 @@ pub fn live_effect_options_json() -> serde_json::Value {
     serde_json::Value::Array(arr)
 }
 
-/// English display names for clock-design ids — same strings the Settings
-/// UI shows (mirrors `locales/en.json`). Emitted into `Widget_config.json`
-/// as `"name"` so `"g10"` reads "Zen Minimal Ribbon". Strictly
-/// informational — never deserialized, edits can't stick.
-pub const WIDGET_DISPLAY_NAMES: &[(&str, &str)] = &[
-    ("g1", "Cyber Glass Flip"),
-    ("g2", "Neon Chrono Rings"),
-    ("g3", "Swiss Bauhaus"),
-    ("g4", "Dot-Matrix Cyber LED"),
-    ("g5", "Liquid Morphic Pill"),
-    ("g6", "Luxury Skeleton Analog"),
-    ("g7", "Brutalist Split Grid"),
-    ("g8", "Horizon Sun/Moon"),
-    ("g9", "Isometric 3D Stack"),
-    ("g10", "Zen Minimal Ribbon"),
-    ("d1", "Aurora Frost"),
-    ("d2", "Neon Terminal"),
-    ("d3", "Chrono Orbit"),
-    ("d4", "Editorial Serif"),
-    ("d5", "Soft Gauge Dial"),
-    ("d6", "HUD Brackets"),
-    ("d7", "Calendar Page"),
-    ("d8", "Gradient Slab"),
-    ("d9", "Date Poster"),
-    ("d10", "Compact Chip"),
-    ("g11", "Neon Circuit HUD"),
-    ("g12", "Swiss Mono Column"),
-    ("g13", "Retro Split-Flap"),
-    ("g14", "Orbital Geometry"),
-    ("g15", "Regent Classic Analog"),
-    ("v1", "Particle Field"),
-    ("v2", "Arc Reactor Ring"),
-    ("v3", "Spectrum Ribbons"),
-    ("v4", "Neon Terrain"),
-    ("v5", "Resonance Orbs"),
-    ("v6", "Bass Bloom"),
-    ("v7", "Equalizer Skyline"),
-    ("v8", "Spiral Sequencer"),
-    ("v9", "Comet Trails"),
-    ("v10", "Pulse Lattice"),
-];
-
-/// English display name for a clock-design id (`"Clock widget"` fallback —
-/// unreachable while callers iterate `CLOCK_WIDGET_IDS`).
-pub fn widget_display_name(id: &str) -> &'static str {
-    WIDGET_DISPLAY_NAMES
-        .iter()
-        .find(|(i, _)| *i == id)
-        .map(|(_, n)| *n)
-        .unwrap_or("Clock widget")
+/// The display name a design id carries into `Widget_config.json`'s
+/// informational `"name"` field — the id *is* the English name (file stem
+/// = dropdown label), so this just echoes it back. Never deserialized —
+/// hand edits to `"name"` can't stick.
+pub fn widget_display_name(id: &str) -> &str {
+    id
 }
 
 /// Sub-element targets inside a clock design — `WidgetParams.elements`

@@ -130,10 +130,18 @@ fn copy_styles(out_dir: &Path) {
         println!("cargo:warning=styles/ not found; skipping");
         return;
     }
-    if let Some(profile_dir) = out_dir.ancestors().nth(3)
-        && let Err(e) = copy_tree(&src, &profile_dir.join("Styles"))
-    {
-        println!("cargo:warning=could not copy Styles/: {e}");
+    if let Some(profile_dir) = out_dir.ancestors().nth(3) {
+        let dst = profile_dir.join("Styles");
+        // Mirror, not merge — a removed/renamed factory file must vanish
+        // from the staged layer or the dropdowns resurrect it.
+        if dst.is_dir()
+            && let Err(e) = std::fs::remove_dir_all(&dst)
+        {
+            println!("cargo:warning=could not clean Styles/: {e}");
+        }
+        if let Err(e) = copy_tree(&src, &dst) {
+            println!("cargo:warning=could not copy Styles/: {e}");
+        }
     }
 }
 

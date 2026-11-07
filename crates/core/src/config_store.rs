@@ -1492,7 +1492,7 @@ mod tests {
         let mut c = sample();
         c.settings.desktop_effect = "rain".into();
         c.settings.desktop_effect_intensity = 80;
-        c.settings.clock_style = "d1".into();
+        c.settings.clock_style = "Aurora Frost".into();
         c.settings.clock_bounds = Some([10, 20, 400, 240]);
         c.settings.clock_adaptive_color = false;
         c.settings.effect_params.insert(
@@ -1556,14 +1556,14 @@ mod tests {
         assert!(widget.get("clockStyle").is_none());
         // The active design's slot mirrors the live runtime fields.
         assert_eq!(
-            widget["d1"]["bounds"],
+            widget["Aurora Frost"]["bounds"],
             serde_json::json!([10, 20, 400, 240])
         );
-        assert_eq!(widget["d1"]["adaptiveColor"], false);
+        assert_eq!(widget["Aurora Frost"]["adaptiveColor"], false);
         // Untouched designs render the follow-live baseline with the full
         // sub-element schema discoverable in the file.
         assert_eq!(
-            widget["g5"],
+            widget["Liquid Morphic Pill"],
             serde_json::json!({
                 "name": "Liquid Morphic Pill",
                 "bounds": null,
@@ -1843,8 +1843,8 @@ mod tests {
         .unwrap();
         fs::write(
             store.dir().join(WIDGET_CONFIG_FILE),
-            r#"{"g10":{"name":"My Renamed Label","bounds":[1,2,300,200]},
-                "d3":{"name":42},"g5":{}}"#,
+            r#"{"Zen Minimal Ribbon":{"name":"My Renamed Label","bounds":[1,2,300,200]},
+                "Chrono Orbit":{"name":42},"Liquid Morphic Pill":{}}"#,
         )
         .unwrap();
         fs::write(
@@ -1858,16 +1858,16 @@ mod tests {
         };
         // Params landed; the labels did not.
         assert_eq!(
-            loaded.settings.widget_params["g10"].bounds,
+            loaded.settings.widget_params["Zen Minimal Ribbon"].bounds,
             Some([1, 2, 300, 200])
         );
         assert_eq!(loaded.settings.effect_params["snow"].speed, Some(2.5));
-        // Re-emitting re-canonicalizes the labels from the table.
+        // Re-emitting re-canonicalizes the labels — the id *is* the name.
         let split = split_config_json(&ConfigStore::to_json(&loaded).unwrap());
         let widget: serde_json::Value = serde_json::from_str(&split.widget).unwrap();
         let effects: serde_json::Value = serde_json::from_str(&split.effects).unwrap();
-        assert_eq!(widget["g10"]["name"], "Zen Minimal Ribbon");
-        assert_eq!(widget["d3"]["name"], "Chrono Orbit");
+        assert_eq!(widget["Zen Minimal Ribbon"]["name"], "Zen Minimal Ribbon");
+        assert_eq!(widget["Chrono Orbit"]["name"], "Chrono Orbit");
         assert_eq!(effects["snow"]["name"], "Snowfall");
     }
 

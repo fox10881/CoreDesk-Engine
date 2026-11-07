@@ -120,7 +120,10 @@ impl VisualizerHost {
                             }
                             Some(0)
                         }
-                        msg::WM_TIMER if wparam == TIMER_FEED => {
+                        msg::WM_TIMER => {
+                            if wparam != TIMER_FEED {
+                                return None;
+                            }
                             let s = state.borrow();
                             let snap = s.spectrum.read().map(|g| *g).unwrap_or_default();
                             // Edge-triggered pause: one `paused:true` frame lets

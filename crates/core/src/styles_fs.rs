@@ -334,7 +334,7 @@ fn collect_widget_dir(dir: &Path, custom: bool, out: &mut BTreeMap<String, Style
     }
 }
 
-/// `<!-- cde-meta {"id":"g5","label":"流光胶囊",…} -->` — the optional
+/// `<!-- cde-meta {"id":"Zen Minimal Ribbon","label":"Zen Minimal Ribbon",…} -->` — the optional
 /// header comment carrying a design's display metadata. Scanned from the
 /// document head only (first 8 KB) so giant modded files still enumerate
 /// cheaply; the JSON is parsed loosely — `label` is all we consume.

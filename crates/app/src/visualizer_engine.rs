@@ -258,7 +258,10 @@ fn control_loop(
     let mut smoothed = [0.0f32; BANDS];
     let mut last_occl_check = Instant::now() - Duration::from_secs(1);
     let mut is_occluded = true; // assume hidden until proven otherwise
-    let mut was_paused = true;
+    // Starts false so the *first* occluded check still takes the
+    // freeze-frame edge — booting straight into occlusion must mark the
+    // snapshot paused, not leave it looking unpaused-but-dead.
+    let mut was_paused = false;
     // Silence↔audible transition diagnostics ("is the engine hearing the
     // desktop?" in the log without per-frame spam): audible = level > 5 % for
     // a beat, silent = under 1 % for ~4 s.
