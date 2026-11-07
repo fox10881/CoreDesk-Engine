@@ -1,0 +1,50 @@
+{
+  "id": "OnlySearch",
+  "label": "Only Search",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Grid#FrameRoot",
+      "styles": [
+        "MaxHeight=160",
+        "MinHeight=100"
+      ]
+    },
+    {
+      "target": "Border#AcrylicOverlay",
+      "styles": [
+        "Height=3"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.ToggleButton#ShowHideCompanion",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#RightCompanionContainerGrid",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    }
+  ],
+  "classicVariant": {
+    "targetStyles": [
+      {
+        "target": "StartDocked.StartSizingFrame",
+        "styles": [
+          "MinHeight=100",
+          "MaxHeight=160"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Grid#UndockedRoot",
+        "styles": [
+          "Visibility=Collapsed"
+        ]
+      }
+    ]
+  }
+}

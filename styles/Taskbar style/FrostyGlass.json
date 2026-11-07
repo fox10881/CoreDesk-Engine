@@ -1,0 +1,526 @@
+{
+  "id": "FrostyGlass",
+  "label": "Frosty Glass",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid",
+      "styles": [
+        "Margin=0,0,0,4",
+        "BorderThickness=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "CornerRadius=$CornerRadius",
+        "Background:=$Background",
+        "Padding=2,0,1.5,0"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel",
+      "styles": [
+        "Margin=3.5",
+        "Background:=$Background",
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Margin=12,0,12,4",
+        "Background:=$Background",
+        "BorderThickness=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "CornerRadius=$CornerRadius",
+        "Padding=-1,0,-1,0"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView",
+      "styles": [
+        "Padding=4.5,4,2,4",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView#NotifyItemIcon",
+      "styles": [
+        "Padding=$TrayPadding",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton",
+      "styles": [
+        "Padding=$TrayPadding",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton",
+      "styles": [
+        "Padding=2,4,4.5,4",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton > Grid > ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid",
+      "styles": [
+        "Padding=2,2,5,4",
+        "CornerRadius=7",
+        "HorizontalAlignment=Center"
+      ]
+    },
+    {
+      "target": "SystemTray.IconView#SystemTrayIcon > Grid#ContainerGrid > ContentPresenter#ContentPresenter > Grid#ContentGrid > SystemTray.TextIconContent > Grid#ContainerGrid",
+      "styles": [
+        "Padding=$TrayPadding",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "SystemTray.StackListView#IconStack > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon",
+      "styles": [
+        "Padding=$TrayPadding",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "SystemTray.Stack#ShowDesktopStack",
+      "styles": [
+        "Visibility=1"
+      ]
+    },
+    {
+      "target": "Taskbar.Gripper#GripperControl",
+      "styles": [
+        "Width=Auto"
+      ]
+    },
+    {
+      "target": "SystemTray.SystemTrayFrame",
+      "styles": [
+        "HorizontalAlignment=Right",
+        "CornerRadius=$CornerRadius",
+        "Width=Auto"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#AugmentedEntryPointContentGrid",
+      "styles": [
+        "Margin=4,0,0,0",
+        "HorizontalAlignment=Center"
+      ]
+    },
+    {
+      "target": "TextBlock#TimeInnerTextBlock",
+      "styles": [
+        "FontSize=13",
+        "FontFamily=Segoe UI VF",
+        "Margin=0",
+        "Padding=0",
+        "RenderTransform:=<TranslateTransform X=\"5\" Y=\"2\" />",
+        "Width=Auto"
+      ]
+    },
+    {
+      "target": "TextBlock#DateInnerTextBlock",
+      "styles": [
+        "Visibility=1",
+        "RenderTransform:=<TranslateTransform X=\"4\" Y=\"0\" />",
+        "FontSize=11",
+        "FontFamily=Segoe UI VF"
+      ]
+    },
+    {
+      "target": "TextBlock#InnerTextBlock[Text=uE971]",
+      "styles": [
+        "Text=uED14"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#ConfirmatorMainGrid",
+      "styles": [
+        "BorderThickness=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "Background:=$Background",
+        "CornerRadius=10"
+      ]
+    },
+    {
+      "target": "TextBlock#SearchBoxTextBlock",
+      "styles": [
+        "Text=Search",
+        "FontSize=10",
+        "FontFamily=vivo Sans EN VF"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton > Grid > ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid > Grid > SystemTray.TextIconContent",
+      "styles": [
+        "Visibility=1"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Button",
+      "styles": [
+        "BorderThickness=1",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#OverflowFlyoutBackgroundBorder",
+      "styles": [
+        "BorderThickness=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "Background:=$Background",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.VirtualDesktopBarElement#VirtualDesktopBar",
+      "styles": [
+        "CornerRadius=$CornerRadius",
+        "Background:=$Background"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#BackgroundDimmingLayer",
+      "styles": [
+        "Background:=$Background",
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#SnapBarBorder",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness=$BorderThickness",
+        "RenderTransform:=<TranslateTransform X=\"0\" Y=\"10\" />",
+        "Margin=0,0,0,-10",
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#SnapPickerBorder",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness=$BorderThickness",
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#SearchPillBackgroundElement",
+      "styles": [
+        "BorderBrush:=$ElementBorderBrush",
+        "CornerRadius=$ElementCornerRadius",
+        "BorderThickness=$ElementBorderThickness",
+        "Margin=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarExtensionElement",
+      "styles": [
+        "RenderTransform:=<TranslateTransform X=\"0\" Y=\"0\" />"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel",
+      "styles": [
+        "RenderTransform:=<TranslateTransform X=\"0\" Y=\"0\" />",
+        "Padding=1.5,4,1.5,4"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ToolTip > Windows.UI.Xaml.Controls.ContentPresenter#LayoutRoot",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "SearchUx.SearchUI.SearchButtonControl",
+      "styles": [
+        "Width=Auto",
+        "Margin=-1,0,-1,0",
+        "Padding=$TrayPadding",
+        "CornerRadius=7"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.VirtualDesktopBarElement > Windows.UI.Xaml.Controls.Grid#GridElement > Windows.UI.Xaml.Controls.Border#VirtualDesktopSwitcherBackground",
+      "styles": [
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness=$BorderThickness",
+        "Background:=$Background",
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.SwitchItemListViewItem > Grid > Border",
+      "styles": [
+        "Background:=$Background",
+        "CornerRadius=$CornerRadius",
+        "BorderThickness:=$BorderThickness",
+        "BorderBrush:=$BorderBrush"
+      ]
+    },
+    {
+      "target": "Border#VirtualDesktopBarBackground",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness=$BorderThickness",
+        "CornerRadius=$CornerRadius",
+        "Margin=0,0,0,-3"
+      ]
+    },
+    {
+      "target": "Border#HoverFlyoutBackground",
+      "styles": [
+        "BorderBrush:=$BorderBrush",
+        "CornerRadius=$CornerRadius",
+        "BorderThickness=$BorderThickness",
+        "Background:=$Background"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#HoverFlyoutBackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill:=Transparent"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid",
+      "styles": [
+        "BorderBrush:=$BorderBrush",
+        "CornerRadius=$CornerRadius",
+        "BorderThickness=$BorderThickness",
+        "Background:=$Background"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton#TaskListButton",
+      "styles": [
+        "CornerRadius=7",
+        "Padding=$TrayPadding",
+        "Visibility=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.Border#BackgroundElement, Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Windows.UI.Xaml.Controls.Border#BackgroundElement",
+      "styles": [
+        "CornerRadius=7",
+        "Padding=$TrayPadding",
+        "Visibility=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid@DockingStates",
+      "styles": [
+        "Tag=horizontal",
+        "Tag@DockedLeft=vertical",
+        "Tag@DockedRight=vertical",
+        "Tag=>taskbarDock"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame",
+      "styles": [
+        "HorizontalAlignment=Center",
+        "Width={{taskbarDock==`vertical`?skip():`Auto`}}",
+        "Padding=1,0,1,0"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Visibility=0"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Border#BackgroundElement, Taskbar.TaskListLabeledButtonPanel > Border#BackgroundElement",
+      "styles": [
+        "Visibility=0"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton]",
+      "styles": [
+        "Visibility=0"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid > Grid",
+      "styles": [
+        "Background:=Transparent",
+        "BorderBrush:=Transparent"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskItemThumbnailView > Grid@CommonStates > Border#BackgroundBorder",
+      "styles": [
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.VirtualDesktopElementThemed > Windows.UI.Xaml.Controls.Grid#MainGrid > Windows.UI.Xaml.Controls.Border#MainBorder",
+      "styles": [
+        "CornerRadius:=$CornerRadius",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness",
+        "Background:=$Background",
+        "Margin=0,0,0,0"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.VirtualDesktopElementThemed > Windows.UI.Xaml.Controls.Grid#MainGrid > Windows.UI.Xaml.Controls.Border#BorderHighlight",
+      "styles": [
+        "CornerRadius:=$CornerRadius",
+        "Visibility=1"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.VirtualDesktopElementThemed > Windows.UI.Xaml.Controls.Grid#MainGrid > Windows.UI.Xaml.Controls.Border#ActiveDesktopPill",
+      "styles": [
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.NewVirtualDesktopElementThemed#NewVirtualDesktopButtonThemed > Windows.UI.Xaml.Controls.Grid#MainGrid > Windows.UI.Xaml.Controls.Border#MainBorder",
+      "styles": [
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.NewVirtualDesktopElementThemed#NewVirtualDesktopButtonThemed > Windows.UI.Xaml.Controls.Grid#MainGrid > Windows.UI.Xaml.Controls.Border#BorderHighlight",
+      "styles": [
+        "CornerRadius:=$CornerRadius",
+        "Visibility=1"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.MenuFlyoutPresenter > Windows.UI.Xaml.Controls.Border",
+      "styles": [
+        "Background:=$Background",
+        "CornerRadius:=$CornerRadius",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#BackgroundControl > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Shapes.Rectangle#BackgroundFill",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.AltTab > Windows.UI.Xaml.Controls.Grid#ModalRootGrid > Windows.UI.Xaml.Controls.Border#BackgroundElement",
+      "styles": [
+        "Background=Transparent",
+        "BorderThickness=0",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.AltTab > Windows.UI.Xaml.Controls.Grid#ModalRootGrid > Windows.UI.Xaml.Controls.Border#BackgroundElement > WindowsInternal.ComposableShell.Experiences.Switcher.SwitchItemList",
+      "styles": [
+        "Background:=$Background",
+        "BorderThickness:=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness",
+        "CornerRadius:=10"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel",
+      "styles": [
+        "Margin=0"
+      ]
+    },
+    {
+      "target": "Taskbar.Gripper#GripperControl",
+      "styles": [
+        "Width=Auto",
+        "MinWidth=24"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background:=$Background",
+        "CornerRadius:=10",
+        "BorderThickness:=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "BackgroundSizing=InnerBorderEdge"
+      ]
+    },
+    {
+      "target": "SearchUx.SearchUI.SearchIconButton > SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.Border#BackgroundElement, SearchUx.SearchUI.SearchIconButton > SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Windows.UI.Xaml.Controls.Border#BackgroundElement",
+      "styles": [
+        "CornerRadius:=7",
+        "Padding=$TrayPadding"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#SearchPillBackgroundElement",
+      "styles": [
+        "CornerRadius:=7",
+        "Padding=$TrayPadding"
+      ]
+    },
+    {
+      "target": "Border#TaskbarSearchBackground",
+      "styles": [
+        "CornerRadius=$CornerRadius",
+        "Background:=$Background",
+        "BorderThickness=$BorderThickness",
+        "BorderBrush:=$BorderBrush"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView > Grid#ContainerGrid > Border#BackgroundBorder",
+      "styles": [
+        "CornerRadius=7"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "Background=<WindhawkBlur BlurAmount=\"20\" TintColor=\"{ThemeResource SystemChromeDarkColor}\" TintOpacity=\"0.15\" />",
+    "BorderBrush2=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"{ThemeResource SystemChromeHighColor}\" Offset=\"0.0\" /><GradientStop Color=\"{ThemeResource SystemChromeLowColor}\" Offset=\"0.25\" /><GradientStop Color=\"{ThemeResource SystemChromeHighColor}\" Offset=\"1\" /></LinearGradientBrush>",
+    "BorderThickness=1",
+    "CornerRadius=10",
+    "BorderBrush=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#50808080\" Offset=\"0.0\" /><GradientStop Color=\"#50404040\" Offset=\"0.25\" /><GradientStop Color=\"#50808080\" Offset=\"1\" /></LinearGradientBrush>",
+    "Background2=<AcrylicBrush TintColor=\"{ThemeResource SystemChromeAltHighColor}\" TintOpacity=\"0.3\" FallbackColor=\"{ThemeResource SystemChromeAltHighColor}\" />",
+    "TrayPadding=2,4,2,4",
+    "ElementBG=<SolidColorBrush Color=\"{ThemeResource SystemChromeAltHighColor}\" Opacity=\"0.3\" />",
+    "ElementBorderThickness=1",
+    "ElementBorderBrush=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#50808080\" Offset=\"1\" /><GradientStop Color=\"#50606060\" Offset=\"0.15\" /></LinearGradientBrush>",
+    "ElementCornerRadius=10",
+    "Background3=Transparent",
+    "BorderBrush3=Transparent"
+  ]
+}

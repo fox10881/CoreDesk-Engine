@@ -1,0 +1,212 @@
+{
+  "id": "BottomDensy",
+  "label": "BottomDensy",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Rectangle#BackgroundStroke",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@RunningIndicatorStates > Rectangle#RunningIndicator, Taskbar.TaskListLabeledButtonPanel@RunningIndicatorStates > Rectangle#RunningIndicator",
+      "styles": [
+        "Fill=#8f8f8f",
+        "Fill@ActiveRunningIndicator=#fef9f0",
+        "Width=2",
+        "Height=2",
+        "Margin=0,-2,0,0",
+        "Width@ActiveRunningIndicator=32"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@RunningIndicatorStates > Microsoft.UI.Xaml.Controls.ProgressBar#ProgressIndicator, Taskbar.TaskListLabeledButtonPanel@RunningIndicatorStates > Microsoft.UI.Xaml.Controls.ProgressBar#ProgressIndicator",
+      "styles": [
+        "VerticalAlignment=0"
+      ]
+    },
+    {
+      "target": "Rectangle#RunningIndicator",
+      "styles": [
+        "VerticalAlignment=0"
+      ]
+    },
+    {
+      "target": "Border#ProgressBarRoot",
+      "styles": [
+        "VerticalAlignment=0"
+      ]
+    },
+    {
+      "target": "Rectangle#IndeterminateProgressBarIndicator",
+      "styles": [
+        "VerticalAlignment=0"
+      ]
+    },
+    {
+      "target": "Rectangle#IndeterminateProgressBarIndicator2",
+      "styles": [
+        "VerticalAlignment=0"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel, Taskbar.TaskListLabeledButtonPanel",
+      "styles": [
+        "Padding=2,0,2,0",
+        "VerticalAlignment=2"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton]",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "SystemTray.Stack#ShowDesktopStack",
+      "styles": [
+        "Width=1"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Rectangle#ShowDesktopPipe",
+      "styles": [
+        "HorizontalAlignment=0"
+      ]
+    },
+    {
+      "target": "SystemTray.NotificationAreaIcons#NotificationAreaIcons > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.NotifyIconView#NotifyItemIcon > Grid#ContainerGrid > ContentPresenter#ContentPresenter > Grid#ContentGrid > SystemTray.ImageIconContent > Grid#ContainerGrid > Image",
+      "styles": [
+        "Width=20",
+        "Height=20"
+      ]
+    },
+    {
+      "target": "WrapGrid > ContentPresenter > SystemTray.NotifyIconView > Grid#ContainerGrid > ContentPresenter#ContentPresenter > Grid#ContentGrid > SystemTray.ImageIconContent > Grid#ContainerGrid > Image",
+      "styles": [
+        "Width=20",
+        "Height=20"
+      ]
+    },
+    {
+      "target": "SystemTray.NotificationAreaOverflow > Grid#OverflowRootGrid",
+      "styles": [
+        "Padding=0,0,0,0"
+      ]
+    },
+    {
+      "target": "SystemTray.NotificationAreaOverflow > Grid#OverflowRootGrid > Border#OverflowFlyoutBackgroundBorder",
+      "styles": [
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "SystemTray.NotificationAreaOverflow > Grid#OverflowRootGrid > ItemsControl",
+      "styles": [
+        "Margin=0,0,0,0"
+      ]
+    },
+    {
+      "target": "SystemSettings.View.RootPage > Grid#RootPageGrid > Grid#RootCommandSearchGrid > SystemSettings.View.SettingsAutoSuggestCommandSearchBox#CommandSearchBox",
+      "styles": [
+        "Margin=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > SystemTray.NotificationAreaOverflow > Grid#OverflowRootGrid > Border#OverflowFlyoutBackgroundBorder",
+      "styles": [
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid",
+      "styles": [
+        "BorderThickness=0",
+        "CornerRadius=0",
+        "MinHeight=32"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid",
+      "styles": [
+        "Padding=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator",
+      "styles": [
+        "Padding=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator > Button",
+      "styles": [
+        "Margin=0,0,2,0",
+        "Height=16",
+        "Width=16"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid",
+      "styles": [
+        "MinHeight=16"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator > Button > ContentPresenter#ContentPresenter > Microsoft.UI.Xaml.Controls.AnimatedIcon#VolumeIcon",
+      "styles": [
+        "Padding=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator > Slider#volumeSlider > Grid > Grid#SliderContainer > Grid#HorizontalTemplate",
+      "styles": [
+        "RowDefinitions:=<RowDefinitionCollection><RowDefinition Height=\"2\"/><RowDefinition Height=\"Auto\"/><RowDefinition Height=\"2\"/></RowDefinitionCollection>"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator > TextBlock#volumeLevelText",
+      "styles": [
+        "MinWidth=24",
+        "Margin=0,0,0,0",
+        "VerticalAlignment=1"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas",
+      "styles": [
+        "VerticalAlignment=1"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator",
+      "styles": [
+        "Width:=$volume_bar_width_outer_152"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid > Grid#VolumeConfirmator > Slider#volumeSlider",
+      "styles": [
+        "Width:=$volume_bar_width_inner_110"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > HWConfirmatorUI.ConfirmatorHostControl > Canvas#ConfirmatorFrameCanvas > Grid > Grid#ConfirmatorMainGrid",
+      "styles": [
+        "MaxWidth=4096"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "volume_bar_width_outer_152=132",
+    "volume_bar_width_inner_110=90"
+  ]
+}

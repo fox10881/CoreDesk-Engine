@@ -2605,17 +2605,20 @@ impl Config {
         if !looks_like_rgba(&s.fe_dark_rgba) {
             s.fe_dark_rgba = fe_dark_rgba_default();
         }
-        // `""` = surface not styled — always a legal theme value.
-        if !s.taskbar_style.is_empty() && !crate::taskbar_themes::is_style_id(&s.taskbar_style) {
+        // `""` = surface not styled — always a legal theme value. The check is
+        // charset-only: style files live on disk now (`styles_fs`), so a missing
+        // or unparsable file must not clear the setting — it resolves to
+        // Windows Default at apply time and returns when the file does.
+        if !s.taskbar_style.is_empty() && !crate::styles_fs::is_valid_style_id(&s.taskbar_style) {
             s.taskbar_style.clear();
         }
         if !s.start_menu_style.is_empty()
-            && !crate::start_menu_themes::is_style_id(&s.start_menu_style)
+            && !crate::styles_fs::is_valid_style_id(&s.start_menu_style)
         {
             s.start_menu_style.clear();
         }
         if !s.notification_center_style.is_empty()
-            && !crate::notification_center_themes::is_style_id(&s.notification_center_style)
+            && !crate::styles_fs::is_valid_style_id(&s.notification_center_style)
         {
             s.notification_center_style.clear();
         }
@@ -4028,6 +4031,9 @@ mod theme_portable_tests {
         c.settings.fe_effect = "micaalt2".into();
         c.settings.fe_light_rgba = "not-a-color".into();
         c.settings.fe_dark_rgba = "#GGHHIIJJ".into();
+        // Style files live on disk (`styles_fs`): a well-formed but missing
+        // id survives validation (it resolves to Windows Default at apply
+        // and returns when the file does); only charset-invalid ids clear.
         c.settings.taskbar_style = "NonexistentStyle".into();
         c.settings.start_menu_style = "Down Aero".into(); // valid — kept
         c.settings.notification_center_style = "???".into();
@@ -4048,7 +4054,7 @@ mod theme_portable_tests {
         assert_eq!(s.fe_effect, "");
         assert!(super::looks_like_rgba(&s.fe_light_rgba));
         assert!(super::looks_like_rgba(&s.fe_dark_rgba));
-        assert_eq!(s.taskbar_style, "");
+        assert_eq!(s.taskbar_style, "NonexistentStyle");
         assert_eq!(s.start_menu_style, "Down Aero");
         assert_eq!(s.notification_center_style, "");
         assert_eq!(s.clock_style, "none");

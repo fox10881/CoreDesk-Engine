@@ -1,0 +1,692 @@
+{
+  "id": "Oversimplified&Accentuated",
+  "label": "Oversimplified & Accentuated",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "MenuFlyoutPresenter",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "ToolTip > ContentPresenter#LayoutRoot",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush:=$Reveal",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Grid#NotificationCenterGrid",
+      "styles": [
+        "Background:=$Alt",
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "TextBlock#NotificationsTextBlock",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Button#ClearAll",
+      "styles": [
+        "AccessKey=C"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.ToggleButton#DoNotDisturbButton",
+      "styles": [
+        "AccessKey=D"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.AnimatedIcon#DoNotDisturbButtonIcon",
+      "styles": [
+        "Height=16",
+        "Width=16"
+      ]
+    },
+    {
+      "target": "Grid#DoNotDisturbSubtext",
+      "styles": [
+        "Background:=$Accent",
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=5",
+        "Margin=0,0,0,10"
+      ]
+    },
+    {
+      "target": "Grid#DoNotDisturbSubtext > TextBlock[1]",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#DoNotDisturbSubtext > TextBlock[2]",
+      "styles": [
+        "HorizontalAlignment=Center",
+        "FontSize=18"
+      ]
+    },
+    {
+      "target": "Grid#DoNotDisturbSubtext > TextBlock[3]",
+      "styles": [
+        "TextAlignment=Center",
+        "FontSize=11"
+      ]
+    },
+    {
+      "target": "Grid#DoNotDisturbSubtext > Button",
+      "styles": [
+        "HorizontalAlignment=Center",
+        "Margin= 0,0,0,0"
+      ]
+    },
+    {
+      "target": "TextBlock#NotificationSettingsButtonText[Text=Notification settings]",
+      "styles": [
+        "Text=Settings"
+      ]
+    },
+    {
+      "target": "Border#ItemOpaquePlating",
+      "styles": [
+        "BorderBrush:=$Reveal"
+      ]
+    },
+    {
+      "target": "Border#StandardImageBorder",
+      "styles": [
+        "Height=30",
+        "Width=30"
+      ]
+    },
+    {
+      "target": "Grid#GroupTitleGrid > TextBlock#Title",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid > Button#VerbButton",
+      "styles": [
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Border#PopupBorder",
+      "styles": [
+        "Background:=$DarkAccent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "ProgressBar#progressBar > Grid > Border#DeterminateRoot",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Border#ToastBackgroundBorder, Border#ToastBackgroundBorder2",
+      "styles": [
+        "Background:=$Alt",
+        "BorderBrush=Transparent",
+        "CornerRadius=15",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Border#AppLogoBorder2",
+      "styles": [
+        "Height=30",
+        "Width=30"
+      ]
+    },
+    {
+      "target": "Border#AppLogoBorder",
+      "styles": [
+        "Height=30",
+        "Width=30"
+      ]
+    },
+    {
+      "target": "Image#AppLogo2",
+      "styles": [
+        "Height=30",
+        "Width=30"
+      ]
+    },
+    {
+      "target": "Grid#ToastTitleBar > TextBlock#SenderName",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#CalendarCenterGrid",
+      "styles": [
+        "Background:=$Alt",
+        "BorderBrush=Transparent",
+        "CornerRadius=20",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Border#CalendarHeaderMinimizedOverlay",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Button#ExpandCollapseButton",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent",
+        "AccessKey=E"
+      ]
+    },
+    {
+      "target": "ScrollViewer#CalendarControlScrollViewer",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "CalendarViewDayItem",
+      "styles": [
+        "CornerRadius=10"
+      ]
+    },
+    {
+      "target": "CalendarViewDayItem > Border",
+      "styles": [
+        "BorderBrush:= <RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"1\" />",
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.CalendarPanel#YearViewPanel > Control",
+      "styles": [
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.CalendarPanel#YearViewPanel > Control > Border",
+      "styles": [
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.CalendarPanel#DecadeViewPanel > Control",
+      "styles": [
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.CalendarPanel#DecadeViewPanel > Control > Border",
+      "styles": [
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Grid#FocusGrid",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Button#IncreaseTimeButton",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Button#DecreaseTimeButton",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Button#StartButton",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Grid#ControlCenterRegion",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent",
+        "CornerRadius=20",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Grid#L1Grid > Border",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Grid#L1Grid",
+      "styles": [
+        "Background:=$Alt",
+        "BorderBrush=Transparent",
+        "CornerRadius=20"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedGridView > Grid > GridView#RootGridView",
+      "styles": [
+        "Height=auto"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.PipsPager#QuickActionsPager",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "ContentPresenter#ContentPresenter",
+      "styles": [
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedToggleButton",
+      "styles": [
+        "Height=60"
+      ]
+    },
+    {
+      "target": "ContentControl > ContentPresenter > Grid > Grid",
+      "styles": [
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedToggleButton > ContentPresenter#ContentPresenter@CommonStates",
+      "styles": [
+        "Background@Normal:= <AcrylicBrush TintColor=\"{ThemeResource SystemAltHighColor}\" FallbackColor=\"{ThemeResource CardStrokeColorDefaultSolid}\" />",
+        "Background@Checked:=$Accent",
+        "Background@CheckedPointerOver:= <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColorLight1}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAccentColorLight1}\" />",
+        "Background@CheckedPressed:= <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColorDark1}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAccentColorDark1}\" />",
+        "Background@CheckedDisabled:= <AcrylicBrush TintColor=\"red\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"red\" />"
+      ]
+    },
+    {
+      "target": "Grid > Microsoft.UI.Xaml.Controls.AnimatedIcon",
+      "styles": [
+        "Height=30",
+        "Width=30"
+      ]
+    },
+    {
+      "target": "ContentPresenter#Content > StackPanel > TextBlock",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedToggleButton#ToggleButton[AutomationProperties.Name=Accessibility]",
+      "styles": [
+        "CornerRadius=10"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedToggleButton#ToggleButton[AutomationProperties.Name=Cast]",
+      "styles": [
+        "CornerRadius=10"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedToggleButton#ToggleButton[AutomationProperties.Name=Project]",
+      "styles": [
+        "CornerRadius=10"
+      ]
+    },
+    {
+      "target": "ControlCenter.PaginatedGridView > Grid",
+      "styles": [
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Rectangle#HorizontalTrackRect",
+      "styles": [
+        "Opacity=0"
+      ]
+    },
+    {
+      "target": "Rectangle#HorizontalDecreaseRect",
+      "styles": [
+        "Fill:=$Accent",
+        "Height=6"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.Thumb#HorizontalThumb > Border",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.Thumb#HorizontalThumb",
+      "styles": [
+        "Width=0"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.AnimatedIcon#BrightnessPlayer",
+      "styles": [
+        "Height=25",
+        "Width=25"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.AnimatedIcon#FooterButtonIcon",
+      "styles": [
+        "Height=25",
+        "Width=25"
+      ]
+    },
+    {
+      "target": "Button#VolumeL2Button > ContentPresenter > StackPanel > FontIcon[1]",
+      "styles": [
+        "FontSize=20"
+      ]
+    },
+    {
+      "target": "StackPanel > ContentPresenter > ContentControl > ContentPresenter > Button > ContentPresenter > StackPanel > TextBlock#Icon",
+      "styles": [
+        "FontSize=25"
+      ]
+    },
+    {
+      "target": "StackPanel > ContentPresenter > ContentControl > ContentPresenter > Button > ContentPresenter > StackPanel > TextBlock[2]",
+      "styles": [
+        "FontSize=16"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.ToggleButton > ContentPresenter > Microsoft.UI.Xaml.Controls.AnimatedIcon",
+      "styles": [
+        "Height=25",
+        "Width=25"
+      ]
+    },
+    {
+      "target": "Grid#L1Grid > Grid",
+      "styles": [
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageHeader",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Grid#FullScreenPageRoot > ContentPresenter#PageHeader > Border > Grid > Button#BackButton",
+      "styles": [
+        "CornerRadius=14"
+      ]
+    },
+    {
+      "target": "ContentPresenter > Grid#FullScreenPageRoot",
+      "styles": [
+        "Background:=$DarkAccent"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageContent > Grid > Border",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Grid > ScrollViewer#ListContent",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Border#SwitchKnobOn",
+      "styles": [
+        "Background="
+      ]
+    },
+    {
+      "target": "StackPanel > ContentPresenter > Border",
+      "styles": [
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Border#WADFeatureFooter",
+      "styles": [
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRoot",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRegion",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "CornerRadius=20",
+        "Height=Auto",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRoot > Grid[2]",
+      "styles": [
+        "Margin=-8,0,0,12"
+      ]
+    },
+    {
+      "target": "StackPanel#PrimaryAndSecondaryTextContainer",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#AlbumTextAndArtContainer",
+      "styles": [
+        "HorizontalAlignment=Center"
+      ]
+    },
+    {
+      "target": "Grid#ThumbnailImage",
+      "styles": [
+        "CornerRadius=15",
+        "Height=300",
+        "Width=300"
+      ]
+    },
+    {
+      "target": "Border#JumpListRestyledAcrylic",
+      "styles": [
+        "Background:=$DarkAccent",
+        "CornerRadius=15",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "GridViewItem[1] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=1"
+      ]
+    },
+    {
+      "target": "GridViewItem[2] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=2"
+      ]
+    },
+    {
+      "target": "GridViewItem[3] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=3"
+      ]
+    },
+    {
+      "target": "GridViewItem[4] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=4"
+      ]
+    },
+    {
+      "target": "GridViewItem[5] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=5"
+      ]
+    },
+    {
+      "target": "GridViewItem[6] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=6"
+      ]
+    },
+    {
+      "target": "GridViewItem[7] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=7"
+      ]
+    },
+    {
+      "target": "GridViewItem[8] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=8"
+      ]
+    },
+    {
+      "target": "GridViewItem[9] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=9"
+      ]
+    },
+    {
+      "target": "GridViewItem[10] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=0"
+      ]
+    },
+    {
+      "target": "GridViewItem[11] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=-"
+      ]
+    },
+    {
+      "target": "GridViewItem[1] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=1"
+      ]
+    },
+    {
+      "target": "GridViewItem[2] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=2"
+      ]
+    },
+    {
+      "target": "GridViewItem[3] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=3"
+      ]
+    },
+    {
+      "target": "GridViewItem[4] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=4"
+      ]
+    },
+    {
+      "target": "GridViewItem[5] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=5"
+      ]
+    },
+    {
+      "target": "GridViewItem[6] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=6"
+      ]
+    },
+    {
+      "target": "GridViewItem[7] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=7"
+      ]
+    },
+    {
+      "target": "GridViewItem[8] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=8"
+      ]
+    },
+    {
+      "target": "GridViewItem[9] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=9"
+      ]
+    },
+    {
+      "target": "GridViewItem[10] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=0"
+      ]
+    },
+    {
+      "target": "GridViewItem[11] > Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > ContentControl > ContentPresenter > Grid > ControlCenter.PaginatedToggleButton#ToggleButton",
+      "styles": [
+        "AccessKey=-"
+      ]
+    },
+    {
+      "target": "Grid#RootGrid > QuickActions.ControlCenter.FrameWithContentChanged#L2Frame",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "QuickActions.ControlCenter.AccessibleWindow#PageWindow",
+      "styles": [
+        "Background=Transparent"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "Alt = <AcrylicBrush TintColor=\"{ThemeResource SystemAltHighColor}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAltHighColor}\" />",
+    "Accent = <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColor}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAccentColor}\" />",
+    "DarkAccent = <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColorDark1}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.3\" FallbackColor=\"{ThemeResource SystemAccentColorDark1}\" />",
+    "SolidAccent = <SolidColorBrush Color=\"{ThemeResource SystemAccentColor}\" Opacity=\"1\"/>",
+    "Reveal = <RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"1\" />"
+  ]
+}

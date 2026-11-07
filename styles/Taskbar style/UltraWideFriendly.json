@@ -1,0 +1,82 @@
+{
+  "id": "UltraWideFriendly",
+  "label": "Ultra-Wide Friendly",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": ":root > ScrollViewer > ScrollContentPresenter > Border > Grid",
+      "styles": [
+        "ColumnDefinitions:=<ColumnDefinitionCollection><ColumnDefinition Width=\"*\"/><ColumnDefinition Width=\"Auto\"/><ColumnDefinition Width=\"Auto\"/><ColumnDefinition Width=\"*\"/></ColumnDefinitionCollection>",
+        "HorizontalAlignment=Stretch",
+        "Background:=<SolidColorBrush Color=\"$GhostBarBackgroundColor\"/>",
+        "ActualWidth=>containerGridWidth"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid@DockingStates",
+      "styles": [
+        "Tag=horizontal",
+        "Tag@DockedLeft=vertical",
+        "Tag@DockedRight=vertical",
+        "Tag=>taskbarDock"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame",
+      "styles": [
+        "Grid.Column=1",
+        "Width={{taskbarDock==`vertical`?skip():`Auto`}}",
+        "HorizontalAlignment=Right",
+        "Margin=0,0,$IslandHorizontalMargin,0",
+        "MaxWidth={{containerGridWidth>0?min($TaskbarFrameMaxWidth,containerGridWidth):$TaskbarFrameMaxWidth}}"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid",
+      "styles": [
+        "Background:=<SolidColorBrush Color=\"$IslandBackgroundColor\"/>",
+        "CornerRadius=10",
+        "Padding=25,0,25,0",
+        "Margin=0,$IslandVerticalMargin,0,$IslandVerticalMargin"
+      ]
+    },
+    {
+      "target": "SystemTray.SystemTrayFrame",
+      "styles": [
+        "Grid.Column=2",
+        "Width=Auto",
+        "HorizontalAlignment=Left",
+        "Margin=$IslandHorizontalMargin,0,0,0"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background:=<SolidColorBrush Color=\"$IslandBackgroundColor\"/>",
+        "CornerRadius=10",
+        "Padding=5,0,5,0",
+        "Margin=0,$IslandVerticalMargin,0,$IslandVerticalMargin"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#BackgroundControl",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "GhostBarBackgroundColor=#66000000",
+    "IslandBackgroundColor={ThemeResource ControlFillColorDefault}",
+    "IslandVerticalMargin=3",
+    "IslandHorizontalMargin=5",
+    "TaskbarFrameMaxWidth=8000"
+  ]
+}

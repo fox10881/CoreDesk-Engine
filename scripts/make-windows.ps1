@@ -88,6 +88,8 @@ try {
   Copy-Item -LiteralPath "docs/GLASS_RENDERING.md" -Destination $common
   Copy-Item -LiteralPath "docs/DESKTOP_CONTAINERS.md" -Destination $common
   Copy-Item -LiteralPath "skills/coredesk-cli/SKILL.md" -Destination (Join-Path $common "SKILL.md")
+  # Factory XAML styles — the engine resolves <exe dir>\Styles\<category>\*.json.
+  Copy-Item -LiteralPath "styles" -Destination (Join-Path $common "Styles") -Recurse
   $assetsStage = Join-Path $common "assets"
   New-Item -ItemType Directory -Path $assetsStage -Force | Out-Null
   Copy-Item -LiteralPath "assets/wallpapers" -Destination $assetsStage -Recurse

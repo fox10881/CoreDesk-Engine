@@ -1,0 +1,444 @@
+{
+  "id": "Oversimplified&Accentuated",
+  "label": "Oversimplified & Accentuated",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "MenuFlyoutPresenter",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "ToolTip > ContentPresenter#LayoutRoot",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush:=$Reveal",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Border#AcrylicBorder",
+      "styles": [
+        "Background:=$Alt",
+        "BorderBrush=Transparent",
+        "CornerRadius=20"
+      ]
+    },
+    {
+      "target": "Border#AcrylicOverlay",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#DropShadow",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#RootGridDropShadow",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#RightCompanionDropShadow",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#StartDropShadow",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#BorderElement",
+      "styles": [
+        "Opacity=0"
+      ]
+    },
+    {
+      "target": "StartDocked.SearchBoxToggleButton#StartMenuSearchBox > Grid",
+      "styles": [
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=20",
+        "Margin=0,0,0,-8"
+      ]
+    },
+    {
+      "target": "Grid > Image#SearchIconOn",
+      "styles": [
+        "Width=20"
+      ]
+    },
+    {
+      "target": "TextBlock#PlaceholderText",
+      "styles": [
+        "Text=Search"
+      ]
+    },
+    {
+      "target": "Grid#InnerContent > Rectangle",
+      "styles": [
+        "Fill:=$SolidAccent",
+        "MinHeight=22",
+        "MinWidth=2",
+        "Margin=80,8,0,31",
+        "Opacity=1"
+      ]
+    },
+    {
+      "target": "StartMenu.PinnedList#StartMenuPinnedList",
+      "styles": [
+        "Height=421"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.PipsPager#PinnedListPipsPager",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "TextBlock#PinnedListHeaderText",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#ContentBorder@CommonStates > Grid#DroppedFlickerWorkaroundWrapper > Border#BackgroundBorder",
+      "styles": [
+        "Background@Normal:=<SolidColorBrush Color=\"Transparent\" Opacity=\"0.8\"/>",
+        "Background@PointerOver:=<SolidColorBrush Color=\"{ThemeResource ControlFillColorSecondary}\" Opacity=\"0.8\"/>",
+        "Background@Pressed:=<RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"0.3\" />",
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0.2\" />",
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=12",
+        "Height=70",
+        "Width=70"
+      ]
+    },
+    {
+      "target": "Grid#LogoContainer",
+      "styles": [
+        "Height=60",
+        "Width=60"
+      ]
+    },
+    {
+      "target": "Border#ContentBorder@CommonStates > Grid#DroppedFlickerWorkaroundWrapper > ContentPresenter#ContentPresenter > Grid > StartMenu.PinnedListTile > Grid#Root > Grid#LogoContainer > Image#Logo",
+      "styles": [
+        "Height=40",
+        "Width=40",
+        "Height@Pressed=36",
+        "Width@Pressed=36"
+      ]
+    },
+    {
+      "target": "Border#FolderPlate",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent",
+        "Height=56",
+        "Width=56"
+      ]
+    },
+    {
+      "target": "Grid#LogosContainer",
+      "styles": [
+        "Height=68",
+        "Width=68"
+      ]
+    },
+    {
+      "target": "ItemsControl#LogosItemsControl",
+      "styles": [
+        "Height=50",
+        "Width=50"
+      ]
+    },
+    {
+      "target": "ItemsControl#LogosItemsControl > ItemsPresenter > ItemsWrapGrid > ContentPresenter > Windows.UI.Xaml.Controls.Grid",
+      "styles": [
+        "Height=22",
+        "Width=22"
+      ]
+    },
+    {
+      "target": "Grid#Root > Border",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush:=Transparent",
+        "CornerRadius=20"
+      ]
+    },
+    {
+      "target": "TextBlock#TruncationTextBlock",
+      "styles": [
+        "FontSize=30"
+      ]
+    },
+    {
+      "target": "TextBlock#DisplayName",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#SuggestionsParentContainer",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#TopLevelSuggestionsListHeader",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#ShowMoreSuggestions",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#TopLevelSuggestionsContainer",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "StartDocked.NavigationPaneButton#PowerButton > Grid",
+      "styles": [
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "StartDocked.NavigationPaneButton#PowerButton > Grid > ContentPresenter > Grid > FontIcon",
+      "styles": [
+        "Foreground:=$SolidAccent"
+      ]
+    },
+    {
+      "target": "FontIcon#WindowsUpdatePendingReminder",
+      "styles": [
+        "Foreground:=<SolidColorBrush Color=\"{ThemeResource SystemAccentColorLight2}\" Opacity=\"1\" />"
+      ]
+    },
+    {
+      "target": "FontIcon#IconOverlay",
+      "styles": [
+        "Foreground:=$SolidAccent"
+      ]
+    },
+    {
+      "target": "Grid#AccountBadgePlaceholder > StartDocked.IconBadgeView > Grid#IconBadgeRoot > Grid > Windows.UI.Xaml.Shapes.Ellipse",
+      "styles": [
+        "Fill:=<SolidColorBrush Color=\"{ThemeResource SystemAccentColorLight2}\" Opacity=\"1\" />"
+      ]
+    },
+    {
+      "target": "Border#BackgroundBorder",
+      "styles": [
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Button#ShowAllAppsButton > ContentPresenter",
+      "styles": [
+        "Background:=<RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"0.5\" />",
+        "BorderBrush=Transparent",
+        "Height=25"
+      ]
+    },
+    {
+      "target": "Button#CloseAllAppsButton > ContentPresenter",
+      "styles": [
+        "Background:=<RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"0.5\" />",
+        "BorderBrush=Transparent",
+        "Height=25"
+      ]
+    },
+    {
+      "target": "Button > ContentPresenter > StackPanel > TextBlock",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "StackPanel > FontIcon > Grid > TextBlock",
+      "styles": [
+        "FontSize=14 //(Default=10)"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.TextBlock#AllAppsHeading",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "StartDocked.AllAppsZoomListViewItem > Grid#ContentBorder@DisabledStates > Border#BorderBackground",
+      "styles": [
+        "BorderBrush@Enabled:=$Reveal"
+      ]
+    },
+    {
+      "target": "Border#Border",
+      "styles": [
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Border#BorderBackground",
+      "styles": [
+        "CornerRadius=12"
+      ]
+    },
+    {
+      "target": "Border#AppBorder",
+      "styles": [
+        "Background:=$Alt",
+        "BorderBrush=Transparent",
+        "CornerRadius=20"
+      ]
+    },
+    {
+      "target": "Border#LayerBorder",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#dropshadow",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#TaskbarSearchBackground",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Cortana.UI.Views.RichSearchBoxControl#SearchBoxControl > Grid#RootGrid",
+      "styles": [
+        "BorderBrush:=$Reveal",
+        "BorderThickness=2",
+        "CornerRadius=20"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.AnimatedIcon#SearchIconPlayer",
+      "styles": [
+        "Width=20"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "Alt=<AcrylicBrush TintColor=\"{ThemeResource SystemAltHighColor}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAltHighColor}\" />",
+    "Accent=<AcrylicBrush TintColor=\"{ThemeResource SystemAccentColor}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAccentColor}\" />",
+    "DarkAccent=<AcrylicBrush TintColor=\"{ThemeResource SystemAccentColorDark1}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.3\" FallbackColor=\"{ThemeResource SystemAccentColorDark1}\" />",
+    "SolidAccent=<SolidColorBrush Color=\"{ThemeResource SystemAccentColor}\" Opacity=\"1\"/>",
+    "Reveal=<RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"1\" />"
+  ],
+  "webViewTargetStyles": [
+    {
+      "target": "li.rightHeaderButtons.itemTooltip.MouseHoverTooltip",
+      "styles": [
+        "display: none"
+      ]
+    },
+    {
+      "target": ".scope-with-background__backButton",
+      "styles": [
+        "display: none !important"
+      ]
+    },
+    {
+      "target": ".scope-with-background__rightCaret,.scope-with-background__leftCaret",
+      "styles": [
+        "display: none !important"
+      ]
+    },
+    {
+      "target": ".previewContainer",
+      "styles": [
+        "border-radius: 20px !important"
+      ]
+    },
+    {
+      "target": ".scopes-list",
+      "styles": [
+        "justify-content: center"
+      ]
+    },
+    {
+      "target": ".scope-with-background.darkTheme .scope-tile--selected .scope-tile__title,.scope-with-background .scope-tile--selected .scope-tile__title",
+      "styles": [
+        "Background: var(--accent0) !important",
+        "color: white !important"
+      ]
+    },
+    {
+      "target": ".scope-tile > div",
+      "styles": [
+        "background-color: Transparent !important"
+      ]
+    },
+    {
+      "target": ".darkTheme #menuContainer",
+      "styles": [
+        "background: black",
+        "border: 1px solid #404040",
+        "border-radius: 20px",
+        "box-shadow: none"
+      ]
+    },
+    {
+      "target": "#root.darkTheme:not(.fileExplorer) .contextMenu",
+      "styles": [
+        "background: black !important",
+        "border-radius: 20px !important"
+      ]
+    },
+    {
+      "target": ".lightTheme #menuContainer",
+      "styles": [
+        "background: white !important",
+        "border: 1px solid #404040",
+        "border-radius: 20px !important",
+        "box-shadow: none"
+      ]
+    },
+    {
+      "target": "#root:not(.fileExplorer) .contextMenu",
+      "styles": [
+        "background: white !important",
+        "border-radius: 20px !important"
+      ]
+    },
+    {
+      "target": "ul.contextMenu::before",
+      "styles": [
+        "display: none !important"
+      ]
+    }
+  ]
+}

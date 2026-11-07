@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert the Windhawk `windows-11-notification-center-styler` theme structs
 into the CoreDesk backend catalog
-(crates/core/data/notification_center_themes.json).
+(crates/core/styles/Notification Center style/*.json).
 
 The source is the mod's published C++ source: `const Theme g_theme<Name> = {{...},
 {...}, {...}}` aggregates — three lists (targetStyles, styleConstants,
@@ -15,8 +15,13 @@ import json
 import re
 import sys
 
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from style_emit import CATEGORY_DIRS, write_category
+
 SRC = sys.argv[1] if len(sys.argv) > 1 else "windows-11-notification-center-styler.txt"
-DST = sys.argv[2] if len(sys.argv) > 2 else "crates/core/data/notification_center_themes.json"
+DST = sys.argv[2] if len(sys.argv) > 2 else "styles"
 
 # setting id -> (struct suffix, display label)
 SELECTABLE = [
@@ -183,8 +188,6 @@ for sid, struct, label in SELECTABLE:
     catalog["themes"][sid] = themes[struct]
     catalog["options"].append({"id": sid, "label": label})
 
-with open(DST, "w", encoding="utf-8", newline="\n") as f:
-    json.dump(catalog, f, ensure_ascii=False, separators=(",", ":"))
-    f.write("\n")
+n = write_category(catalog, CATEGORY_DIRS["notification_center"], DST)
 total_targets = sum(len(t["targetStyles"]) for t in catalog["themes"].values())
-print(f"{len(catalog['options'])} options, {len(catalog['themes'])} themes, {total_targets} target rules -> {DST}")
+print(f"{len(catalog['options'])} options, {n} style files, {total_targets} target rules -> {Path(DST) / CATEGORY_DIRS['notification_center']}")

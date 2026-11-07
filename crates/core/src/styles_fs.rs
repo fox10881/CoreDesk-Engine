@@ -1,0 +1,424 @@
+//! Filesystem-backed style catalogs — the data-driven modding layer.
+//!
+//! Three fixed category directories hold one `<id>.json` per style:
+//!
+//! - [`TASKBAR_DIR`] — `"Taskbar style"`
+//! - [`START_MENU_DIR`] — `"Start Menu style"`
+//! - [`NOTIFICATION_CENTER_DIR`] — `"Notification Center style"`
+//!
+//! Each is resolved across two layers: the factory set shipped with the app
+//! at `<exe dir>\Styles\<category>\` and the user's editable set at
+//! `<config dir>\Styles\<category>\` (registered once by
+//! [`set_user_styles_root`] when the config directory is known). A user file
+//! *shadows* the factory file of the same id — deleting the override
+//! restores the shipped style, and reinstalling/resetting can never destroy
+//! a modder's files.
+//!
+//! The file stem is the catalog id — the exact string `settings.*_style` and
+//! `.cde` archives carry. Nothing here watches the filesystem: files are
+//! read when a dropdown enumerates or a style applies; the delivered wire
+//! stays cached in the host as before. The injected `coredesk_tap.dll`
+//! never sees a file — the host parses the JSON and serializes the `CDES-*`
+//! wire it already understands.
+//!
+//! A style file is the theme payload plus metadata:
+//!
+//! ```json
+//! {
+//!   "id": "Luminosity_variant_Dock",
+//!   "label": "Luminosity — Dock",
+//!   "author": "CoreDesk Engine",
+//!   "version": 1,
+//!   "styleConstants": ["..."],
+//!   "targetStyles": [{"target": "...", "styles": ["..."]}],
+//!   "themeResourceVariables": ["..."]
+//! }
+//! ```
+//!
+//! (`startMenuLayout`/`classicVariant`/`webViewTargetStyles` for the Start
+//! Menu, `variantFeature`/`weatherVariant` for the taskbar's Squircle —
+//! whichever fields the surface's payload ships.)
+
+use serde_json::Value;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::RwLock;
+
+/// `Styles\` category directory names — the same names the installers
+/// deploy under `{app}\Styles\` and the user's `Styles\` override root.
+pub const TASKBAR_DIR: &str = "Taskbar style";
+pub const START_MENU_DIR: &str = "Start Menu style";
+pub const NOTIFICATION_CENTER_DIR: &str = "Notification Center style";
+
+/// A hand-edited style bigger than this is a mistake (the shipped set tops
+/// out near 65 KB); refuse rather than stall the UI thread parsing it.
+const MAX_STYLE_FILE_BYTES: u64 = 4 * 1024 * 1024;
+
+/// A dropdown entry: the style id (the file stem) plus the display label
+/// from the file's `label` field, falling back to the id. `custom` marks
+/// entries resolved from the user's editable layer.
+#[derive(Clone, Debug)]
+pub struct StyleOption {
+    pub id: String,
+    pub label: String,
+    pub custom: bool,
+}
+
+/// Whether `id` is a legal style id: non-empty, NTFS-safe, no path
+/// separators (id = file stem, and it arrives from settings/`.cde` input —
+/// this is also the path-traversal guard for file resolution). This is the
+/// only check [`crate::model`] validation may run without touching the
+/// filesystem: a missing file must not clear the setting — it resolves to
+/// Windows Default until the file comes back.
+pub fn is_valid_style_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '&' | '.' | '-'))
+}
+
+/// `<exe dir>\Styles` — the shipped factory set. `COREDESK_STYLES_DIR`
+/// overrides it (dev runs out of `target\`, fixture dirs in tests).
+pub fn factory_styles_root() -> PathBuf {
+    if let Some(dir) = std::env::var_os("COREDESK_STYLES_DIR")
+        && !dir.is_empty()
+    {
+        return PathBuf::from(dir);
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|p| p.join("Styles")))
+        .unwrap_or_else(|| PathBuf::from("Styles"))
+}
+
+static USER_ROOT: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+/// Points the user layer at `<config dir>\Styles` — called once when the
+/// app's config directory is resolved. Portable installs pass their
+/// portable config dir so mods travel with the app folder; the MSIX
+/// edition's package-virtualized `%APPDATA%` is writable too.
+pub fn set_user_styles_root(dir: PathBuf) {
+    *USER_ROOT.write().unwrap_or_else(|p| p.into_inner()) = Some(dir);
+}
+
+/// The registered user layer root, if any.
+pub fn user_styles_root() -> Option<PathBuf> {
+    USER_ROOT.read().unwrap_or_else(|p| p.into_inner()).clone()
+}
+
+/// Every selectable style in `category`, sorted by label: the union of both
+/// layers, user files shadowing factory ids. Files that don't parse
+/// (mid-save, typos) are skipped — a broken file stays invisible rather
+/// than selectable-and-dead; a broken *user* file also masks its factory
+/// twin, so a deleted factory can't resurrect under an overriding stem.
+pub fn style_options(category: &str) -> Vec<StyleOption> {
+    enumerate_in(
+        &factory_styles_root(),
+        user_styles_root().as_deref(),
+        category,
+    )
+}
+
+/// [`style_options`] against explicit roots — the unit-testable core.
+pub fn enumerate_in(factory: &Path, user: Option<&Path>, category: &str) -> Vec<StyleOption> {
+    let mut by_id: BTreeMap<String, StyleOption> = BTreeMap::new();
+    collect_dir(&factory.join(category), false, &mut by_id);
+    if let Some(user) = user {
+        collect_dir(&user.join(category), true, &mut by_id);
+    }
+    let mut opts: Vec<_> = by_id.into_values().collect();
+    opts.sort_by_key(|a| a.label.to_lowercase());
+    opts
+}
+
+fn collect_dir(dir: &Path, custom: bool, out: &mut BTreeMap<String, StyleOption>) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in rd.flatten() {
+        let path = entry.path();
+        if !path.is_file()
+            || !path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+        {
+            continue;
+        }
+        let Some(id) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !is_valid_style_id(id) {
+            tracing::warn!(file = %path.display(), "style file has an invalid id — skipped");
+            continue;
+        }
+        match read_theme(&path) {
+            Some(doc) => {
+                let label = doc["label"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|l| !l.is_empty())
+                    .unwrap_or(id)
+                    .to_string();
+                out.insert(
+                    id.to_string(),
+                    StyleOption {
+                        id: id.to_string(),
+                        label,
+                        custom,
+                    },
+                );
+            }
+            None => {
+                tracing::warn!(file = %path.display(), "style file failed to parse — skipped");
+                if custom {
+                    out.remove(id);
+                }
+            }
+        }
+    }
+}
+
+/// Whether `id` names a style file in either layer — the `is_style_id` gate
+/// behind the dropdown setter. Cheap existence check; apply re-parses.
+pub fn style_exists(category: &str, id: &str) -> bool {
+    exists_in(
+        &factory_styles_root(),
+        user_styles_root().as_deref(),
+        category,
+        id,
+    )
+}
+
+/// [`style_exists`] against explicit roots.
+pub fn exists_in(factory: &Path, user: Option<&Path>, category: &str, id: &str) -> bool {
+    is_valid_style_id(id) && resolve_path(factory, user, category, id).is_some()
+}
+
+/// The theme payload (`targetStyles`, `styleConstants`, …) for `id` — the
+/// user layer first when its file exists. `None` when the id is absent or
+/// the resolved file doesn't parse; callers treat that like an unknown id
+/// (Windows Default at apply time).
+pub fn load_theme(category: &str, id: &str) -> Option<Value> {
+    load_in(
+        &factory_styles_root(),
+        user_styles_root().as_deref(),
+        category,
+        id,
+    )
+}
+
+/// [`load_theme`] against explicit roots.
+pub fn load_in(factory: &Path, user: Option<&Path>, category: &str, id: &str) -> Option<Value> {
+    read_theme(&resolve_path(factory, user, category, id)?)
+}
+
+/// User layer first (an existing user file wins — even unreadable, so a
+/// broken override can't silently behave like the factory theme), then the
+/// shipped file.
+fn resolve_path(factory: &Path, user: Option<&Path>, category: &str, id: &str) -> Option<PathBuf> {
+    if !is_valid_style_id(id) {
+        return None;
+    }
+    let name = format!("{id}.json");
+    if let Some(user) = user {
+        let path = user.join(category).join(&name);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    let path = factory.join(category).join(name);
+    path.is_file().then_some(path)
+}
+
+/// Reads + parses one style file: object JSON, UTF-8, BOM tolerated
+/// (Notepad writes it), size-capped. `None` on any failure — callers warn
+/// or treat the file as absent.
+fn read_theme(path: &Path) -> Option<Value> {
+    let meta = std::fs::metadata(path).ok()?;
+    if meta.len() > MAX_STYLE_FILE_BYTES {
+        tracing::warn!(
+            file = %path.display(),
+            max = MAX_STYLE_FILE_BYTES,
+            "style file exceeds the size cap — skipped"
+        );
+        return None;
+    }
+    let bytes = std::fs::read(path).ok()?;
+    let text = std::str::from_utf8(&bytes).ok()?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let doc: Value = serde_json::from_str(text).ok()?;
+    doc.is_object().then_some(doc)
+}
+
+/// `ApplyStyleConstants` from the Windhawk mods: replace each `$name` token
+/// with its constant's value; unknown `$x` survives literally. Shared by
+/// the three surface serializers.
+pub(crate) fn expand_constants(input: &str, constants: &[(String, String)]) -> String {
+    let mut out = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'$' {
+            let rest = &input[i + 1..];
+            if let Some((name, value)) =
+                constants.iter().find(|(n, _)| rest.starts_with(n.as_str()))
+            {
+                out.push_str(value);
+                i += 1 + name.len();
+                continue;
+            }
+        }
+        let ch_len = input[i..].chars().next().map(char::len_utf8).unwrap_or(1);
+        out.push_str(&input[i..i + ch_len]);
+        i += ch_len;
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn write(dir: &Path, name: &str, body: &str) {
+        fs::create_dir_all(dir).unwrap();
+        fs::write(dir.join(name), body).unwrap();
+    }
+
+    fn theme_doc(label: &str) -> String {
+        format!(
+            r#"{{"id":"x","label":"{label}","targetStyles":[{{"target":"T","styles":["Margin=0"]}}]}}"#
+        )
+    }
+
+    #[test]
+    fn ids_validate_by_charset_not_existence() {
+        assert!(is_valid_style_id("Luminosity_variant_Dock"));
+        assert!(is_valid_style_id("Oversimplified&Accentuated"));
+        assert!(is_valid_style_id("Command Center"));
+        assert!(is_valid_style_id("OS26 Tahoe Glass"));
+        assert!(!is_valid_style_id(""));
+        assert!(!is_valid_style_id("../escape"));
+        assert!(!is_valid_style_id("a/b"));
+        assert!(!is_valid_style_id("a\\b"));
+        assert!(!is_valid_style_id("a:b"));
+        assert!(!is_valid_style_id("a<b"));
+        assert!(!is_valid_style_id("a?b"));
+        assert!(!is_valid_style_id("a|b"));
+        assert!(!is_valid_style_id("a*b"));
+        assert!(!is_valid_style_id(&"x".repeat(200)));
+    }
+
+    #[test]
+    fn user_layer_shadows_factory_by_stem() {
+        let base = std::env::temp_dir().join(format!("stylesfs-{}", std::process::id()));
+        let factory = base.join("factory");
+        let user = base.join("user");
+        write(
+            &factory.join(TASKBAR_DIR),
+            "One.json",
+            &theme_doc("Factory One"),
+        );
+        write(
+            &factory.join(TASKBAR_DIR),
+            "Two.json",
+            &theme_doc("Factory Two"),
+        );
+        write(&user.join(TASKBAR_DIR), "One.json", &theme_doc("My One"));
+
+        let opts = enumerate_in(&factory, Some(&user), TASKBAR_DIR);
+        assert_eq!(opts.len(), 2);
+        let one = opts.iter().find(|o| o.id == "One").unwrap();
+        assert_eq!(one.label, "My One");
+        assert!(one.custom);
+        let two = opts.iter().find(|o| o.id == "Two").unwrap();
+        assert!(!two.custom);
+
+        let doc = load_in(&factory, Some(&user), TASKBAR_DIR, "One").unwrap();
+        assert_eq!(doc["label"], "My One");
+        let doc = load_in(&factory, Some(&user), TASKBAR_DIR, "Two").unwrap();
+        assert_eq!(doc["label"], "Factory Two");
+        assert!(exists_in(&factory, Some(&user), TASKBAR_DIR, "One"));
+        assert!(!exists_in(&factory, Some(&user), TASKBAR_DIR, "Missing"));
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn broken_files_hide_and_broken_user_file_masks_factory() {
+        let base = std::env::temp_dir().join(format!("stylesfs-bad-{}", std::process::id()));
+        let factory = base.join("factory");
+        let user = base.join("user");
+        write(&factory.join(TASKBAR_DIR), "Ok.json", &theme_doc("Ok"));
+        write(&factory.join(TASKBAR_DIR), "Broken.json", "{not json");
+        write(&user.join(TASKBAR_DIR), "Ok.json", "{still broken");
+
+        let opts = enumerate_in(&factory, Some(&user), TASKBAR_DIR);
+        assert!(
+            opts.is_empty(),
+            "broken factory + broken override hide both"
+        );
+        assert!(load_in(&factory, Some(&user), TASKBAR_DIR, "Ok").is_none());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn label_falls_back_to_stem_and_bom_is_tolerated() {
+        let base = std::env::temp_dir().join(format!("stylesfs-bom-{}", std::process::id()));
+        let factory = base.join("factory");
+        write(
+            &factory.join(TASKBAR_DIR),
+            "Plain.json",
+            "{\"targetStyles\":[]}",
+        );
+        write(
+            &factory.join(TASKBAR_DIR),
+            "Bommed.json",
+            "\u{feff}{\"label\":\"Has BOM\"}",
+        );
+        let opts = enumerate_in(&factory, None, TASKBAR_DIR);
+        assert_eq!(opts.len(), 2);
+        assert_eq!(opts[0].label, "Has BOM");
+        assert_eq!(opts[1].id, "Plain");
+        assert_eq!(opts[1].label, "Plain");
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn shipped_styles_all_parse() {
+        // The repo's `styles/` tree is the shipped factory set — every file
+        // must stay loadable. `CARGO_MANIFEST_DIR` is `crates/core`.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../styles");
+        if !root.is_dir() {
+            return; // packaged source trees may not carry it
+        }
+        for category in [TASKBAR_DIR, START_MENU_DIR, NOTIFICATION_CENTER_DIR] {
+            let opts = enumerate_in(&root, None, category);
+            assert!(
+                !opts.is_empty(),
+                "factory category {category} must ship styles"
+            );
+            for o in &opts {
+                let id = &o.id;
+                assert!(
+                    load_in(&root, None, category, id).is_some(),
+                    "{category}/{id} must load"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn constants_expand_longest_first() {
+        // The serializers sort constants longest-name-first before use —
+        // mirror that order here (`$CommonBg` must not lose to `$Common`).
+        let constants = vec![
+            ("CommonBg".to_string(), "Y".to_string()),
+            ("Common".to_string(), "X".to_string()),
+        ];
+        assert_eq!(
+            expand_constants("$CommonBg/$Common/$Nope", &constants),
+            "Y/X/$Nope"
+        );
+    }
+}

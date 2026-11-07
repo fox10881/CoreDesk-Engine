@@ -14,6 +14,7 @@ pub mod model;
 pub mod notification_center_themes;
 pub mod rules;
 pub mod start_menu_themes;
+pub mod styles_fs;
 pub mod taskbar_themes;
 pub mod updates;
 

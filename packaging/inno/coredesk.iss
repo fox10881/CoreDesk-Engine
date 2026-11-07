@@ -79,8 +79,18 @@ Source: "{#PayloadDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\UPGRADING.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\SKILL.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#PayloadDir}\assets\wallpapers\*"; DestDir: "{app}\assets\wallpapers"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Factory XAML styles — one <id>.json per style per category. User mods live
+; under %APPDATA%\CoreDeskEngine\Styles (never here), so a reinstall/upgrade
+; wiping this tree is a clean factory reset that keeps every modder file.
+Source: "{#PayloadDir}\Styles\*"; DestDir: "{app}\Styles"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Last: an update aborted halfway (a file in use) keeps the old app, which offers it again.
 Source: "{#PayloadDir}\coredesk.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+[InstallDelete]
+; Prune style files a newer build no longer ships — the folder set only ever
+; holds factory files (see above), so wiping it wholesale is safe and leaves
+; the user's %APPDATA% override layer untouched.
+Type: filesandordirs; Name: "{app}\Styles\*"
 
 [Icons]
 Name: "{group}\{#ProductName}"; Filename: "{app}\coredesk.exe"; WorkingDir: "{app}"

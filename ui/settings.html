@@ -935,10 +935,12 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     renderPeekHotkey();
   }
 
-  // Start Menu Style options arrive with each state push ({id, label} only -
-  // the converted theme payload never leaves the backend). Rebuilt only when
-  // the id list changes so an in-progress pick isn't clobbered; the native
-  // engine applies it inside StartMenuExperienceHost.
+  // Start Menu Style options arrive with each state push ({id, label, custom}
+  // only — the converted theme payload never leaves the backend). Styles are
+  // JSON files under Styles\<category>\ — `custom` marks the user's
+  // %APPDATA% overrides (shown with a marker). Rebuilt only when the id list
+  // changes so an in-progress pick isn't clobbered; the native engine
+  // applies it inside StartMenuExperienceHost.
   function renderStartMenuStyles(m) {
     const sel = document.getElementById('startMenuStyleSel');
     const opts = m.startMenuStyles || [];
@@ -948,13 +950,13 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       sel.replaceChildren(...opts.map(o => {
         const e = document.createElement('option');
         e.value = o.id;
-        e.textContent = o.label;
+        e.textContent = o.label + (o.custom ? ' (' + t('自定义') + ')' : '');
         return e;
       }));
     }
   }
 
-  // Taskbar Style — the same {id, label}-only contract; the resident
+  // Taskbar Style — the same {id, label, custom}-only contract; the resident
   // coredesk_tap.dll applies it inside explorer.exe.
   function renderTaskbarStyles(m) {
     const sel = document.getElementById('taskbarStyleSel');
@@ -965,14 +967,14 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       sel.replaceChildren(...opts.map(o => {
         const e = document.createElement('option');
         e.value = o.id;
-        e.textContent = o.label;
+        e.textContent = o.label + (o.custom ? ' (' + t('自定义') + ')' : '');
         return e;
       }));
     }
   }
 
-  // Notification Center Style — the same {id, label}-only contract; the
-  // resident applies it inside ShellExperienceHost.exe/ShellHost.exe.
+  // Notification Center Style — the same {id, label, custom}-only contract;
+  // the resident applies it inside ShellExperienceHost.exe/ShellHost.exe.
   function renderNotificationCenterStyles(m) {
     const sel = document.getElementById('notificationCenterStyleSel');
     const opts = m.notificationCenterStyles || [];

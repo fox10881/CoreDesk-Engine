@@ -1,0 +1,251 @@
+{
+  "id": "Lucent_variant_Light",
+  "label": "Lucent — Light",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill:=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#00000000\" Offset=\"0.3\" /><GradientStop Color=\"#AA000000\" Offset=\"0.9\" /></LinearGradientBrush>"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#HoverFlyoutBackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill:=<LinearGradientBrush StartPoint=\"0,0.5\" EndPoint=\"0,1\"><GradientStop Color=\"#ee000000\" Offset=\"0.1\" /><GradientStop Color=\"#EBEBEB\" Offset=\"0.9\" /><GradientStop Color=\"#AAFFFFFF\" Offset=\"1.0\" /></LinearGradientBrush>"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Rectangle#RunningIndicator, Taskbar.TaskListLabeledButtonPanel > Rectangle#RunningIndicator",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@RunningIndicatorStates > Border#BackgroundElement, Taskbar.TaskListLabeledButtonPanel@RunningIndicatorStates > Border#BackgroundElement",
+      "styles": [
+        "Background@InactiveRunningIndicator:=<LinearGradientBrush StartPoint=\"0,0.5\" EndPoint=\"0,1\"><GradientStop Color=\"#33000000\" Offset=\"0.1\" /><GradientStop Color=\"#33EBEBEB\" Offset=\"0.9\" /><GradientStop Color=\"#AAFFFFFF\" Offset=\"1.0\" /></LinearGradientBrush>",
+        "Margin=0,-1,0,-1"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates > TextBlock#LabelControl, Taskbar.TaskListLabeledButtonPanel@CommonStates > TextBlock#LabelControl",
+      "styles": [
+        "Foreground@ActiveNormal=Black",
+        "Foreground@ActivePointerOver=Black",
+        "Margin=0,0,3,0",
+        "Foreground@ActivePressed=#424242"
+      ]
+    },
+    {
+      "target": "SystemTray.SystemTrayFrame > StackPanel#SystemTrayFrameGrid, SystemTray.SystemTrayFrame > Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background:=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#50000000\" Offset=\"0.3\" /><GradientStop Color=\"#EE000000\" Offset=\"0.9\" /></LinearGradientBrush>",
+        "Margin=0",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView#NotifyItemIcon",
+      "styles": [
+        "Padding=2"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel",
+      "styles": [
+        "CornerRadius=0",
+        "BorderThickness=0",
+        "MaxWidth=48",
+        "Margin=0",
+        "Padding=0",
+        "Background:=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#80000000\" Offset=\"0.0\" /><GradientStop Color=\"#FF000000\" Offset=\"1.0\" /></LinearGradientBrush>"
+      ]
+    },
+    {
+      "target": "Grid",
+      "styles": [
+        "RequestedTheme=2"
+      ]
+    },
+    {
+      "target": "Grid#OverflowRootGrid > Border",
+      "styles": [
+        "Background:=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#50000000\" Offset=\"0.3\" /><GradientStop Color=\"#EE000000\" Offset=\"0.9\" /></LinearGradientBrush>",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton",
+      "styles": [
+        "Margin=10,0,-10,0"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates, Taskbar.TaskListLabeledButtonPanel@CommonStates",
+      "styles": [
+        "Background@ActiveNormal=#FCFCFC",
+        "Background@ActivePointerOver=#BBBBBB",
+        "Background@InactivePointerOver=#BBBBBB",
+        "Background@InactivePressed=#EBEBEB",
+        "Background@ActivePressed=#EBEBEB",
+        "Background@RequestingAttention=#FFE9AFAA",
+        "Background@RequestingAttentionPointerOver=#FFF8E7E5",
+        "Background@RequestingAttentionPressed=#FFFEEEF0",
+        "Background@MultiWindowPointerOver=#BBBBBB",
+        "Background@MultiWindowActive=#BBBBBB",
+        "Background@MultiWindowPressed=#EBEBEB"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates > Border, Taskbar.TaskListLabeledButtonPanel@CommonStates > Border",
+      "styles": [
+        "BorderThickness=0",
+        "Margin=-2,-4,-2,-4",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel@CommonStates > Grid > Border, Taskbar.TaskListButtonPanel@CommonStates > Border",
+      "styles": [
+        "CornerRadius=0",
+        "Background@InactivePointerOver=#BBBBBB",
+        "Background@InactivePressed=#EBEBEB",
+        "Background@ActiveNormal=#BBBBBB",
+        "Background@ActivePointerOver=#BBBBBB",
+        "Background@ActivePressed=#EBEBEB",
+        "Margin=-3,-10,-3,-10",
+        "BorderThickness=0"
+      ]
+    },
+    {
+      "target": "Grid#ContainerGrid@",
+      "styles": [
+        "Background@PointerOver=#BBBBBB",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton > Grid@CommonStates > Border#BackgroundBorder",
+      "styles": [
+        "Background@PointerOver=#BBBBBB",
+        "Margin=0",
+        "Padding=0",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton > Grid@CommonStates",
+      "styles": [
+        "Background@PointerOver=#BBBBBB",
+        "Background@Pressed=#EBEBEB",
+        "Background@Checked=#BBBBBB",
+        "Background@CheckedPointerOver=#BBBBBB",
+        "Background@CheckedPressed=#EBEBEB"
+      ]
+    },
+    {
+      "target": "Rectangle#ShowDesktopPipe",
+      "styles": [
+        "Opacity=0"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView > Grid@",
+      "styles": [
+        "Background@Pressed=#EBEBEB",
+        "Background@CheckedPressed=#EBEBEB",
+        "Background@PointerOver=#BBBBBB",
+        "Background@CheckedNormal=#BBBBBB",
+        "Background@CheckedPointerOver=#EBEBEB"
+      ]
+    },
+    {
+      "target": "SystemTray.Stack#NonActivatableStack > Grid > SystemTray.StackListView > Windows.UI.Xaml.Controls.ItemsPresenter > Windows.UI.Xaml.Controls.StackPanel > Windows.UI.Xaml.Controls.ContentPresenter > SystemTray.IconView > Grid@",
+      "styles": [
+        "Background@Pressed=#EBEBEB",
+        "Background@CheckedPressed=#EBEBEB",
+        "Background@PointerOver=#BBBBBB",
+        "Background@CheckedNormal=#BBBBBB",
+        " Background@CheckedPointerOver=#EBEBEB"
+      ]
+    },
+    {
+      "target": "Grid#OverflowRootGrid > Windows.UI.Xaml.Controls.ItemsControl > Windows.UI.Xaml.Controls.ItemsPresenter > Windows.UI.Xaml.Controls.WrapGrid > Windows.UI.Xaml.Controls.ContentPresenter > SystemTray.NotifyIconView > Grid@",
+      "styles": [
+        "CornerRadius=0",
+        "Margin=2,-5,2,-5"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Grid > Border, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Border",
+      "styles": [
+        "Width=48"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Border#MultiWindowElement, Taskbar.TaskListLabeledButtonPanel > Border#MultiWindowElement",
+      "styles": [
+        "Height=0"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates > Rectangle, Taskbar.TaskListLabeledButtonPanel@CommonStates > Rectangle",
+      "styles": [
+        "StrokeThickness=3",
+        "Stroke@MultiWindowNormal=#BBBBBB",
+        "Stroke@MultiWindowPointerOver=#EBEBEB",
+        "Stroke@MultiWindowPressed=#EBEBEB",
+        "Stroke@MultiWindowActive=#EBEBEB",
+        "Width=Auto",
+        "RadiusX=0",
+        "Margin=-2,0,-2,-3"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView > Grid > Border",
+      "styles": [
+        "BorderThickness=0",
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton > Grid > Border",
+      "styles": [
+        "BorderThickness=0",
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Taskbar.SearchBoxButton > Taskbar.TaskListButtonPanel@CommonStates",
+      "styles": [
+        "Background@InactivePointerOver_SearchIcon=#BEBEBE",
+        "Background@ActiveNormal_SearchIcon=#BEBEBE",
+        "Background@ActivePointerOver_SearchIcon=#EBEBEB"
+      ]
+    },
+    {
+      "target": "SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel@CommonStates",
+      "styles": [
+        "Background@InactivePointerOver=#BEBEBE",
+        "Background@ActiveNormal=#BEBEBE",
+        "Background@ActivePointerOver=#EBEBEB"
+      ]
+    },
+    {
+      "target": "SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Grid > Border, SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Border",
+      "styles": [
+        "CornerRadius=0",
+        "Margin=-3,-10,-3,-10",
+        "BorderThickness=0"
+      ]
+    }
+  ]
+}

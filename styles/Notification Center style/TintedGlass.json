@@ -1,0 +1,217 @@
+{
+  "id": "TintedGlass",
+  "label": "Tinted Glass",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Grid#NotificationCenterGrid",
+      "styles": [
+        "Background:=$Base",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "Grid#CalendarCenterGrid",
+      "styles": [
+        "Background:=$Base",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "ScrollViewer#CalendarControlScrollViewer",
+      "styles": [
+        "BorderThickness=0,0,0,0",
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "Border#CalendarHeaderMinimizedOverlay",
+      "styles": [
+        "Background:=$Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ActionCenter.FocusSessionControl#FocusSessionControl > Grid#FocusGrid",
+      "styles": [
+        "Background:=$Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "MenuFlyoutPresenter > Border",
+      "styles": [
+        "Background:=$Overlay",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius",
+        "Padding=2,4,2,4"
+      ]
+    },
+    {
+      "target": "Border#JumpListRestyledAcrylic",
+      "styles": [
+        "Background:=$Base",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius",
+        "Margin=-2,-2,-2,-2"
+      ]
+    },
+    {
+      "target": "Grid#ControlCenterRegion",
+      "styles": [
+        "Background:=$Base",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "Grid#L1Grid > Border",
+      "styles": [
+        "Background:=$Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRegion",
+      "styles": [
+        "Background:=$Base",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRoot",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageContent",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageContent > Grid > Border",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "QuickActions.ControlCenter.AccessibleWindow#PageWindow > ContentPresenter > Grid#FullScreenPageRoot",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "QuickActions.ControlCenter.AccessibleWindow#PageWindow > ContentPresenter > Grid#FullScreenPageRoot > ContentPresenter#PageHeader",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "ScrollViewer#ListContent",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "ActionCenter.FlexibleToastView#FlexibleNormalToastView",
+      "styles": [
+        "Background:=$Transparent"
+      ]
+    },
+    {
+      "target": "Border#ToastBackgroundBorder, Border#ToastBackgroundBorder2",
+      "styles": [
+        "Background:=$Base",
+        "BorderThickness=0,0,0,0",
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "JumpViewUI.SystemItemListViewItem > Grid#LayoutRoot > Border#BackgroundBorder",
+      "styles": [
+        "Background:=$Transparent",
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "JumpViewUI.JumpListListViewItem > Grid#LayoutRoot > Border#BackgroundBorder",
+      "styles": [
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "ActionCenter.FlexibleItemView",
+      "styles": [
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRegion",
+      "styles": [
+        "Height=Auto"
+      ]
+    },
+    {
+      "target": "Grid#ThumbnailImage",
+      "styles": [
+        "Width=$thumbnailImageSize",
+        "Height=$thumbnailImageSize",
+        "HorizontalAlignment=Center",
+        "VerticalAlignment=Top",
+        "Grid.Column=1",
+        "Margin=0,2,0,45"
+      ]
+    },
+    {
+      "target": "Grid#ThumbnailImage > Border",
+      "styles": [
+        "CornerRadius=$Radius"
+      ]
+    },
+    {
+      "target": "StackPanel#PrimaryAndSecondaryTextContainer",
+      "styles": [
+        "VerticalAlignment=Bottom",
+        "Grid.Column=0"
+      ]
+    },
+    {
+      "target": "StackPanel#PrimaryAndSecondaryTextContainer > TextBlock#TitleText",
+      "styles": [
+        "TextAlignment=Center"
+      ]
+    },
+    {
+      "target": "StackPanel#PrimaryAndSecondaryTextContainer > TextBlock#SubtitleText",
+      "styles": [
+        "TextAlignment=Center"
+      ]
+    },
+    {
+      "target": "ContentControl#TogglesGroup > ContentPresenter > ControlCenter.PaginatedGridView > Grid",
+      "styles": [
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "Grid#FooterGrid",
+      "styles": [
+        "BorderThickness=0,0,0,0"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "Base=<WindhawkBlur BlurAmount=\"18\" TintColor=\"#80000000\"/>",
+    "Radius=14",
+    "Transparent=<SolidColorBrush Color=\"Transparent\"/>",
+    "Accent=<SolidColorBrush Color=\"{ThemeResource SystemAccentColorLight1}\" Opacity = \"1\" />",
+    "Overlay=<WindhawkBlur BlurAmount=\"18\" TintColor=\"#1AFFFFFF\"/>",
+    "thumbnailImageSize=300"
+  ]
+}

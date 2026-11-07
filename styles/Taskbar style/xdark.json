@@ -1,0 +1,134 @@
+{
+  "id": "xdark",
+  "label": "xdark",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskListButton",
+      "styles": [
+        "CornerRadius=13",
+        "Padding=6,0,6,0",
+        "HorizontalContentAlignment=Left"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base > TextBlock#InnerTextBlock",
+      "styles": [
+        "FontSize=16",
+        "Foreground=#facc15"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView#NotifyItemIcon",
+      "styles": [
+        "MinWidth=25"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton > Grid > ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter[1] > SystemTray.IconView > Grid > Grid",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid",
+      "styles": [
+        "Padding=2"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView",
+      "styles": [
+        "MinWidth=27"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton > Grid > ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid > Grid > SystemTray.TextIconContent",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Border#BackgroundElement, Taskbar.TaskListLabeledButtonPanel > Border#BackgroundElement",
+      "styles": [
+        "Background=#000000"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background=#000000",
+        "CornerRadius=13",
+        "Margin=0,5,4,5",
+        "Padding=2,0,-18,0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid > Rectangle#RunningIndicator",
+      "styles": [
+        "Height=3",
+        "RadiusX=1.5",
+        "RadiusY=1.5",
+        "Fill@ActiveNormal=#facc15",
+        "VerticalAlignment=Bottom",
+        "Margin=16,0,16,4",
+        "StrokeThickness=0"
+      ]
+    },
+    {
+      "target": "SystemTray.ImageIconContent > Grid#ContainerGrid > Image",
+      "styles": [
+        "Width=13"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base > TextBlock#InnerTextBlock",
+      "styles": [
+        "FontSize=13",
+        "Foreground=#facc15"
+      ]
+    },
+    {
+      "target": "TextBlock#LabelControl",
+      "styles": [
+        "FontFamily=Segoe UI Medium",
+        "Foreground=#facc15",
+        "Margin=1,0,0,0",
+        "VerticalAlignment=Center",
+        "TextWrapping=NoWrap"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton]",
+      "styles": [
+        "Visibility=Visible"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.TextBlock#InnerTextBlock[Text=uE971]",
+      "styles": [
+        "Text=uE712",
+        "Foreground=#facc15"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Rectangle#BackgroundStroke",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base > TextBlock#InnerTextBlock",
+      "styles": [
+        "Foreground=#facc15"
+      ]
+    }
+  ]
+}

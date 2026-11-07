@@ -1,0 +1,130 @@
+{
+  "id": "Borderless",
+  "label": "Borderless",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > Grid",
+      "styles": [
+        "ColumnDefinitions:=<ColumnDefinitionCollection><ColumnDefinition Width=\"*\"/><ColumnDefinition Width=\"Auto\"/><ColumnDefinition Width=\"Auto\"/><ColumnDefinition Width=\"*\"/></ColumnDefinitionCollection>",
+        "HorizontalAlignment=Stretch"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid@DockingStates",
+      "styles": [
+        "Tag=horizontal",
+        "Tag@DockedLeft=vertical",
+        "Tag@DockedRight=vertical",
+        "Tag=>taskbarDock"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame",
+      "styles": [
+        "Grid.Column=1",
+        "Width={{taskbarDock==`vertical`?skip():$TaskbarFrameWidth}}",
+        "Margin=0",
+        "MaxWidth=$TaskbarFrameWidth"
+      ]
+    },
+    {
+      "target": "SystemTray.SystemTrayFrame",
+      "styles": [
+        "Grid.Column=1",
+        "Width=Auto",
+        "HorizontalAlignment=Right",
+        "Height=40",
+        "VerticalAlignment=Center"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Windows.UI.Xaml.Controls.Grid#RootGrid > Taskbar.TaskbarBackground#BackgroundControl",
+      "styles": [
+        "CornerRadius=6",
+        "Margin=0,2,0,2"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater",
+      "styles": [
+        "Margin=0,4,0,4"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#OverflowFlyoutBackgroundBorder",
+      "styles": [
+        "Shadow:=",
+        "BorderThickness:="
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#ConfirmatorMainGrid",
+      "styles": [
+        "Shadow:=",
+        "BorderThickness:="
+      ]
+    },
+    {
+      "target": "Taskbar.OverflowToggleButton#OverflowButton > Taskbar.TaskListButtonPanel#OverflowToggleButtonRootPanel > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.FontIcon#FontIcon > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock, Taskbar.OverflowToggleButton#OverflowButton > Taskbar.TaskListButtonPanel#OverflowToggleButtonRootPanel > Windows.UI.Xaml.Controls.FontIcon#FontIcon > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+      "styles": [
+        "Text=uE8F9"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Rectangle#MostRecentlyUsedDivider",
+      "styles": [
+        "Height=32",
+        "Width=2"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Rectangle#LeftOverflowButtonDivider",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Rectangle#RightOverflowButtonDivider",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater",
+      "styles": [
+        "Height=48"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid > Grid",
+      "styles": [
+        "Background:="
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid",
+      "styles": [
+        "Margin=390,0,574,12",
+        "Shadow:=",
+        "BorderThickness:="
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#HoverFlyoutBackground",
+      "styles": [
+        "Shadow:="
+      ]
+    }
+  ],
+  "styleConstants": [
+    "TaskbarFrameWidth=800"
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "id": "Unified",
+  "label": "Unified",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "ActionCenter.FocusSessionControl",
+      "styles": [
+        "Height=0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#CalendarCenterGrid",
+      "styles": [
+        "CornerRadius=0,0,6,6",
+        "Margin=0,0,0,12",
+        "BorderThickness=1,0,1,1"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#NotificationCenterGrid",
+      "styles": [
+        "CornerRadius=6,6,0,0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#MediaTransportControlsRegion",
+      "styles": [
+        "CornerRadius=6,6,0,0",
+        "BorderThickness=1,1,1,0",
+        "Margin=0,0,0,-6"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#CalendarHeaderMinimizedOverlay",
+      "styles": [
+        "Visibility=Visible"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ScrollViewer#CalendarControlScrollViewer",
+      "styles": [
+        "BorderThickness=0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ContentPresenter",
+      "styles": [
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0.083\"/>"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.ListViewItemPresenter#Root > Windows.UI.Xaml.Controls.Border",
+      "styles": [
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0.083\"/>"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ComboBox > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.Border",
+      "styles": [
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0.083\"/>"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.CalendarViewDayItem > Windows.UI.Xaml.Controls.Border",
+      "styles": [
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0.083\"/>"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Control > Windows.UI.Xaml.Controls.Border",
+      "styles": [
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0.083\"/>"
+      ]
+    }
+  ]
+}

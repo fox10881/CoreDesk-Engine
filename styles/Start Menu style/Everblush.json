@@ -1,0 +1,381 @@
+{
+  "id": "Everblush",
+  "label": "Everblush",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Border#AcrylicBorder",
+      "styles": [
+        "Background=#141b1e",
+        "BorderBrush=#268ccf7e"
+      ]
+    },
+    {
+      "target": "Border#AcrylicOverlay",
+      "styles": [
+        "Background=#141b1e"
+      ]
+    },
+    {
+      "target": "StartMenu.SearchBoxToggleButton > Grid > Border",
+      "styles": [
+        "Background=#232a2d",
+        "BorderBrush=transparent"
+      ]
+    },
+    {
+      "target": "StartMenu.ExpandedFolderList > Grid > Border",
+      "styles": [
+        "Background=#232a2d"
+      ]
+    },
+    {
+      "target": "TextBlock#PlaceholderText",
+      "styles": [
+        "Foreground=#80b3b9b8"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Button > Grid@CommonStates",
+      "styles": [
+        "Background=#d28ccf7e",
+        "CornerRadius=4"
+      ]
+    },
+    {
+      "target": "StackPanel > Windows.UI.Xaml.Controls.Button",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater > Windows.UI.Xaml.Controls.Button",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "TextBlock#DisplayName",
+      "styles": [
+        "Foreground=#b3b9b8"
+      ]
+    },
+    {
+      "target": "TextBlock#Title",
+      "styles": [
+        "Foreground=#b3b9b8"
+      ]
+    },
+    {
+      "target": "TextBlock#Subtitle",
+      "styles": [
+        "Foreground=#6cbfbf"
+      ]
+    },
+    {
+      "target": "TextBlock#PinnedListHeaderText",
+      "styles": [
+        "Foreground=#8ccf7e"
+      ]
+    },
+    {
+      "target": "TextBlock#TopLevelSuggestionsListHeaderText",
+      "styles": [
+        "Foreground=#8ccf7e"
+      ]
+    },
+    {
+      "target": "TextBlock#AllAppsHeading",
+      "styles": [
+        "Foreground=#8ccf7e"
+      ]
+    },
+    {
+      "target": "TextBlock#MoreSuggestionsListHeaderText",
+      "styles": [
+        "Foreground=#8ccf7e"
+      ]
+    },
+    {
+      "target": "TextBlock#AppDisplayName",
+      "styles": [
+        "Foreground=#b3b9b8"
+      ]
+    },
+    {
+      "target": "TextBlock#Text",
+      "styles": [
+        "Foreground=#e5c76b"
+      ]
+    },
+    {
+      "target": "TextBlock#FolderGlyph",
+      "styles": [
+        "Foreground=#e5c76b"
+      ]
+    },
+    {
+      "target": "TextBlock#StatusMessage",
+      "styles": [
+        "Foreground=#8ccf7e"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#ContentBorder > Windows.UI.Xaml.Controls.Grid#DroppedFlickerWorkaroundWrapper > Border@CommonStates",
+      "styles": [
+        "Background:=<LinearGradientBrush StartPoint=\"0.5,0\" EndPoint=\"0,0.5\"> <GradientStop Color=\"#268ccf7e\" Offset=\"0\" /><GradientStop Color=\"#26e5c76b\" Offset=\"1\" /></LinearGradientBrush>",
+        "BorderBrush:=<LinearGradientBrush StartPoint=\"0.5,0\" EndPoint=\"0,0.5\"> <GradientStop Color=\"#828ccf7e\" Offset=\"0\" /><GradientStop Color=\"#82e5c76b\" Offset=\"1\" /></LinearGradientBrush>",
+        "CornerRadius=6"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Border#ContentBorder > Windows.UI.Xaml.Controls.Grid#DroppedFlickerWorkaroundWrapper > Border#BackgroundBorder",
+      "styles": [
+        "Background=Transparent"
+      ]
+    },
+    {
+      "target": "Border#AppBorder",
+      "styles": [
+        "Background=#141b1e"
+      ]
+    },
+    {
+      "target": "Border#TaskbarSearchBackground",
+      "styles": [
+        "Background=#232a2d",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Grid",
+      "styles": [
+        "RequestedTheme=2"
+      ]
+    },
+    {
+      "target": "TextBlock#UserTileNameText",
+      "styles": [
+        "Foreground=#67b0e8"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ContentPresenter > Windows.UI.Xaml.Controls.FontIcon > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+      "styles": [
+        "Foreground=#6cbfbf"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.FontIcon > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+      "styles": [
+        "Foreground=#e5c76b"
+      ]
+    },
+    {
+      "target": "MenuFlyoutPresenter",
+      "styles": [
+        "Background=#232a2d"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.FontIcon#SearchGlyph > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+      "styles": [
+        "Foreground=#232a2d"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.DropDownButton > Grid",
+      "styles": [
+        "Background=#d28ccf7e"
+      ]
+    }
+  ],
+  "classicVariant": {
+    "targetStyles": [
+      {
+        "target": "Border#AcrylicBorder",
+        "styles": [
+          "Background=#141b1e",
+          "BorderBrush=#268ccf7e"
+        ]
+      },
+      {
+        "target": "Border#AcrylicOverlay",
+        "styles": [
+          "Background=#141b1e"
+        ]
+      },
+      {
+        "target": "StartDocked.SearchBoxToggleButton > Grid > Border",
+        "styles": [
+          "Background=#232a2d",
+          "BorderBrush=transparent"
+        ]
+      },
+      {
+        "target": "StartMenu.ExpandedFolderList > Grid > Border",
+        "styles": [
+          "Background=#232a2d"
+        ]
+      },
+      {
+        "target": "TextBlock#PlaceholderText",
+        "styles": [
+          "Foreground=#80b3b9b8"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Button",
+        "styles": [
+          "Background=#d28ccf7e"
+        ]
+      },
+      {
+        "target": "StackPanel > Windows.UI.Xaml.Controls.Button",
+        "styles": [
+          "Background=transparent",
+          "BorderBrush=transparent"
+        ]
+      },
+      {
+        "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater > Windows.UI.Xaml.Controls.Button",
+        "styles": [
+          "Background=transparent",
+          "BorderBrush=transparent"
+        ]
+      },
+      {
+        "target": "TextBlock#DisplayName",
+        "styles": [
+          "Foreground=#b3b9b8"
+        ]
+      },
+      {
+        "target": "TextBlock#Title",
+        "styles": [
+          "Foreground=#b3b9b8"
+        ]
+      },
+      {
+        "target": "TextBlock#Subtitle",
+        "styles": [
+          "Foreground=#6cbfbf"
+        ]
+      },
+      {
+        "target": "TextBlock#PinnedListHeaderText",
+        "styles": [
+          "Foreground=#8ccf7e"
+        ]
+      },
+      {
+        "target": "TextBlock#TopLevelSuggestionsListHeaderText",
+        "styles": [
+          "Foreground=#8ccf7e"
+        ]
+      },
+      {
+        "target": "TextBlock#AllAppsHeading",
+        "styles": [
+          "Foreground=#8ccf7e"
+        ]
+      },
+      {
+        "target": "TextBlock#MoreSuggestionsListHeaderText",
+        "styles": [
+          "Foreground=#8ccf7e"
+        ]
+      },
+      {
+        "target": "TextBlock#AppDisplayName",
+        "styles": [
+          "Foreground=#b3b9b8"
+        ]
+      },
+      {
+        "target": "TextBlock#Text",
+        "styles": [
+          "Foreground=#e5c76b"
+        ]
+      },
+      {
+        "target": "TextBlock#FolderGlyph",
+        "styles": [
+          "Foreground=#e5c76b"
+        ]
+      },
+      {
+        "target": "TextBlock#StatusMessage",
+        "styles": [
+          "Foreground=#8ccf7e"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Border#ContentBorder > Windows.UI.Xaml.Controls.Grid#DroppedFlickerWorkaroundWrapper > Border@CommonStates",
+        "styles": [
+          "Background:=<LinearGradientBrush StartPoint=\"0.5,0\" EndPoint=\"0,0.5\"> <GradientStop Color=\"#268ccf7e\" Offset=\"0\" /><GradientStop Color=\"#26e5c76b\" Offset=\"1\" /></LinearGradientBrush>",
+          "BorderBrush:=<LinearGradientBrush StartPoint=\"0.5,0\" EndPoint=\"0,0.5\"> <GradientStop Color=\"#828ccf7e\" Offset=\"0\" /><GradientStop Color=\"#82e5c76b\" Offset=\"1\" /></LinearGradientBrush>",
+          "CornerRadius=6"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Border#ContentBorder > Windows.UI.Xaml.Controls.Grid#DroppedFlickerWorkaroundWrapper > Border#BackgroundBorder",
+        "styles": [
+          "Background=transparent"
+        ]
+      },
+      {
+        "target": "Border#AppBorder",
+        "styles": [
+          "Background=#141b1e"
+        ]
+      },
+      {
+        "target": "Border#TaskbarSearchBackground",
+        "styles": [
+          "Background=#232a2d",
+          "BorderBrush=transparent"
+        ]
+      },
+      {
+        "target": "Grid",
+        "styles": [
+          "RequestedTheme=2"
+        ]
+      },
+      {
+        "target": "TextBlock#UserTileNameText",
+        "styles": [
+          "Foreground=#67b0e8"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.ContentPresenter > Windows.UI.Xaml.Controls.FontIcon > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+        "styles": [
+          "Foreground=#6cbfbf"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.FontIcon > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+        "styles": [
+          "Foreground=#e5c76b"
+        ]
+      },
+      {
+        "target": "MenuFlyoutPresenter",
+        "styles": [
+          "Background=#232a2d"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.FontIcon#SearchGlyph > Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.TextBlock",
+        "styles": [
+          "Foreground=#232a2d"
+        ]
+      }
+    ]
+  }
+}

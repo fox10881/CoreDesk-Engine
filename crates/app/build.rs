@@ -89,6 +89,51 @@ fn link_options(out_dir: &Path) {
         );
         copy_webview_loader(out_dir);
         copy_explorer_blur_mica(out_dir);
+        copy_styles(out_dir);
+    }
+}
+
+/// `Styles/` ships beside the exe (the installers stage it into `{app}`); dev
+/// binaries resolve their factory style layer at `<exe dir>\Styles`, so the
+/// repo's `styles/` tree is copied next to `target/<profile>` as well.
+fn copy_styles(out_dir: &Path) {
+    fn copy_tree(src: &Path, dst: &Path) -> std::io::Result<()> {
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let from = entry.path();
+            let to = dst.join(entry.file_name());
+            if from.is_dir() {
+                std::fs::create_dir_all(&to)?;
+                copy_tree(&from, &to)?;
+            } else {
+                std::fs::create_dir_all(dst)?;
+                std::fs::copy(&from, &to)?;
+            }
+        }
+        Ok(())
+    }
+    fn watch(dir: &Path) {
+        if let Ok(rd) = std::fs::read_dir(dir) {
+            for entry in rd.flatten() {
+                let p = entry.path();
+                println!("cargo:rerun-if-changed={}", p.display());
+                if p.is_dir() {
+                    watch(&p);
+                }
+            }
+        }
+    }
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let src = manifest_dir.join("..").join("..").join("styles");
+    watch(&src);
+    if !src.is_dir() {
+        println!("cargo:warning=styles/ not found; skipping");
+        return;
+    }
+    if let Some(profile_dir) = out_dir.ancestors().nth(3)
+        && let Err(e) = copy_tree(&src, &profile_dir.join("Styles"))
+    {
+        println!("cargo:warning=could not copy Styles/: {e}");
     }
 }
 

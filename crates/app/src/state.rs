@@ -107,6 +107,10 @@ fn in_package_folder(path: &Path) -> bool {
 impl AppState {
     pub fn load(work_areas: Vec<WorkArea>, portable: bool) -> Self {
         let directory = config_dir(portable);
+        // Modded XAML styles live beside the config (`Styles\<category>\*.json`),
+        // shadowing the shipped set under <exe>\Styles — portable puts both
+        // layers next to the exe.
+        coredesk_core::styles_fs::set_user_styles_root(directory.join("Styles"));
         let store = ConfigStore::new(&directory);
         let (outcome, unreadable_moved_to) = store.load_reporting();
         let (config, first_run, recovered_from) = match outcome {

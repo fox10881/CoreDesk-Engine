@@ -1,0 +1,82 @@
+{
+  "id": "NoRecommendedSection",
+  "label": "No Recommended Section",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Grid#TopLevelSuggestionsListHeader",
+      "styles": [
+        "Height=0",
+        "Visibility=>showMoreSuggestionsVisible"
+      ]
+    },
+    {
+      "target": "Grid#TopLevelSuggestionsRoot",
+      "styles": [
+        "Grid.Row=0",
+        "MaxHeight=54",
+        "RenderTransform:=<TranslateTransform Y=\"22\"/>"
+      ]
+    },
+    {
+      "target": "Grid#ShowMoreSuggestions",
+      "styles": [
+        "Visibility={{showMoreSuggestionsVisible}}",
+        "Margin=0"
+      ]
+    },
+    {
+      "target": "Button#ShowMoreSuggestionsButton > Grid > ContentPresenter > StackPanel > TextBlock",
+      "styles": [
+        "Text=Recommended"
+      ]
+    },
+    {
+      "target": "Grid#TopLevelHeader > Grid[2] > Button",
+      "styles": [
+        "RenderTransform:=<TranslateTransform X=\"{{(1-showMoreSuggestionsVisible)*-135}}\"/>"
+      ]
+    }
+  ],
+  "classicVariant": {
+    "targetStyles": [
+      {
+        "target": "Windows.UI.Xaml.Controls.Grid#TopLevelSuggestionsListHeader",
+        "styles": [
+          "Visibility=Collapsed"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Grid#NoTopLevelSuggestionsText",
+        "styles": [
+          "Visibility=Collapsed"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Grid#TopLevelSuggestionsContainer",
+        "styles": [
+          "Height=0"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.GridView#RecommendedList",
+        "styles": [
+          "Visibility=Collapsed"
+        ]
+      },
+      {
+        "target": "Windows.UI.Xaml.Controls.Grid#ShowMoreSuggestions",
+        "styles": [
+          "Visibility=Collapsed"
+        ]
+      },
+      {
+        "target": "StartMenu.PinnedList",
+        "styles": [
+          "Height=504"
+        ]
+      }
+    ]
+  }
+}

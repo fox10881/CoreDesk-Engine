@@ -1,0 +1,152 @@
+{
+  "id": "RosePine",
+  "label": "Rosé Pine",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskListButton",
+      "styles": [
+        "CornerRadius=3"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base > TextBlock#InnerTextBlock",
+      "styles": [
+        "FontSize=16"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView#NotifyItemIcon",
+      "styles": [
+        "MinWidth=25"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton > Grid > ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter[1] > SystemTray.IconView > Grid > Grid",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid",
+      "styles": [
+        "Padding=2"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView",
+      "styles": [
+        "MinWidth=27"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton > Grid > ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid > Grid > SystemTray.TextIconContent",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Border#BackgroundElement, Taskbar.TaskListLabeledButtonPanel > Border#BackgroundElement",
+      "styles": [
+        "Background:=#302d47",
+        "CornerRadius=6"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background:=#302d47",
+        "CornerRadius=6",
+        "Margin=0,5,4,4",
+        "Padding=3,0,-8,0"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates > Rectangle#RunningIndicator, Taskbar.TaskListLabeledButtonPanel@CommonStates > Rectangle#RunningIndicator",
+      "styles": [
+        "Height=Auto",
+        "RadiusX=5",
+        "RadiusY=5",
+        "StrokeThickness=2",
+        "Stroke@InactivePointerOver=#ebbcba",
+        "Stroke@InactivePressed=#ebbcba",
+        "Stroke@ActiveNormal=#ebbcba",
+        "Stroke@ActivePointerOver=#ebbcba",
+        "Stroke@ActivePressed=#ebbcba",
+        "Fill=Transparent",
+        "Width=37",
+        "VerticalAlignment=Stretch",
+        "Canvas.ZIndex=1"
+      ]
+    },
+    {
+      "target": "SystemTray.ImageIconContent > Grid#ContainerGrid > Image",
+      "styles": [
+        "Width=13"
+      ]
+    },
+    {
+      "target": "SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base > TextBlock#InnerTextBlock",
+      "styles": [
+        "FontSize=14"
+      ]
+    },
+    {
+      "target": "TextBlock#LabelControl",
+      "styles": [
+        "FontFamily=JetBrainsMono NF",
+        "Foreground=#e0def4",
+        "Padding=2,0,8,0"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton]",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.TextBlock#InnerTextBlock[Text=uE971]",
+      "styles": [
+        "Text=uE712"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#HoverFlyoutBackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=#302d47"
+      ]
+    },
+    {
+      "target": "Rectangle#BackgroundStroke",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Border#BackgroundElement, Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Border#BackgroundElement, SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Grid > Border#BackgroundElement, SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Border#BackgroundElement",
+      "styles": [
+        "Background=#302d47"
+      ]
+    },
+    {
+      "target": "TextBlock#DateInnerTextBlock",
+      "styles": [
+        "Margin=0,0,0,-2"
+      ]
+    },
+    {
+      "target": "Grid#OverflowRootGrid > Border",
+      "styles": [
+        "Background=#302d47"
+      ]
+    }
+  ]
+}

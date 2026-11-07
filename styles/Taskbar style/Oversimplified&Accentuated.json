@@ -1,0 +1,221 @@
+{
+  "id": "Oversimplified&Accentuated",
+  "label": "Oversimplified & Accentuated",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "MenuFlyoutPresenter",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "ToolTip > ContentPresenter#LayoutRoot",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill:=$Alt"
+      ]
+    },
+    {
+      "target": "Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton > Grid > ContentPresenter#ContentPresenter > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid#ContainerGrid > Grid#ContentGrid > SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base > TextBlock#InnerTextBlock",
+      "styles": [
+        "FontSize=22"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@RunningIndicatorStates > Rectangle#RunningIndicator, Taskbar.TaskListLabeledButtonPanel@RunningIndicatorStates > Rectangle#RunningIndicator",
+      "styles": [
+        "Fill@ActiveRunningIndicator:=$SolidAccent",
+        "Height=4",
+        "Width@ActiveRunningIndicator=25"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid#IconPanel > Microsoft.UI.Xaml.Controls.ProgressBar#ProgressIndicator, Taskbar.TaskListButton > Taskbar.TaskListLabeledButtonPanel > Microsoft.UI.Xaml.Controls.ProgressBar#ProgressIndicator",
+      "styles": [
+        "MinHeight=4",
+        "Width=25"
+      ]
+    },
+    {
+      "target": "Grid#LayoutRoot@CommonStates > Border#ProgressBarRoot > Border > Grid > Rectangle#DeterminateProgressBarIndicator",
+      "styles": [
+        "Fill@Updating:= <SolidColorBrush Color=\"Green\" Opacity=\"1\" />",
+        "Fill@Determinate:= <SolidColorBrush Color=\"Green\" Opacity=\"1\" />",
+        "Fill@Paused:= <SolidColorBrush Color=\"Orange\" Opacity=\"1\" />",
+        "Fill@Error:= <SolidColorBrush Color=\"Red\" Opacity=\"1\" />",
+        "Fill@UpdatingError:= <SolidColorBrush Color=\"Red\" Opacity=\"1\" />"
+      ]
+    },
+    {
+      "target": "Rectangle#ProgressBarTrack",
+      "styles": [
+        "Fill=Transparent"
+      ]
+    },
+    {
+      "target": "Canvas#HoverFlyoutCanvas > Grid#HoverFlyoutGrid > Border#HoverFlyoutBackground",
+      "styles": [
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#HoverFlyoutBackgroundControl > Grid > Windows.UI.Xaml.Shapes.Rectangle#BackgroundFill",
+      "styles": [
+        "Fill:=$DarkAccent"
+      ]
+    },
+    {
+      "target": "Grid#OverflowRootGrid",
+      "styles": [
+        "Padding:="
+      ]
+    },
+    {
+      "target": "Border#OverflowFlyoutBackgroundBorder",
+      "styles": [
+        "Background:=$Alt",
+        "Shadow:=",
+        "BorderThickness:="
+      ]
+    },
+    {
+      "target": "SystemTray.ImageIconContent > Windows.UI.Xaml.Controls.Grid#ContainerGrid > Windows.UI.Xaml.Controls.Image",
+      "styles": [
+        "Height=20",
+        "Width=20"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid > Grid#OverlayPanel",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=Transparent"
+      ]
+    },
+    {
+      "target": "Grid > HyperlinkButton#Footer",
+      "styles": [
+        "HorizontalContentAlignment = 1"
+      ]
+    },
+    {
+      "target": "Grid#ConfirmatorMainGrid",
+      "styles": [
+        "Background:=$DarkAccent",
+        "BorderBrush=Transparent",
+        "CornerRadius=15",
+        "Margin=0,0,0,5",
+        "Padding=4,0,0,0",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "Grid#BrightnessConfirmator",
+      "styles": [
+        "Padding=6,0,16,0"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.AnimatedIcon#BrightnessIcon",
+      "styles": [
+        "Height=30",
+        "Width=30",
+        "Margin=0,-1,12,0"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.AnimatedIcon#VolumeIcon",
+      "styles": [
+        "Height=30",
+        "Width=30"
+      ]
+    },
+    {
+      "target": "TextBlock#volumeLevelText",
+      "styles": [
+        "FontSize=15"
+      ]
+    },
+    {
+      "target": "Rectangle#HorizontalDecreaseRect",
+      "styles": [
+        "Height=6",
+        "Margin= 0,2,0,0"
+      ]
+    },
+    {
+      "target": "Rectangle#HorizontalTrackRect",
+      "styles": [
+        "Fill=Transparent",
+        "Height=6"
+      ]
+    },
+    {
+      "target": "Grid#HorizontalTemplate > Rectangle#HorizontalDecreaseRect",
+      "styles": [
+        "Fill:= <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColor}\" TintOpacity=\"1\" TintLuminosityOpacity=\"1\" FallbackColor=\"{ThemeResource SystemAccentColorDark2}\" />"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.AltTab > Grid#ModalRootGrid > Border#BackgroundElement",
+      "styles": [
+        "Background=Transparent",
+        "BorderThickness=0",
+        "CornerRadius=20",
+        "Shadow:="
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.Switcher.AltTab > Grid#ModalRootGrid > Border#BackgroundElement > WindowsInternal.ComposableShell.Experiences.Switcher.SwitchItemList",
+      "styles": [
+        "Background:=$DarkAccent"
+      ]
+    },
+    {
+      "target": "Border#BackgroundDimmingLayer",
+      "styles": [
+        "Background:= <WindhawkBlur BlurAmount=\"30\" TintColor=\"#00000080\" />"
+      ]
+    },
+    {
+      "target": "Border#VirtualDesktopBarBackground",
+      "styles": [
+        "Background:= <SolidColorBrush Color=\"{ThemeResource SystemAccentColorDark1}\" Opacity=\"0.4\" />",
+        "BorderBrush=Transparent"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "Alt= <AcrylicBrush TintColor=\"{ThemeResource SystemAltHighColor}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAltHighColor}\" />",
+    "Accent = <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColor}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.6\" FallbackColor=\"{ThemeResource SystemAccentColor}\" />",
+    "DarkAccent = <AcrylicBrush TintColor=\"{ThemeResource SystemAccentColorDark1}\" TintOpacity=\"0.6\" TintLuminosityOpacity=\"0.3\" FallbackColor=\"{ThemeResource SystemAccentColorDark1}\" />",
+    "SolidAccent = <SolidColorBrush Color=\"{ThemeResource SystemAccentColor}\" Opacity=\"1\" />",
+    "Reveal= <RevealBorderBrush Color=\"Transparent\" TargetTheme=\"1\" Opacity=\"1\" />"
+  ]
+}

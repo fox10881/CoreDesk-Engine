@@ -1,0 +1,551 @@
+{
+  "id": "Blob",
+  "label": "Blob",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskbarFrame",
+      "styles": [
+        "Height => TaskbarHeight"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill := $taskbarFill"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#BackgroundControl > Grid > Rectangle#BackgroundStroke",
+      "styles": [
+        "Height := $taskbarStrokeHeight",
+        "Fill := $taskbarStrokeColor"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton#TaskListButton > Grid#IconPanel, Taskbar.TaskListButton#TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel",
+      "styles": [
+        "Padding := {{$buttonSpacing-2}},{{$taskbarTopOffset}},{{$buttonSpacing-2}},{{$taskbarBottomOffset}}",
+        "MinWidth := $buttonMinWidth"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.ExperienceToggleButton#LaunchListButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel",
+      "styles": [
+        "Padding := {{$buttonSpacing-2}},{{$taskbarTopOffset}},{{$buttonSpacing-2}},{{$taskbarBottomOffset}}",
+        "MinWidth := $buttonMinWidth"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.TaskbarExtensionElement > ContentPresenter > SearchUx.SearchUI.SearchButtonControl > Grid > SearchUx.SearchUI.SearchIconButton > SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel",
+      "styles": [
+        "Padding := {{$buttonSpacing-2}},{{$taskbarTopOffset}},{{$buttonSpacing-2}},{{$taskbarBottomOffset}}",
+        "MinWidth := $buttonMinWidth"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.ExperienceToggleButton#LaunchListButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel@CommonStates > Grid > Border#BackgroundElement, Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.ExperienceToggleButton#LaunchListButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "Background@ActiveNormal := $blobFill",
+        "Background@ActivePressed := $blobFill",
+        "Background@InactivePressed := $blobFill",
+        "Background@ActivePointerOver := $blobFill",
+        "Background@InactivePointerOver := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.TaskbarExtensionElement > ContentPresenter > SearchUx.SearchUI.SearchButtonControl > Grid > SearchUx.SearchUI.SearchIconButton > SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel@CommonStates > Grid > Border#BackgroundElement, Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.TaskbarExtensionElement > ContentPresenter > SearchUx.SearchUI.SearchButtonControl > Grid > SearchUx.SearchUI.SearchIconButton > SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "Background@ActiveNormal := $blobFill",
+        "Background@ActivePressed := $blobFill",
+        "Background@InactivePressed := $blobFill",
+        "Background@ActivePointerOver := $blobFill",
+        "Background@InactivePointerOver := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon, Taskbar.ExperienceToggleButton#LaunchListButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarContentOffset-2}}"
+      ]
+    },
+    {
+      "target": "SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Grid > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon, SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarContentOffset-2}}"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates > Border#BackgroundElement, Taskbar.TaskListLabeledButtonPanel#IconPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "Margin = 0",
+        "Background@ActiveNormal := $blobFill",
+        "Background@InactiveNormal = Transparent",
+        "Background@ActivePointerOver := $blobFill",
+        "Background@InactivePointerOver := $blobFill",
+        "Background@ActivePressed := $blobFill",
+        "Background@InactivePressed := $blobFill",
+        "Background@MultiWindowActive := $blobFill",
+        "Background@MultiWindowPointerOver := $blobFill",
+        "Background@MultiWindowPressed := $blobFill",
+        "Background@RequestingAttentionPointerOver := $blobFill",
+        "Background@RequestingAttentionPressed := $blobFill",
+        "Background@RequestingAttentionMultiPointerOver := $blobFill",
+        "Background@RequestingAttentionMultiPressed := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "Canvas.ZIndex = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@CommonStates > Rectangle#RunningIndicator, Taskbar.TaskListLabeledButtonPanel#IconPanel@CommonStates > Rectangle#RunningIndicator",
+      "styles": [
+        "Opacity@NoRunningIndicator = 0",
+        "Width = 2",
+        "Height = 2",
+        "VerticalAlignment = 1",
+        "Margin = 3,0,0,0",
+        "Opacity = 0",
+        "Opacity@MultiWindowNormal = 1",
+        "Opacity@MultiWindowActive = 1",
+        "Opacity@MultiWindowPressed = 1",
+        "Opacity@MultiWindowPointerOver = 1",
+        "Opacity@RequestingAttentionMulti = 1",
+        "Opacity@RequestingAttentionMultiPointerOver = 1",
+        "Opacity@RequestingAttentionMultiPressed = 1",
+        "Fill := $multiWinIndicatorColor",
+        "RadiusX = 0",
+        "RadiusY = 0",
+        "StrokeThickness = 0",
+        "Canvas.ZIndex = 4"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ProgressBar#ProgressIndicator",
+      "styles": [
+        "Height := {{TaskbarHeight-($taskbarBottomOffset+$taskbarTopOffset)}}",
+        "Margin = 1,0,0,0",
+        "CornerRadius := $highlightRadius"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ProgressBar#ProgressIndicator > Grid#LayoutRoot",
+      "styles": [
+        "CornerRadius := $highlightRadius",
+        "Canvas.ZIndex = 1"
+      ]
+    },
+    {
+      "target": "Border#ProgressBarRoot > Border > Grid",
+      "styles": [
+        "Height = Auto"
+      ]
+    },
+    {
+      "target": "Grid#LayoutRoot > Border#ProgressBarRoot > Border > Grid > Rectangle#ProgressBarTrack",
+      "styles": [
+        "Fill = Transparent"
+      ]
+    },
+    {
+      "target": "Grid#LayoutRoot@CommonStates > Border#ProgressBarRoot > Border > Grid > Rectangle#DeterminateProgressBarIndicator",
+      "styles": [
+        "Fill := $progressColor",
+        "Fill@Paused := $progressPausedColor"
+      ]
+    },
+    {
+      "target": "Grid#LayoutRoot@CommonStates > Border#ProgressBarRoot > Border > Grid > Rectangle#IndeterminateProgressBarIndicator",
+      "styles": [
+        "Fill := $progressColor",
+        "Fill@Paused := $progressPausedColor"
+      ]
+    },
+    {
+      "target": "Grid#LayoutRoot@CommonStates > Border#ProgressBarRoot > Border > Grid > Rectangle#IndeterminateProgressBarIndicator2",
+      "styles": [
+        "Fill := $progressColor",
+        "Fill@Paused := $progressPausedColor"
+      ]
+    },
+    {
+      "target": "Border#MultiWindowElement",
+      "styles": [
+        "Visibility = 1"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > TextBlock#LabelControl, Taskbar.TaskListLabeledButtonPanel > TextBlock#LabelControl",
+      "styles": [
+        "Margin := {{$iconLabelSpacing}},0,4,{{$taskbarContentOffset}}",
+        "Padding := {{$leftRightPadding}},0",
+        "Canvas.ZIndex = 3"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton#TaskListButton > Grid#IconPanel > Image#Icon, Taskbar.TaskListButton#TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel > Image#Icon",
+      "styles": [
+        "Margin := {{$iconSpacing}},0,0,{{$taskbarContentOffset-2}}",
+        "Canvas.ZIndex = 3",
+        "HorizontalAlignment = 0"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Rectangle#DefaultIcon, Taskbar.TaskListLabeledButtonPanel > Rectangle#DefaultIcon",
+      "styles": [
+        "Stretch = 1",
+        "Height = 8",
+        "Width = 1",
+        "Visibility = 0",
+        "Fill := $separatorColor",
+        "RenderTransform := <TranslateTransform X=\"-14\" Y=\"0\" />"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel",
+      "styles": [
+        "Visibility := {{1-$showStartButton}}"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Image#OverlayIcon, Taskbar.TaskListLabeledButtonPanel#IconPanel > Image#OverlayIcon",
+      "styles": [
+        "Width := $badgeSize",
+        "Height := $badgeSize",
+        "Margin := $badgeNudge",
+        "Canvas.ZIndex = 3"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Taskbar.Badge#BadgeControl, Taskbar.TaskListLabeledButtonPanel#IconPanel > Taskbar.Badge#BadgeControl",
+      "styles": [
+        "MinWidth := $badgeSize",
+        "Width := $badgeSize",
+        "Height := $badgeSize",
+        "Margin := $badgeNudge",
+        "Canvas.ZIndex = 3"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel > Taskbar.Badge#BadgeControl > Grid > TextBlock#BadgeText, Taskbar.TaskListLabeledButtonPanel#IconPanel > Taskbar.Badge#BadgeControl > Grid > TextBlock#BadgeText",
+      "styles": [
+        "FontSize = 8"
+      ]
+    },
+    {
+      "target": "SystemTray.SystemTrayFrame > StackPanel#SystemTrayFrameGrid > SystemTray.OmniButton#NotificationCenterButton, SystemTray.SystemTrayFrame > Grid#SystemTrayFrameGrid > SystemTray.OmniButton#NotificationCenterButton",
+      "styles": [
+        "Margin := 0,0,{{$taskbarRightOffset-12}},0"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton > Grid@CommonStates > Border#BackgroundBorder",
+      "styles": [
+        "Margin := 2,{{$taskbarTopOffset}},0,{{$taskbarBottomOffset}}",
+        "Background@PointerOver := $blobFill",
+        "Background@Pressed := $blobFill",
+        "Background@Checked := $blobFill",
+        "Background@CheckedPointerOver := $blobFill",
+        "Background@CheckedPressed := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>",
+        "CornerRadius := $highlightRadius"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton > Grid@CommonStates > Border#BackgroundBorder",
+      "styles": [
+        "Margin := 2,{{$taskbarTopOffset}},2,{{$taskbarBottomOffset}}",
+        "Background@PointerOver := $blobFill",
+        "Background@Pressed := $blobFill",
+        "Background@Checked := $blobFill",
+        "Background@CheckedPointerOver := $blobFill",
+        "Background@CheckedPressed := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>",
+        "CornerRadius := $highlightRadius"
+      ]
+    },
+    {
+      "target": "SystemTray.IconView#SystemTrayIcon > Grid#ContainerGrid@ > Border#BackgroundBorder",
+      "styles": [
+        "Margin := 2,{{$taskbarTopOffset}},2,{{$taskbarBottomOffset}}",
+        "Background@CheckedNormal := $blobFill",
+        "Background@CheckedPressed := $blobFill",
+        "Background@Pressed := $blobFill",
+        "Background@CheckedPointerOver := $blobFill",
+        "Background@PointerOver := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView#NotifyItemIcon > Grid#ContainerGrid@ > Border#BackgroundBorder",
+      "styles": [
+        "Margin := 2,{{$taskbarTopOffset}},2,{{$taskbarBottomOffset}}",
+        "Background@CheckedNormal := $blobFill",
+        "Background@CheckedPressed := $blobFill",
+        "Background@Pressed := $blobFill",
+        "Background@CheckedPointerOver := $blobFill",
+        "Background@PointerOver := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView > Grid#ContainerGrid@ > Border#BackgroundBorder",
+      "styles": [
+        "Margin := 2,{{$taskbarTopOffset}},2,{{$taskbarBottomOffset}}",
+        "Background@CheckedNormal := $blobFill",
+        "Background@CheckedPressed := $blobFill",
+        "Background@Pressed := $blobFill",
+        "Background@CheckedPointerOver := $blobFill",
+        "Background@PointerOver := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#NotificationCenterButton > Grid > ContentPresenter#ContentPresenter > ItemsPresenter > StackPanel",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarBottomOffset-$taskbarTopOffset+$taskbarContentOffset}}"
+      ]
+    },
+    {
+      "target": "SystemTray.OmniButton#ControlCenterButton > Grid > ContentPresenter#ContentPresenter > ItemsPresenter",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarBottomOffset-$taskbarTopOffset+$taskbarContentOffset-2}}"
+      ]
+    },
+    {
+      "target": "SystemTray.AdaptiveTextBlock#LanguageInnerTextBlock > TextBlock#InnerTextBlock",
+      "styles": [
+        "MaxLines = 1",
+        "Margin := 0,0,0,{{$taskbarBottomOffset-$taskbarTopOffset+$taskbarContentOffset}}"
+      ]
+    },
+    {
+      "target": "SystemTray.Stack#MainStack > Grid#Content > SystemTray.StackListView#IconStack > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid#ContainerGrid > Grid#ContentGrid > SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base, SystemTray.Stack#MainStack > Grid#Content > SystemTray.StackListView#IconStack > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.IconView#SystemTrayIcon > Grid#ContainerGrid > ContentPresenter#ContentPresenter > Grid#ContentGrid > SystemTray.TextIconContent > Grid#ContainerGrid > SystemTray.AdaptiveTextBlock#Base",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarBottomOffset-$taskbarTopOffset+$taskbarContentOffset-2}}"
+      ]
+    },
+    {
+      "target": "SystemTray.NotificationAreaIcons#NotificationAreaIcons > ItemsPresenter > StackPanel > ContentPresenter > SystemTray.NotifyIconView#NotifyItemIcon > Grid#ContainerGrid > ContentPresenter#ContentPresenter > Grid#ContentGrid > SystemTray.ImageIconContent > Grid#ContainerGrid > Image",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarBottomOffset-$taskbarTopOffset+$taskbarContentOffset-2}}"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView > Grid#ContainerGrid > ContentPresenter#ContentPresenter",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarBottomOffset-$taskbarTopOffset+$taskbarContentOffset-2}}"
+      ]
+    },
+    {
+      "target": "Grid#OverflowRootGrid > Border",
+      "styles": [
+        "Shadow :="
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker2 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel, Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker2 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel",
+      "styles": [
+        "RenderTransform := <TranslateTransform X=\"0\" Y=\"-1\" />"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker2 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > TextBlock[1], Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker2 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > TextBlock[1]",
+      "styles": [
+        "ActualWidth => WeatherTempWidth",
+        "RenderTransform := <TranslateTransform X=\"0\" Y=\"8\" />"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker2 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > TextBlock[2], Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker2 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > TextBlock[2]",
+      "styles": [
+        "ActualWidth => WeatherCondWidth",
+        "RenderTransform := <TranslateTransform X=\"{{WeatherTempWidth+8}}\" Y=\"-8\" />"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid, Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid",
+      "styles": [
+        "Margin := 0,0,0,{{$taskbarContentOffset-4}}",
+        "Width := {{WeatherCondWidth+WeatherTempWidth+62}}"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel",
+      "styles": [
+        "Width := {{WeatherCondWidth+WeatherTempWidth+62}}",
+        "Margin := {{$taskbarLeftOffset-12}},0,56,0",
+        "Padding := 12,{{$taskbarTopOffset}},0,{{$taskbarBottomOffset}}"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel@CommonStates > Grid > Border#BackgroundElement, Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "Background@ActiveNormal := $blobFill",
+        "Background@ActivePressed := $blobFill",
+        "Background@InactivePressed := $blobFill",
+        "Background@ActivePointerOver := $blobFill",
+        "Background@InactivePointerOver := $blobFill",
+        "CornerRadius := $highlightRadius",
+        "BorderThickness = 0",
+        "BackgroundTransition := <BrushTransition Duration=\"0:0:0\"/>"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel, Taskbar.TaskbarFrame > Grid#RootGrid > Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel",
+      "styles": [
+        "Margin = 0,3,0,0"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid[0] > Grid[2], Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid[0] > Grid[2]",
+      "styles": [
+        "HorizontalAlignment = 1",
+        "VerticalAlignment = 1",
+        "RenderTransformOrigin = -0.5,0.5",
+        "RenderTransform := <TransformGroup><ScaleTransform ScaleX = \"0.9\" ScaleY = \"0.9\" /><TranslateTransform X=\"10\" Y=\"8\" /></TransformGroup>"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid, Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid",
+      "styles": [
+        "Background = Transparent"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid, Taskbar.TaskbarFrame > Grid#RootGrid > Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater > Taskbar.AugmentedEntryPointButton#AugmentedEntryPointButton > Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid",
+      "styles": [
+        "Margin = 16,0,0,0",
+        "HorizontalAlignment = 0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker1 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#BadgeAnchorLargeTicker, Taskbar.TaskListButtonPanel#ExperienceToggleButtonRootPanel > Grid#AugmentedEntryPointContentGrid > Grid > Grid > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Border > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Grid > Border#LargeTicker1 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#BadgeAnchorLargeTicker",
+      "styles": [
+        "Margin := 0,0,0,1"
+      ]
+    },
+    {
+      "target": "WindowsInternal.ComposableShell.Experiences.TextInput.Common.InputSwitcher > ContentControl > ContentPresenter > Grid",
+      "styles": [
+        "Shadow :="
+      ]
+    },
+    {
+      "target": "Grid#ContainerGrid@ > Rectangle#ShowDesktopPipe",
+      "styles": [
+        "Grid.Row = 0",
+        "Grid.RowSpan = 3",
+        "Grid.Column = 0",
+        "Grid.ColumnSpan = 3",
+        "Width = 4",
+        "Height = 4",
+        "Height@PointerOver = 10",
+        "Height@Pressed = 6",
+        "RadiusX = 2",
+        "RadiusY = 2",
+        "Margin := 0,{{$taskbarTopOffset}},0,{{$taskbarBottomOffset+$taskbarContentOffset-4}}",
+        "Fill := $showDesktopIndicatorColor"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#OverflowToggleButtonRootPanel",
+      "styles": [
+        "Margin := 8,{{$taskbarTopOffset}},0,{{$taskbarBottomOffset}}",
+        "Padding = 0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButtonPanel#OverflowToggleButtonRootPanel > Grid > Border#BackgroundElement, Taskbar.TaskListButtonPanel#OverflowToggleButtonRootPanel > Border#BackgroundElement",
+      "styles": [
+        "CornerRadius := $highlightRadius"
+      ]
+    },
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > Taskbar.FlyoutFrame > Canvas#HoverFlyoutCanvas > Grid#HoverFlyoutGrid > Border#HoverFlyoutBackground",
+      "styles": [
+        "Shadow :="
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Grid#IconPanel, Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel",
+      "styles": [
+        "MinWidth = 28",
+        "Padding := {{$buttonSpacing-2}},4"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Grid#IconPanel > Image#Icon, Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel > Image#Icon",
+      "styles": [
+        "Margin = 0"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Grid#IconPanel > Border#BackgroundElement, Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel > Border#BackgroundElement",
+      "styles": [
+        "Margin = 0"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Grid#IconPanel > Rectangle#RunningIndicator, Microsoft.UI.Xaml.Controls.ItemsRepeater#OverflowFlyoutListRepeater > Taskbar.TaskListButton#TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel > Rectangle#RunningIndicator",
+      "styles": [
+        "Opacity = 0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Path#BlobShape",
+      "styles": [
+        "Fill := $blobFill"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "taskbarLeftOffset = 12",
+    "taskbarRightOffset = 12",
+    "taskbarTopOffset = 8",
+    "taskbarBottomOffset = 4",
+    "taskbarStrokeHeight = 4",
+    "taskbarContentOffset = 4",
+    "highlightRadius = 8",
+    "buttonMinWidth = 36",
+    "buttonSpacing = 4",
+    "iconSpacing = 8",
+    "iconLabelSpacing = 4",
+    "leftRightPadding = 4",
+    "badgeSize = 12",
+    "badgeNudge = 4,6,0,0",
+    "showStartButton = 1",
+    "blobFill = <SolidColorBrush Color=\"{ThemeResource AdaptiveBlob}\"/>",
+    "taskbarStrokeColor = <SolidColorBrush Color=\"{ThemeResource AdaptiveBlob}\"/>",
+    "taskbarFill = <SolidColorBrush Color=\"{ThemeResource Default}\"/>",
+    "progressColor = <SolidColorBrush Color=\"{ThemeResource SystemAccentColor}\" Opacity=\"0.2\"/>",
+    "progressPausedColor = <SolidColorBrush Color=\"orange\" Opacity=\"0.2\"/>",
+    "showDesktopIndicatorColor = <SolidColorBrush Color=\"{ThemeResource SystemAccentColor}\" Opacity=\"0.7\"/>",
+    "multiWinIndicatorColor = <SolidColorBrush Color=\"{ThemeResource AdaptiveIndicator}\" Opacity=\"0.7\"/>",
+    "separatorColor = <SolidColorBrush Color=\"{ThemeResource AdaptiveIndicator}\" Opacity=\"0.15\"/>"
+  ],
+  "themeResourceVariables": [
+    "AdaptiveIndicator@Light =#000000",
+    "AdaptiveIndicator@Dark =#FFFFFF",
+    "AdaptiveBlob@Light =#FFFFFF",
+    "AdaptiveBlob@Dark =#09131E"
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "id": "TaskbarXII",
+  "label": "TaskbarXII",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "ScrollViewer > ScrollContentPresenter > Border > Grid",
+      "styles": [
+        "Background:=<AcrylicBrush TintColor=\"{ThemeResource SystemListLowColor}\" TintOpacity=\"0.1\" FallbackColor=\"{ThemeResource SystemChromeHighColor}\" />"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid@DockingStates",
+      "styles": [
+        "Tag=horizontal",
+        "Tag@DockedLeft=vertical",
+        "Tag@DockedRight=vertical",
+        "Tag=>taskbarDock"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame",
+      "styles": [
+        "HorizontalAlignment=Right",
+        "Width={{taskbarDock==`vertical`?skip():`Auto`}}",
+        "Height={{taskbarDock==`vertical`?skip():56}}",
+        "Grid.Column=0",
+        "Margin=0,0,2,0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid",
+      "styles": [
+        "Height=48",
+        "CornerRadius=4"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#BackgroundControl",
+      "styles": [
+        "Height=48",
+        "Opacity=0.7"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground > Grid",
+      "styles": [
+        "CornerRadius=4",
+        "Opacity=1"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.ItemsRepeater#TaskbarFrameRepeater",
+      "styles": [
+        "Margin=0,0,3,0"
+      ]
+    },
+    {
+      "target": "Taskbar.SearchBoxButton > Taskbar.TaskListButtonPanel, SearchUx.SearchUI.SearchButtonRootGrid#SearchBoxButtonRootPanel",
+      "styles": [
+        "Margin=2,0,6,0"
+      ]
+    },
+    {
+      "target": "TextBlock#SearchBoxTextBlock",
+      "styles": [
+        "Text=u2726 Meow"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Shapes.Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Border#LargeTicker1",
+      "styles": [
+        "Margin=0,2,4,0"
+      ]
+    },
+    {
+      "target": "Border#LargeTicker1 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Image",
+      "styles": [
+        "MaxHeight=27",
+        "MaxWidth=27"
+      ]
+    },
+    {
+      "target": "Border#LargeTicker1 > AdaptiveCards.Rendering.Uwp.WholeItemsPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer",
+      "styles": [
+        "MaxHeight=27",
+        "MaxWidth=27"
+      ]
+    },
+    {
+      "target": "SystemTray.SystemTrayFrame",
+      "styles": [
+        "HorizontalAlignment=Left",
+        "VerticalAlignment=Center",
+        "Grid.Column=1",
+        "Margin=2,0,0,0"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background:=<SolidColorBrush Color=\"{ThemeResource SystemChromeAltHighColor}\" Opacity=\"0.6\" />",
+        "CornerRadius=4",
+        "Padding=8,3,0,3"
+      ]
+    },
+    {
+      "target": "Grid#SystemTrayFrameGrid > SystemTray.Stack#SecondaryClockStack",
+      "styles": [
+        "Grid.Column=8"
+      ]
+    },
+    {
+      "target": "Grid#SystemTrayFrameGrid > SystemTray.OmniButton#ControlCenterButton",
+      "styles": [
+        "Grid.Column=4"
+      ]
+    },
+    {
+      "target": "Grid#SystemTrayFrameGrid > SystemTray.OmniButton#NotificationCenterButton",
+      "styles": [
+        "Grid.Column=5"
+      ]
+    },
+    {
+      "target": "Grid#SystemTrayFrameGrid > SystemTray.Stack#MainStack",
+      "styles": [
+        "Grid.Column=6"
+      ]
+    },
+    {
+      "target": "Grid#SystemTrayFrameGrid > SystemTray.Stack#ShowDesktopStack",
+      "styles": [
+        "Grid.Column=7"
+      ]
+    },
+    {
+      "target": "SystemTray.DateTimeIconContent > Grid > StackPanel",
+      "styles": [
+        "Orientation=Horizontal",
+        "Spacing=12"
+      ]
+    },
+    {
+      "target": "TextBlock#InnerTextBlock[Text=uE971]",
+      "styles": [
+        "Text=uED14"
+      ]
+    },
+    {
+      "target": "TextBlock#TimeInnerTextBlock",
+      "styles": [
+        "FontSize=15",
+        "FontWeight=Bold"
+      ]
+    },
+    {
+      "target": "TextBlock#DateInnerTextBlock",
+      "styles": [
+        "FontSize=15",
+        "FontWeight=SemiBold"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ScrollViewer > Windows.UI.Xaml.Controls.ScrollContentPresenter > Windows.UI.Xaml.Controls.Border > Windows.UI.Xaml.Controls.Grid",
+      "styles": [
+        "ColumnDefinitions:=<ColumnDefinitionCollection><ColumnDefinition Width=\"*\"/><ColumnDefinition Width=\"*\"/></ColumnDefinitionCollection>"
+      ]
+    },
+    {
+      "target": "Taskbar.AugmentedEntryPointButton > Taskbar.TaskListButtonPanel",
+      "styles": [
+        "Margin=0"
+      ]
+    }
+  ]
+}

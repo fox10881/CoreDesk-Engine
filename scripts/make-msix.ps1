@@ -72,6 +72,8 @@ Copy-Item -LiteralPath (Join-Path $release "coredesk-cli.exe") -Destination $sta
 Copy-Item -LiteralPath "third_party/webview2/WebView2Loader.x64.dll" -Destination (Join-Path $stage "WebView2Loader.dll")
 Copy-Item -LiteralPath "third_party/webview2/LICENSE.txt" -Destination (Join-Path $stage "LICENSE-WebView2Loader.txt")
 Copy-Item -LiteralPath "LICENSE" -Destination (Join-Path $stage "LICENSE.txt")
+# Factory XAML styles — the engine resolves <exe dir>\Styles\<category>\*.json.
+Copy-Item -LiteralPath "styles" -Destination (Join-Path $stage "Styles") -Recurse
 & $Python scripts/write-license-notices.py (Join-Path $stage "THIRD-PARTY-LICENSES.txt")
 if ($LASTEXITCODE -ne 0) { throw "License notice generation failed" }
 

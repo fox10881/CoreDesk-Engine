@@ -1,0 +1,335 @@
+{
+  "id": "FrostyGlass",
+  "label": "Frosty Glass",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Grid#NotificationCenterGrid",
+      "styles": [
+        "CornerRadius=$CornerRadius",
+        "BorderThickness=$BorderThickness",
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush"
+      ]
+    },
+    {
+      "target": "Grid#CalendarCenterGrid",
+      "styles": [
+        "CornerRadius=$CornerRadius",
+        "BorderThickness=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "Background:=$Background"
+      ]
+    },
+    {
+      "target": "Grid#ControlCenterRegion",
+      "styles": [
+        "CornerRadius=$CornerRadius",
+        "BorderThickness=$BorderThickness",
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRegion",
+      "styles": [
+        "CornerRadius:=$CornerRadius",
+        "BorderThickness:=$BorderThickness",
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush"
+      ]
+    },
+    {
+      "target": "MenuFlyoutPresenter",
+      "styles": [
+        "CornerRadius:=$CornerRadius",
+        "BorderThickness:=$BorderThickness",
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush"
+      ]
+    },
+    {
+      "target": "Button#ClearAll",
+      "styles": [
+        "AccessKey=x"
+      ]
+    },
+    {
+      "target": "Button#ExpandCollapseButton",
+      "styles": [
+        "AccessKey=c"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#ThumbnailImage",
+      "styles": [
+        "Width:=$thumbnailImageSize",
+        "Height:=$thumbnailImageSize",
+        "HorizontalAlignment=Center",
+        "VerticalAlignment=Top",
+        "Grid.Column=1",
+        "Margin=0,2,0,55"
+      ]
+    },
+    {
+      "target": "ControlCenter.MediaTransportControls#MediaTransportControls > Windows.UI.Xaml.Controls.Grid#MediaTransportControlsRegion",
+      "styles": [
+        "Height=Auto"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.StackPanel#PrimaryAndSecondaryTextContainer",
+      "styles": [
+        "VerticalAlignment=Bottom",
+        "Grid.Column=0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.StackPanel#PrimaryAndSecondaryTextContainer > Windows.UI.Xaml.Controls.TextBlock#TitleText",
+      "styles": [
+        "TextAlignment=Center",
+        "Margin=0,0,0,0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.StackPanel#PrimaryAndSecondaryTextContainer > Windows.UI.Xaml.Controls.TextBlock#SubtitleText",
+      "styles": [
+        "TextAlignment=Center",
+        "Margin=0,0,0,5"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#ThumbnailImage > Windows.UI.Xaml.Controls.Border",
+      "styles": [
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "Grid#MediaTransportControlsRoot",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "ContentControl > ContentPresenter > Grid > Grid",
+      "styles": [
+        "BorderBrush:=Transparent"
+      ]
+    },
+    {
+      "target": "Border#WADFeatureFooter",
+      "styles": [
+        "BorderBrush:=Transparent"
+      ]
+    },
+    {
+      "target": "StackPanel > ContentPresenter > Border",
+      "styles": [
+        "BorderBrush:=Transparent",
+        "BorderThickness:=0"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid[AutomationProperties.LocalizedLandmarkType=Footer]",
+      "styles": [
+        "BorderBrush:=Transparent"
+      ]
+    },
+    {
+      "target": "Microsoft.UI.Xaml.Controls.PipsPager#QuickActionsPager",
+      "styles": [
+        "Visibility=1"
+      ]
+    },
+    {
+      "target": "JumpViewUI.JumpListListViewItem > Grid#LayoutRoot > Border#BackgroundBorder",
+      "styles": [
+        "CornerRadius:=4.5",
+        "Margin=4,0,4,0"
+      ]
+    },
+    {
+      "target": "JumpViewUI.SystemItemListViewItem > Grid#LayoutRoot > Border#BackgroundBorder",
+      "styles": [
+        "CornerRadius:=4.5",
+        "Margin=4,0,4,0"
+      ]
+    },
+    {
+      "target": "Grid#NotificationCenterGrid",
+      "styles": [
+        "VerticalAlignment:=2"
+      ]
+    },
+    {
+      "target": "Border#ToastBackgroundBorder, Border#ToastBackgroundBorder2",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "ScrollViewer#CalendarControlScrollViewer",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "Border#CalendarHeaderMinimizedOverlay",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "Grid#L1Grid > Border",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageContent",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageContent > Grid > Border",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "QuickActions.ControlCenter.AccessibleWindow#PageWindow > ContentPresenter > Grid#FullScreenPageRoot",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "QuickActions.ControlCenter.AccessibleWindow#PageWindow > ContentPresenter > Grid#FullScreenPageRoot > ContentPresenter#PageHeader",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "ScrollViewer#ListContent",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "ActionCenter.FlexibleToastView#FlexibleNormalToastView",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "ActionCenter.FlexibleItemView",
+      "styles": [
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
+      "target": "ContentControl#TogglesGroup > ContentPresenter > ControlCenter.PaginatedGridView > Grid",
+      "styles": [
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "Grid#FooterGrid",
+      "styles": [
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ActionCenter.FocusSessionControl#FocusSessionControl > Grid#FocusGrid",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0,0,0,0"
+      ]
+    },
+    {
+      "target": "ContentPresenter#PageContent",
+      "styles": [
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid > Windows.UI.Xaml.Controls.Border#ItemOpaquePlating",
+      "styles": [
+        "CornerRadius:=7",
+        "Visibility=0",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness",
+        "Margin=4,4,4,1"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.ListViewItem",
+      "styles": [
+        "Margin=0,0,0,3"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#StandardHeroContainer > Windows.UI.Xaml.Controls.Image",
+      "styles": [
+        "Opacity=1"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Primitives.ScrollBar#VerticalScrollBar",
+      "styles": [
+        "Visibility=1"
+      ]
+    },
+    {
+      "target": "MenuFlyoutPresenter > Border",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness:=$BorderThickness",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "Border#JumpListRestyledAcrylic",
+      "styles": [
+        "Background:=$Background",
+        "BorderThickness:=$BorderThickness",
+        "BorderBrush:=$BorderBrush",
+        "CornerRadius:=$CornerRadius"
+      ]
+    },
+    {
+      "target": "ScrollViewer#JumpListScroller",
+      "styles": [
+        "Margin=0,-2,0,-2"
+      ]
+    },
+    {
+      "target": "Windows.UI.Xaml.Controls.Grid#SystemItemsContainer > Windows.UI.Xaml.Controls.Border > JumpViewUI.SystemItemListView#SystemItemList",
+      "styles": [
+        "Margin:=0,3,0,0"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "Background=<WindhawkBlur BlurAmount=\"20\" TintColor=\"{ThemeResource SystemChromeDarkColor}\" TintOpacity=\"0.15\" />",
+    "BorderBrush2=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"{ThemeResource SystemChromeHighColor}\" Offset=\"0.0\" /><GradientStop Color=\"{ThemeResource SystemChromeLowColor}\" Offset=\"0.25\" /><GradientStop Color=\"{ThemeResource SystemChromeHighColor}\" Offset=\"1\" /></LinearGradientBrush>",
+    "BorderThickness=1",
+    "CornerRadius=10",
+    "BorderBrush=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#50808080\" Offset=\"0.0\" /><GradientStop Color=\"#50404040\" Offset=\"0.25\" /><GradientStop Color=\"#50808080\" Offset=\"1\" /></LinearGradientBrush>",
+    "Background2=<AcrylicBrush TintColor=\"{ThemeResource SystemChromeAltHighColor}\" TintOpacity=\"0.3\" FallbackColor=\"{ThemeResource SystemChromeAltHighColor}\" />",
+    "TrayPadding=2",
+    "ElementBG=<SolidColorBrush Color=\"{ThemeResource SystemChromeAltHighColor}\" Opacity=\"0.3\" />",
+    "ElementBorderThickness=1",
+    "ElementBorderBrush=<LinearGradientBrush StartPoint=\"0,0\" EndPoint=\"0,1\"><GradientStop Color=\"#50808080\" Offset=\"1\" /><GradientStop Color=\"#50606060\" Offset=\"0.15\" /></LinearGradientBrush>",
+    "ElementCornerRadius=10",
+    "thumbnailImageSize=300"
+  ]
+}
