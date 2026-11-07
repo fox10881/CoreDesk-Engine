@@ -72,6 +72,21 @@ fn parse_args() -> app::Args {
     }
 }
 
+/// Move `%APPDATA%\<PecoFence|OpenFence>` and `%LOCALAPPDATA%\<…>` into the
+/// same-named `CoreDeskEngine` folders: adoption kept the old roots alive as
+/// the live config home forever; the data physically relocates instead.
+/// Runs before `init_logging` so the Local-side move is a clean rename.
+fn migrate_legacy_appdata() -> Vec<(std::path::PathBuf, coredesk_core::migrate_dirs::MoveOutcome)> {
+    let mut out = Vec::new();
+    for var in ["APPDATA", "LOCALAPPDATA"] {
+        let Some(base) = std::env::var_os(var).map(std::path::PathBuf::from) else {
+            continue;
+        };
+        out.extend(coredesk_core::migrate_dirs::migrate_legacy_dirs(&base));
+    }
+    out
+}
+
 /// `%LOCALAPPDATA%\CoreDeskEngine`: the logs (see `coredesk_core::brand::log_file_name`) and crash
 /// dumps.
 pub(crate) fn log_dir() -> Option<std::path::PathBuf> {
@@ -344,7 +359,37 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    // A `--portable` run has no AppData home at all; every other launch moves
+    // pre-rebrand folders into `CoreDeskEngine` now that the old instance is
+    // gone (before logging, so the Local rename is a clean `fs::rename`).
+    let migrated = if args.portable {
+        Vec::new()
+    } else {
+        migrate_legacy_appdata()
+    };
+
     init_logging(instance.as_deref());
+    for (dir, outcome) in &migrated {
+        use coredesk_core::migrate_dirs::MoveOutcome;
+        match outcome {
+            MoveOutcome::Renamed => {
+                tracing::info!(from = %dir.display(), "legacy data folder renamed to CoreDeskEngine")
+            }
+            MoveOutcome::Merged {
+                conflicts,
+                leftover,
+            } => tracing::info!(
+                from = %dir.display(),
+                conflicts,
+                leftover,
+                "legacy data folder merged into CoreDeskEngine"
+            ),
+            MoveOutcome::Failed(e) => {
+                tracing::warn!(from = %dir.display(), error = %e, "legacy data folder move failed")
+            }
+            MoveOutcome::Absent => {}
+        }
+    }
     install_panic_hook();
     if let Some(dir) = log_dir() {
         coredesk_platform::crashlog::install(dir, instance.as_deref().unwrap_or("main"));

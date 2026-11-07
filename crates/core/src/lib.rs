@@ -10,6 +10,7 @@ pub mod date_group;
 pub mod geometry;
 pub mod hotkey;
 pub mod i18n;
+pub mod migrate_dirs;
 pub mod model;
 pub mod notification_center_themes;
 pub mod rules;
