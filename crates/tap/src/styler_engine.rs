@@ -117,6 +117,14 @@ struct State {
     /// work (the whole tree re-reported once), so the vtw storm counter
     /// ignores traffic until the replay settles.
     readvising: bool,
+    /// The theme's WebView2 CSS (`W` wire section) — armed for injection.
+    web_css: Option<String>,
+    /// Injected WebView2 handle -> its `AddScriptToExecuteOnDocumentCreated`
+    /// script id ("" until the async id lands).
+    web_injected: BTreeMap<u64, String>,
+    /// WebView2 handles whose `CoreWebView2` wasn't initialized yet —
+    /// retried on later visual-tree traffic.
+    web_pending: std::collections::BTreeSet<u64>,
 }
 unsafe impl Send for State {}
 
@@ -134,6 +142,9 @@ fn state() -> std::sync::MutexGuard<'static, State> {
         rules_gen: 0,
         to_release: Vec::new(),
         readvising: false,
+        web_css: None,
+        web_injected: BTreeMap::new(),
+        web_pending: std::collections::BTreeSet::new(),
     });
     STATE.lock().unwrap_or_else(|p| p.into_inner())
 }
@@ -271,6 +282,8 @@ struct WireTheme {
     resvars: Vec<(String, String)>,
     modern: Vec<WireRuleSet>,
     classic: Vec<WireRuleSet>,
+    /// Concatenated `W` rules — CSS for the search-results WebView2.
+    web_css: String,
 }
 
 /// `AdjustTypeName` from the mod (both variants' prefixes merged).
@@ -564,6 +577,11 @@ fn parse_wire(text: &str) -> Result<(WireKind, WireTheme), String> {
                 for set in &mut pending {
                     set.styles.push(line[2..].to_string());
                 }
+            }
+            Some(b'W') if line.starts_with("W ") => {
+                // One complete `selector{decls}` rule per line.
+                theme.web_css.push_str(&line[2..]);
+                theme.web_css.push('\n');
             }
             Some(b'E') if line == "E" => break,
             _ => {}
@@ -3946,6 +3964,74 @@ fn restore_all() {
             let _ = merged.RemoveAt(idx);
         }
     }
+    webview_resync();
+}
+
+/// `AddScriptToExecuteOnDocumentCreated` completion — the issued script id,
+/// kept for `RemoveScriptToExecuteOnDocumentCreated` on resync/reset.
+fn record_script_id(handle: u64, id: String) {
+    state().web_injected.insert(handle, id);
+}
+
+/// `on_element` hook — inject the armed CSS when this handle is a WebView2
+/// control whose `CoreWebView2` is ready; idempotent per handle. A null
+/// `CoreWebView2` (control still initializing) parks the handle in
+/// `web_pending` for retry on later visual-tree traffic.
+fn webview_maybe_inject(diagnostics: &IXamlDiagnostics, handle: u64) {
+    let Some(css) = state().web_css.clone() else {
+        return;
+    };
+    if state().web_injected.contains_key(&handle) {
+        return;
+    }
+    let Some(cwv) = crate::webview::core_webview2(diagnostics, handle) else {
+        // One log per element — enough to tell "element seen, CoreWebView2
+        // not ready" from "element never reported" in the field.
+        if state().web_pending.insert(handle) {
+            crate::tap_log!("webview: element seen but CoreWebView2 unavailable handle={handle}");
+        }
+        return;
+    };
+    state().web_pending.remove(&handle);
+    if crate::webview::inject(&cwv, handle, &css, record_script_id) {
+        // Mark before the async id lands so retries don't double-inject.
+        state().web_injected.entry(handle).or_default();
+        crate::tap_log!("webview: injected css handle={handle}");
+    }
+}
+
+/// UI-thread resync on theme apply/reset — for every known WebView2 handle
+/// drop the previous document-script and either re-inject the armed CSS or
+/// blank the live `<style>` when the new theme carries none.
+fn webview_resync() {
+    let (diag, css, handles) = {
+        let eng = state();
+        (
+            mod_diagnostics(),
+            eng.web_css.clone(),
+            eng.web_injected.clone(),
+        )
+    };
+    let Some(diag) = diag else {
+        state().web_injected.clear();
+        return;
+    };
+    for (handle, old_id) in handles {
+        let Some(cwv) = crate::webview::core_webview2(&diag, handle) else {
+            state().web_injected.remove(&handle);
+            continue;
+        };
+        match &css {
+            Some(css) => {
+                crate::webview::uninject(&cwv, &old_id);
+                crate::webview::inject(&cwv, handle, css, record_script_id);
+            }
+            None => {
+                crate::webview::uninject(&cwv, &old_id);
+                state().web_injected.remove(&handle);
+            }
+        }
+    }
 }
 
 /// Command-thread entry: parse the wire, handle the layout override
@@ -3971,7 +4057,10 @@ pub fn apply_wire(text: &str) {
         //   classic    = !redesigned
         let win_default_new = windows_default_is_new_layout();
         let forced = matches!(theme.layout, Layout::ForceNew | Layout::NewSideBySide);
-        if forced && !win_default_new {
+        // The layout detour + exit-rebuild are SMEH-only machinery — in
+        // `SearchHost.exe` (same wire, webview CSS only) they'd just bounce
+        // the process.
+        if forced && !win_default_new && crate::is_smeh() {
             arm_layout_detour(theme.layout);
             // The menu is rebuilt with the override — exit so SMEH reconstructs
             // it under the forced feature flags (relaunches automatically; the
@@ -3981,10 +4070,12 @@ pub fn apply_wire(text: &str) {
         let mut eng = state();
         let is_redesigned = forced || win_default_new;
         eng.pending_classic = !is_redesigned && !theme.classic.is_empty();
+        eng.web_css = (!theme.web_css.is_empty()).then(|| theme.web_css.clone());
         eng.pending = Some((kind, theme));
     } else {
         let mut eng = state();
         eng.pending_classic = false;
+        eng.web_css = (!theme.web_css.is_empty()).then(|| theme.web_css.clone());
         eng.pending = Some((kind, theme));
     }
     dispatch_apply();
@@ -4000,6 +4091,8 @@ pub fn reset() {
         eng.wire_rules = None;
         eng.rules_gen += 1;
         eng.to_release.clear();
+        eng.web_css = None;
+        eng.web_pending.clear();
     }
     let dispatcher = state().dispatcher.clone();
     if let Some(dispatcher) = dispatcher {
@@ -4028,6 +4121,11 @@ pub fn session_reset() {
         eng.consumers.clear();
         eng.dispatcher = None;
         eng.readvising = false;
+        // The old island's webviews died with it — their handles and
+        // document-scripts are gone; the armed CSS re-injects as the new
+        // tree re-reports.
+        eng.web_injected.clear();
+        eng.web_pending.clear();
     }
     known().clear();
 }
@@ -4167,6 +4265,18 @@ pub fn on_element(
     known().insert(element.Handle.0, reported_type.to_string());
     queue_release(element.Handle.0);
     queue_release(parent);
+    // WebView2 CSS (`W` section) — retry elements whose `CoreWebView2`
+    // wasn't initialized yet, then check the reported element itself.
+    // `maybe_inject` early-outs when no CSS is armed.
+    if !state().web_pending.is_empty() {
+        let retry: Vec<u64> = state().web_pending.iter().copied().collect();
+        for h in retry {
+            webview_maybe_inject(diagnostics, h);
+        }
+    }
+    if reported_type.ends_with("WebView2") {
+        webview_maybe_inject(diagnostics, element.Handle.0);
+    }
     if storm_limited() {
         return;
     }
@@ -4294,6 +4404,9 @@ pub fn wants_session() -> bool {
 
 /// Full teardown on unload/host-death.
 pub fn shutdown() {
+    // Clear first — `restore_all`'s webview resync then un-injects rather
+    // than re-arming the CSS.
+    state().web_css = None;
     let dispatcher = state().dispatcher.clone();
     if let Some(dispatcher) = dispatcher {
         let done = unsafe {

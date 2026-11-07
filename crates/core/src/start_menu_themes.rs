@@ -45,12 +45,13 @@ pub fn theme(id: &str) -> Option<serde_json::Value> {
 /// T <target> / S <style>
 /// ...
 /// R <key>\t<value>       (theme resource variables)
+/// W <css-rule>           (webContentStyles — injected into the search
+///                         WebView2 via `AddScriptToExecuteOnDocumentCreated`)
 /// E
 /// ```
 ///
 /// `$constant` substitution is done here (longest-name-first, the mod's own
-/// ordering), so the DLL only ever sees expanded style strings. Web-view CSS
-/// rules are omitted — the native engine styles XAML only.
+/// ordering), so the DLL only ever sees expanded style strings.
 pub fn theme_wire(id: &str) -> Option<String> {
     Some(wire_from_payload(&theme(id)?))
 }
@@ -142,6 +143,44 @@ fn wire_from_payload(theme: &serde_json::Value) -> String {
             out.push('\n');
         }
     }
+    // `webContentStyles`/`webViewTargetStyles` — the search-results
+    // WebView2's injected CSS (both key names appear in the wild: the mods
+    // use `webContentStyles`, the factory files were authored with
+    // `webViewTargetStyles`). Each `{target, styles[]}` entry becomes one
+    // `W` line carrying a complete CSS rule (`selector{decl;decl;…}`); the
+    // resident concatenates them into the stylesheet it hands
+    // `ICoreWebView2`.
+    for key in ["webContentStyles", "webViewTargetStyles"] {
+        let Some(entries) = theme[key].as_array() else {
+            continue;
+        };
+        for entry in entries {
+            let Some(selector) = entry["target"].as_str() else {
+                continue;
+            };
+            if selector.starts_with("//") || selector.is_empty() {
+                continue;
+            }
+            let Some(styles) = entry["styles"].as_array() else {
+                continue;
+            };
+            let decls: Vec<String> = styles
+                .iter()
+                .filter_map(|s| s.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty() && !s.starts_with("//"))
+                .map(|s| styles_fs::expand_constants(s, &constants))
+                .collect();
+            if decls.is_empty() {
+                continue;
+            }
+            out.push_str("W ");
+            out.push_str(&selector.replace(['\t', '\n'], " "));
+            out.push('{');
+            out.push_str(&decls.join(";").replace(['\t', '\n'], " "));
+            out.push_str("}\n");
+        }
+    }
     out.push_str("E\n");
     out
 }
@@ -198,6 +237,20 @@ mod tests {
         assert!(wire.contains("\nC\n"));
         assert!(wire.contains("T Border#Classic\n"));
         assert!(wire.contains("R Overlay@Light=#40FFFFFF\n"));
+    }
+
+    #[test]
+    fn theme_wire_serializes_webcontent_styles() {
+        let mut doc = fixture();
+        doc["webContentStyles"] = serde_json::json!([
+            { "target": "html", "styles": ["background: transparent !important", "border: none !important"] },
+            { "target": "//comment", "styles": ["ignored: yes"] },
+            { "target": ".suggContainer", "styles": ["background-color: rgba(0,0,0,.5) !important"] }
+        ]);
+        let wire = wire_from_payload(&doc);
+        assert!(wire.contains("W html{background: transparent !important;border: none !important}\n"));
+        assert!(wire.contains("W .suggContainer{background-color: rgba(0,0,0,.5) !important}\n"));
+        assert!(!wire.contains("W //"));
     }
 
     #[test]

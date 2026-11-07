@@ -465,8 +465,11 @@ fn unload_foreign_residents(pid: u32, keep: HWND) {
 /// `FrameworkUdk` diagnostics session — a v6 resident has no FEST handler,
 /// so it must read as stale);
 /// `8` = + in-process `IImageList2::SetOverlayImage` shortcut-overlay heal
-/// (`SLNK` marker + periodic sync against `HKCU\...\Shell Icons\29`).
-pub const TAP_PROTOCOL_VERSION: usize = 8;
+/// (`SLNK` marker + periodic sync against `HKCU\...\Shell Icons\29`);
+/// `9` = + Start Menu search WebView2 CSS injection (`W` section on
+/// `CDES-SMS1` — a v8 resident drops `W` lines as unknown, so it must
+/// read as stale).
+pub const TAP_PROTOCOL_VERSION: usize = 9;
 
 /// Explorer pid carrying a stale pinned resident that can't serve the
 /// taskbar-styler protocol — remembered so the periodic `ensure` doesn't

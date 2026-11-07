@@ -38,7 +38,7 @@ fn window_class() -> &'static [u16] {
                 "coredesk_tap".to_owned()
             };
             let suffix = stem.strip_prefix("coredesk_tap").unwrap_or("");
-            let base = if crate::is_smeh() {
+            let base = if crate::is_smeh() || crate::is_searchhost() {
                 "CoreDeskTAPSM"
             } else if crate::is_nch() {
                 "CoreDeskTAPNC"
@@ -163,9 +163,12 @@ fn start_worker() {
 /// CabinetWClass WinUI3 islands — a v6 resident has no FEST handler, so
 /// it must read as stale);
 /// `8` = + in-process `IImageList2::SetOverlayImage` shortcut-overlay heal
-/// (`SLNK` marker + periodic sync against `HKCU\...\Shell Icons\29`).
+/// (`SLNK` marker + periodic sync against `HKCU\...\Shell Icons\29`);
+/// `9` = + Start Menu search WebView2 CSS injection (`W` section on
+/// `CDES-SMS1` — a v8 resident drops `W` lines as unknown, so it must
+/// read as stale).
 /// Keep in sync with `crates/platform/src/tap.rs::TAP_PROTOCOL_VERSION`.
-pub const TAP_PROTOCOL_VERSION: usize = 8;
+pub const TAP_PROTOCOL_VERSION: usize = 9;
 /// `"CoreDeskEngine.TAP.Build"` — the window property the host reads to
 /// version-check this resident's build.
 fn build_prop_name() -> &'static [u16] {
@@ -476,7 +479,7 @@ fn handle_message(_hwnd: HWND, msg: u32, _wparam: WPARAM, lparam: LPARAM) {
 /// `imageres.dll,-163` (Windows 11's stock arrow, when shown) without needing
 /// admin rights or an Explorer restart.
 fn sync_link_overlay(explicit_shown: Option<bool>) {
-    if crate::is_smeh() || crate::is_nch() {
+    if crate::is_smeh() || crate::is_nch() || crate::is_searchhost() {
         return;
     }
     let shown = explicit_shown.unwrap_or_else(hkcu_wants_link_arrow);

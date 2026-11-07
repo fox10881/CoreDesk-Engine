@@ -321,7 +321,109 @@ pub fn load_theme(category: &str, id: &str) -> Option<Value> {
 
 /// [`load_theme`] against explicit roots.
 pub fn load_in(factory: &Path, user: Option<&Path>, category: &str, id: &str) -> Option<Value> {
-    read_theme(&resolve_path(factory, user, category, id)?)
+    let path = resolve_path(factory, user, category, id)?;
+    let mut theme = read_theme(&path)?;
+    // Relative `ImageSource`/`Source` attributes resolve against the style
+    // file's own directory — a mod ships `GTA VI.json` + `bg.jpg` side by
+    // side and references it as `ImageSource="bg.jpg"`, keeping the file
+    // portable (no absolute paths inside the document).
+    if let Some(dir) = path.parent() {
+        resolve_relative_uris(&mut theme, dir);
+    }
+    Some(theme)
+}
+
+/// Walks every string in the payload rewriting relative image URIs —
+/// constants carry `:=` markup too, so the whole tree is scanned rather
+/// than just `targetStyles`.
+fn resolve_relative_uris(value: &mut Value, dir: &Path) {
+    match value {
+        Value::String(s) => *s = rewrite_relative_uris_in_text(s, dir),
+        Value::Array(arr) => arr
+            .iter_mut()
+            .for_each(|v| resolve_relative_uris(v, dir)),
+        Value::Object(map) => map
+            .values_mut()
+            .for_each(|v| resolve_relative_uris(v, dir)),
+        _ => {}
+    }
+}
+
+/// Rewrites `ImageSource="x.png"` / `Source="x.png"` attribute values that
+/// carry no URI scheme to absolute `file:///` URIs under `dir`. Values with
+/// a scheme (`file:///`, `https://`, `data:`, `ms-appx:`) pass through.
+fn rewrite_relative_uris_in_text(text: &str, dir: &Path) -> String {
+    if !text.contains("=\"") {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len() + 64);
+    let mut rest = text;
+    while let Some(eq) = rest.find("=\"") {
+        // Attribute name = trailing identifier immediately before `=`
+        // (`ImageSource=` keeps `Image` in the run — `Source=` alone only
+        // matches an exact `Source` attribute, not e.g. `PropertySource=`).
+        let name_start = rest[..eq]
+            .rfind(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        let name = &rest[name_start..eq];
+        let val_start = eq + 2;
+        let Some(close) = rest[val_start..].find('"') else {
+            break;
+        };
+        let value = &rest[val_start..val_start + close];
+        out.push_str(&rest[..val_start]);
+        if matches!(name, "ImageSource" | "Source") && is_relative_uri(value) {
+            out.push_str(&file_uri(dir, value));
+        } else {
+            out.push_str(value);
+        }
+        out.push('"');
+        rest = &rest[val_start + close + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// A URI reference with no scheme — a bare filename or relative path the
+/// style intends to resolve beside its own file.
+fn is_relative_uri(value: &str) -> bool {
+    if value.is_empty() || value.starts_with('#') {
+        return false;
+    }
+    match value.find(':') {
+        Some(colon) => !value[..colon]
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.')),
+        // `\\server\share` is already absolute; `foo.png` is relative.
+        None => !value.starts_with(['\\', '/']),
+    }
+}
+
+/// `dir` + a relative name → `file:///C:/…/Start%20Menu%20style/bg.jpg`.
+/// UTF-8 outside the unreserved set is percent-encoded per-segment.
+fn file_uri(dir: &Path, name: &str) -> String {
+    use std::fmt::Write;
+    let path = dir.join(name).to_string_lossy().replace('\\', "/");
+    let mut uri = String::with_capacity(path.len() + 8);
+    uri.push_str("file:///");
+    for b in path.bytes() {
+        match b {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'.'
+            | b'_'
+            | b'~'
+            | b'/'
+            | b':' => uri.push(b as char),
+            _ => {
+                let _ = write!(uri, "%{b:02X}");
+            }
+        }
+    }
+    uri
 }
 
 /// User layer first (an existing user file wins — even unreadable, so a
@@ -591,6 +693,43 @@ mod tests {
             "broken factory + broken override hide both"
         );
         assert!(load_in(&factory, Some(&user), TASKBAR_DIR, "Ok").is_none());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn relative_image_uris_resolve_against_the_style_dir() {
+        let base = std::env::temp_dir().join(format!("stylesfs-uri-{}", std::process::id()));
+        let factory = base.join("factory");
+        write(
+            &factory.join(TASKBAR_DIR),
+            "Img.json",
+            &serde_json::json!({
+                "styleConstants": [
+                    "Wall=<ImageBrush ImageSource=\"bg.jpg\" Stretch=\"UniformToFill\"/>"
+                ],
+                "targetStyles": [
+                    { "target": "Border", "styles": [
+                        "Background:=$Wall",
+                        "Background:=<ImageBrush ImageSource=\"icon.png\"/>",
+                        "Fill:=<ImageBrush ImageSource=\"file:///D:/abs.png\"/>",
+                        "Foreground:=<ImageBrush ImageSource=\"data:image/png;base64,AAAA\"/>"
+                    ] }
+                ]
+            })
+            .to_string(),
+        );
+        let doc = load_in(&factory, None, TASKBAR_DIR, "Img").unwrap();
+        let txt = doc.to_string();
+        let dir = factory
+            .join(TASKBAR_DIR)
+            .to_string_lossy()
+            .replace('\\', "/")
+            .replace(' ', "%20");
+        let dir = dir.trim_start_matches("//?/");
+        assert!(txt.contains(&format!("file:///{dir}/bg.jpg")), "{txt}");
+        assert!(txt.contains(&format!("file:///{dir}/icon.png")), "{txt}");
+        assert!(txt.contains("file:///D:/abs.png"), "{txt}");
+        assert!(txt.contains("data:image/png;base64,AAAA"), "{txt}");
         let _ = fs::remove_dir_all(&base);
     }
 

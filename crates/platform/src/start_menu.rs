@@ -82,37 +82,65 @@ struct CopyDataStruct {
     lp_data: *const core::ffi::c_void,
 }
 
-struct Smeh {
-    /// The in-SMEH command window (`CoreDeskTAP` class, owned by SMEH pid).
+/// Per-process injection bookkeeping — one per host the `CDES-SMS1` wire
+/// is delivered to: `StartMenuExperienceHost.exe` for the menu chrome and
+/// `SearchHost.exe` for the search-results WebView2 (which lives there on
+/// current builds).
+struct Host {
+    /// Image name matched in the toolhelp snapshot.
+    exe: &'static str,
+    /// `true` when the host runs AppContainer and needs the `%ProgramData%`
+    /// ACE'd resident copy (`SearchHost` — same restriction as SEH).
+    appcontainer: bool,
+    /// The in-host command window (`CoreDeskTAPSM` class, owned by `pid`).
     cmd_hwnd: HWND,
-    /// SMEH pid the DLL is loaded in.
+    /// Pid the DLL is loaded in.
     pid: u32,
-    /// The catalog id last sent ("" = Windows Default).
-    style: String,
     /// `RegisterWindowMessage` id for the unload command.
     msg_unload: u32,
-    /// The theme serialized for transport — cached so a re-inject after an
-    /// SMEH restart doesn't rebuild it.
-    wire: String,
     /// Whether `CDS_HELLO` was delivered for `pid` (arms the DLL's host
-    /// death-watch once per SMEH lifetime).
+    /// death-watch once per host lifetime).
     hello_sent: bool,
 }
-unsafe impl Send for Smeh {}
+unsafe impl Send for Host {}
 
-static SMEH: Mutex<Option<Smeh>> = Mutex::new(None);
+impl Host {
+    fn new(exe: &'static str, appcontainer: bool) -> Self {
+        Self {
+            exe,
+            appcontainer,
+            cmd_hwnd: HWND(core::ptr::null_mut()),
+            pid: 0,
+            msg_unload: 0,
+            hello_sent: false,
+        }
+    }
+}
 
-fn lock() -> std::sync::MutexGuard<'static, Option<Smeh>> {
-    SMEH.lock().unwrap_or_else(|p| p.into_inner())
+struct Sms {
+    /// The catalog id last sent ("" = Windows Default).
+    style: String,
+    /// The theme serialized for transport — cached so a re-inject after a
+    /// host restart doesn't rebuild it.
+    wire: String,
+    /// `[SMEH, SearchHost]` — both spawned lazily by the shell.
+    hosts: [Host; 2],
+}
+unsafe impl Send for Sms {}
+
+static SMS: Mutex<Option<Sms>> = Mutex::new(None);
+
+fn lock() -> std::sync::MutexGuard<'static, Option<Sms>> {
+    SMS.lock().unwrap_or_else(|p| p.into_inner())
 }
 
 fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(core::iter::once(0)).collect()
 }
 
-/// Pid of `StartMenuExperienceHost.exe`, or `None` when the shell hasn't
-/// spawned it yet (it idles out and respawns on demand).
-fn find_smeh_pid() -> Option<u32> {
+/// Pid of `exe`, or `None` when the shell hasn't spawned it yet (both
+/// Start-Menu hosts idle out and respawn on demand).
+fn find_pid(exe: &str) -> Option<u32> {
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snap.is_null() {
         return None;
@@ -137,7 +165,7 @@ fn find_smeh_pid() -> Option<u32> {
             .iter()
             .position(|&c| c == 0)
             .unwrap_or(pe.exe_file.len());
-        if from_wide(&pe.exe_file[..len]).eq_ignore_ascii_case("startmenuexperiencehost.exe") {
+        if from_wide(&pe.exe_file[..len]).eq_ignore_ascii_case(exe) {
             found = Some(pe.pid);
             break;
         }
@@ -183,14 +211,18 @@ fn send_copydata(hwnd: HWND, tag: usize, payload: &[u8]) -> bool {
     }
 }
 
-/// Maps `coredesk_tap.dll` into SMEH via `CreateRemoteThread(LoadLibraryW)`,
+/// Maps `coredesk_tap.dll` into the host via `CreateRemoteThread(LoadLibraryW)`,
 /// then waits for its command window. `kernel32`'s image base is shared
 /// per-boot, so the local `LoadLibraryW` address is the remote one.
-fn inject(smeh: &mut Smeh, pid: u32) -> bool {
+fn inject(host: &mut Host, pid: u32) -> bool {
     // Unique-per-build module name — a stale pinned resident can't be
     // evicted by re-injecting the same path (LoadLibrary dedups), so the
     // versioned copy is the only way a fresh resident co-loads.
-    let path = match crate::tap::tap_injectable_path() {
+    let path = match if host.appcontainer {
+        crate::tap::tap_injectable_path_appcontainer()
+    } else {
+        crate::tap::tap_injectable_path()
+    } {
         Some(p) if p.exists() => p,
         _ => return false,
     };
@@ -267,13 +299,13 @@ fn inject(smeh: &mut Smeh, pid: u32) -> bool {
     if !ok {
         return false;
     }
-    smeh.msg_unload =
+    host.msg_unload =
         unsafe { RegisterWindowMessageW(PCWSTR(wide("CoreDeskEngine.TAP.Unload").as_ptr())) };
-    // Up to 5 s for the DLL to boot its command window inside SMEH.
+    // Up to 5 s for the DLL to boot its command window inside the host.
     for _ in 0..100 {
         if let Some(cmd) = find_cmd_window(pid) {
-            smeh.cmd_hwnd = cmd;
-            smeh.pid = pid;
+            host.cmd_hwnd = cmd;
+            host.pid = pid;
             // One resident per process — unwind any stale co-loaded build.
             crate::tap::unload_foreign_residents_matching(pid, cmd, "CoreDeskTAPSM");
             return true;
@@ -283,15 +315,15 @@ fn inject(smeh: &mut Smeh, pid: u32) -> bool {
     false
 }
 
-fn unload_locked(smeh: &mut Smeh) {
-    if !smeh.cmd_hwnd.0.is_null() && smeh.msg_unload != 0 {
-        let _ = send_copydata(smeh.cmd_hwnd, CDS_RESET, &[]);
+fn unload_locked(host: &mut Host) {
+    if !host.cmd_hwnd.0.is_null() && host.msg_unload != 0 {
+        let _ = send_copydata(host.cmd_hwnd, CDS_RESET, &[]);
         // Registered unload message — the DLL restores before returning.
         let mut result = 0usize;
         unsafe {
             let _ = SendMessageTimeoutW(
-                smeh.cmd_hwnd,
-                smeh.msg_unload,
+                host.cmd_hwnd,
+                host.msg_unload,
                 WPARAM(0),
                 LPARAM(0),
                 SMTO_ABORTIFHUNG | SMTO_BLOCK | SMTO_ERRORONEXIT,
@@ -300,26 +332,26 @@ fn unload_locked(smeh: &mut Smeh) {
             );
         }
     }
-    smeh.cmd_hwnd = HWND(core::ptr::null_mut());
-    smeh.pid = 0;
-    smeh.hello_sent = false;
+    host.cmd_hwnd = HWND(core::ptr::null_mut());
+    host.pid = 0;
+    host.hello_sent = false;
 }
 
-/// Sends the stored wire to the resident DLL; re-injects when SMEH
+/// Sends the stored wire to the resident DLL; re-injects when the host
 /// restarted under us.
-fn deliver_locked(smeh: &mut Smeh) -> bool {
-    if smeh.wire.is_empty() {
-        return send_copydata(smeh.cmd_hwnd, CDS_RESET, &[]);
+fn deliver_locked(host: &mut Host, wire: &str) -> bool {
+    if wire.is_empty() {
+        return send_copydata(host.cmd_hwnd, CDS_RESET, &[]);
     }
-    // Arm the DLL's host death-watch once per SMEH lifetime — styles revert
+    // Arm the DLL's host death-watch once per host lifetime — styles revert
     // to stock if coredesk dies.
-    if !smeh.hello_sent {
+    if !host.hello_sent {
         let pid = std::process::id();
-        if send_copydata(smeh.cmd_hwnd, CDS_HELLO, &pid.to_ne_bytes()) {
-            smeh.hello_sent = true;
+        if send_copydata(host.cmd_hwnd, CDS_HELLO, &pid.to_ne_bytes()) {
+            host.hello_sent = true;
         }
     }
-    send_copydata(smeh.cmd_hwnd, CDS_THEME, smeh.wire.as_bytes())
+    send_copydata(host.cmd_hwnd, CDS_THEME, wire.as_bytes())
 }
 
 /// Applies the selected Start Menu style.
@@ -338,38 +370,43 @@ pub fn apply_start_menu_theme(id: &str) -> bool {
         }
     };
     let mut guard = lock();
-    let smeh = guard.get_or_insert_with(|| Smeh {
-        cmd_hwnd: HWND(core::ptr::null_mut()),
-        pid: 0,
+    let sms = guard.get_or_insert_with(|| Sms {
         style: String::new(),
-        msg_unload: 0,
         wire: String::new(),
-        hello_sent: false,
+        hosts: [
+            Host::new("startmenuexperiencehost.exe", false),
+            Host::new("searchhost.exe", true),
+        ],
     });
-    smeh.style = id.to_string();
-    smeh.wire = wire;
-    let Some(pid) = find_smeh_pid() else {
-        return true; // applies when SMEH next launches
-    };
-    let stale = smeh.pid != pid || unsafe { IsWindow(smeh.cmd_hwnd) }.0 == 0;
-    if stale {
-        smeh.cmd_hwnd = find_cmd_window(pid).unwrap_or(HWND(core::ptr::null_mut()));
-        smeh.hello_sent = false;
-        if smeh.cmd_hwnd.0.is_null() {
-            // Fresh (or restarted) SMEH — map the DLL in.
-            smeh.pid = 0;
-            if !inject(smeh, pid) {
-                return false;
+    sms.style = id.to_string();
+    sms.wire = wire;
+    let mut ok = true;
+    for host in &mut sms.hosts {
+        let Some(pid) = find_pid(host.exe) else {
+            continue; // applies when the host next launches
+        };
+        let stale = host.pid != pid || unsafe { IsWindow(host.cmd_hwnd) }.0 == 0;
+        if stale {
+            host.cmd_hwnd = find_cmd_window(pid).unwrap_or(HWND(core::ptr::null_mut()));
+            host.hello_sent = false;
+            if host.cmd_hwnd.0.is_null() {
+                // Fresh (or restarted) host — map the DLL in.
+                host.pid = 0;
+                if !inject(host, pid) {
+                    ok = false;
+                    continue;
+                }
+            } else {
+                host.pid = pid;
             }
-        } else {
-            smeh.pid = pid;
         }
+        ok &= deliver_locked(host, &sms.wire);
     }
-    deliver_locked(smeh)
+    ok
 }
 
 /// Cheap liveness check driven by the app's periodic tick: re-injects and
-/// re-delivers the selected style when SMEH restarted.
+/// re-delivers the selected style when either host restarted.
 pub fn ensure() {
     // Anything deliverable counts — a tint-only wire keeps the host armed
     // even with no style selected.
@@ -377,34 +414,46 @@ pub fn ensure() {
     if !needs {
         return;
     }
-    if find_smeh_pid().is_none() {
-        return;
-    }
     let mut guard = lock();
-    let Some(smeh) = guard.as_mut() else {
+    let Some(sms) = guard.as_mut() else {
         return;
     };
-    let stale = smeh.pid == 0 || unsafe { IsWindow(smeh.cmd_hwnd) }.0 == 0;
-    if !stale {
-        // `IsWindow` on a dead-process window fails — also guard the pid.
-        let alive = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, BOOL(0), smeh.pid) };
-        if !alive.0.is_null() {
-            unsafe {
-                let _ = CloseHandle(alive.0);
-            }
-            return;
+    let mut any_stale = false;
+    for host in &sms.hosts {
+        if find_pid(host.exe).is_none() {
+            continue;
         }
+        let stale = host.pid == 0 || unsafe { IsWindow(host.cmd_hwnd) }.0 == 0;
+        let stale = stale || {
+            // `IsWindow` on a dead-process window fails — also guard the pid.
+            let alive = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, BOOL(0), host.pid) };
+            if !alive.0.is_null() {
+                unsafe {
+                    let _ = CloseHandle(alive.0);
+                }
+                false
+            } else {
+                true
+            }
+        };
+        any_stale |= stale;
     }
-    let style = smeh.style.clone();
+    if !any_stale {
+        return;
+    }
+    let style = sms.style.clone();
     drop(guard);
     let _ = apply_start_menu_theme(&style);
 }
 
-/// Call on shutdown: restores the Start Menu and unloads the DLL if injected.
+/// Call on shutdown: restores the Start Menu and unloads the DLL wherever
+/// it was injected.
 pub fn shutdown() {
     let mut guard = lock();
-    if let Some(mut smeh) = guard.take() {
-        unload_locked(&mut smeh);
+    if let Some(mut sms) = guard.take() {
+        for host in &mut sms.hosts {
+            unload_locked(host);
+        }
     }
 }
 

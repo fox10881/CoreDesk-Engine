@@ -67,6 +67,7 @@ mod styler;
     clippy::all
 )]
 mod styler_bindings;
+mod webview;
 mod win32;
 
 /// Debug-build-only tracing: the DLL swallows COM errors by design (Explorer
@@ -122,7 +123,7 @@ pub unsafe extern "system" fn DllMain(
         unsafe {
             let _ = win32::DisableThreadLibraryCalls(hinstance);
         }
-        if is_explorer_process() || is_smeh_process() || is_nch_process() {
+        if is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process() {
             // Self-pin: the host unhooks right after our command window
             // appears, and `InitializeXamlDiagnosticsEx` only pins us later,
             // inside `SetSite`. Without our own pin the gap between
@@ -143,7 +144,9 @@ pub unsafe extern "system" fn DllMain(
             tap_log!("DllMain attach hmod={hinstance:?} smeh={}", is_smeh());
             std::thread::spawn(bootstrap);
         }
-    } else if reason == 0 && (is_explorer_process() || is_smeh_process() || is_nch_process()) {
+    } else if reason == 0
+        && (is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process())
+    {
         // DLL_PROCESS_DETACH — only meaningful inside a host; the host-side
         // `FreeLibrary(tap.lib)` in coredesk.exe would otherwise log the
         // same line and look like a resident unload.
@@ -221,6 +224,20 @@ pub(crate) fn is_smeh() -> bool {
 
 fn is_smeh_process() -> bool {
     is_smeh()
+}
+
+/// `true` inside `SearchHost.exe` — the search-results host (on current
+/// builds the Start Menu's search WebView2 lives here rather than SMEH).
+/// It receives the same `CDES-SMS1` wire under the `CoreDeskTAPSM` command
+/// window, but SMEH-only machinery (the layout detour + exit throttle)
+/// stays gated on [`is_smeh`].
+pub(crate) fn is_searchhost() -> bool {
+    static IS_SH: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *IS_SH.get_or_init(|| process_name_is("searchhost.exe"))
+}
+
+fn is_searchhost_process() -> bool {
+    is_searchhost()
 }
 
 /// `true` inside `ShellExperienceHost.exe` or `ShellHost.exe` — the
