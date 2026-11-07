@@ -11,7 +11,7 @@ const read = name => JSON.parse(fs.readFileSync(path.join(source, name), "utf8")
 const capture = read("capture-manifest.json");
 const before = read("before-proof.json");
 const proof = read("automatic-proof.json");
-if (capture.product !== "PecoFence" || capture.language !== "en" ||
+if (capture.product !== "CoreDesk" || capture.language !== "en" ||
     capture.themeStyle !== "liquidGlass" || !capture.rulesKeepUpdated ||
     !capture.noManualRoutingCommands || capture.nativeFsResyncs < 2 ||
     !before.newFilesAbsentFromDisk || !before.newFilesAbsentFromCatalog ||
@@ -56,4 +56,4 @@ fs.writeFileSync(path.join(dest, "autosort-provenance.json"), JSON.stringify({
   observedSourceFrames: {imageArrives: 95, documentArrives: 171, mergeStarts: 355, workTabActivates: 406},
   editorial: "New files cards and light trails are graphic cues, not a recreated Explorer or product UI. Cues lead the corresponding native arrival by 24 frames. All native panels and routing/tab actions are from the same take. Cyan grading, framing, camera moves and 2-second reading holds are editorial.",
 }, null, 2) + "\n");
-console.log("Prepared PecoFence automatic routing and tabs from one verified native take.");
+console.log("Prepared CoreDesk automatic routing and tabs from one verified native take.");

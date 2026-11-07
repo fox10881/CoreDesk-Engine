@@ -14,7 +14,7 @@ export const Closing = () => {
       position:"absolute",left:150,top:300,fontFamily:"Bahnschrift",fontSize:166,fontWeight:600,lineHeight:1.08,letterSpacing:-4,textShadow:"0 0 30px #22e4f322",
       opacity:interpolate(frame,[0,24],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"}),
       translate:interpolate(frame,[0,24],["50px 0px","0px 0px"],{extrapolateLeft:"clamp",extrapolateRight:"clamp",easing:Easing.bezier(.16,1,.3,1)}),
-    }}>PecoFence</Interactive.Div>
+    }}>CoreDesk</Interactive.Div>
     <Interactive.Div name="Closing promise" data-review-text="motion-end-promise" style={{
       position:"absolute",left:157,top:512,fontFamily:"Bahnschrift",fontSize:88,fontWeight:400,lineHeight:1.15,letterSpacing:-3,color:"#d6fcff",
       opacity:interpolate(frame,[6,30],[0,1],{extrapolateLeft:"clamp",extrapolateRight:"clamp"}),

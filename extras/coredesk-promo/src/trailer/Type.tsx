@@ -70,7 +70,7 @@ export const Fade: React.FC<{start: number; end?: number; dy?: number; dur?: num
     filter: p < 1 ? `blur(${mix(8, 0, p)}px)` : undefined}}>{children}</div>;
 };
 
-/** PecoFence mark (brackets + four tiles), as in the site and app icon. */
+/** CoreDesk mark (brackets + four tiles), as in the site and app icon. */
 export const Mark: React.FC<{size: number; color?: string; draw?: number; tiles?: number}> = ({size, color = "#fff", draw = 1, tiles = 1}) => (
   <svg width={size} height={size} viewBox="0 0 64 64" fill="none" style={{display: "block"}}>
     <path d="M27 8H14a6 6 0 0 0-6 6v13M37 8h13a6 6 0 0 1 6 6v13M8 37v13a6 6 0 0 0 6 6h13M56 37v13a6 6 0 0 1-6 6H37"

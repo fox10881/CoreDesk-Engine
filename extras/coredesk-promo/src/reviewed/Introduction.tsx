@@ -7,7 +7,7 @@ export const Introduction = () => <AbsoluteFill name="Product introduction"
   <Interactive.Div name="Product name" data-review-text="intro-brand"
     style={{position: "absolute", left: 150, top: 180, fontFamily: "Segoe UI",
       fontSize: 150, fontWeight: 600, lineHeight: 1.1, letterSpacing: -6}}>
-    PecoFence
+    CoreDesk
   </Interactive.Div>
   <Interactive.Div name="What the product is" data-review-text="definition"
     style={{position: "absolute", left: 150, top: 365, fontFamily: "Segoe UI",

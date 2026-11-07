@@ -57,7 +57,7 @@ const Check: React.FC<{p: number}> = ({p}) => (
   </svg>
 );
 
-/** A coding agent's transcript: the request, then the pecofence-cli calls it makes. */
+/** A coding agent's transcript: the request, then the coredesk-cli calls it makes. */
 const AgentCard: React.FC<{t: number}> = ({t}) => {
   const enter = prog(t, 16.2, 0.7);
   const leave = prog(t, 22.75, 0.5, ease.in);
@@ -77,7 +77,7 @@ const AgentCard: React.FC<{t: number}> = ({t}) => {
         <svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" fill="#9fb4ff"/></svg>
         YOUR AI AGENT
         <div style={{marginLeft: "auto", font: `500 18px/1 ${FONT_MONO}`, color: "#c5d1ff", padding: "7px 12px", borderRadius: 999,
-          background: "#4768de40", border: "1px solid #6f8cff55"}}>pecofence-cli</div>
+          background: "#4768de40", border: "1px solid #6f8cff55"}}>coredesk-cli</div>
       </div>
       <div style={{marginTop: 22, font: `600 16px/1 ${FONT_TEXT}`, color: "#8390bb", letterSpacing: "0.08em"}}>YOU</div>
       <div style={{marginTop: 9, font: `450 30px/1.3 ${FONT_TEXT}`, color: "#fff", minHeight: 117}}>
@@ -95,7 +95,7 @@ const AgentCard: React.FC<{t: number}> = ({t}) => {
               <div style={{display: "flex", gap: 14, alignItems: "flex-start"}}>
                 <div style={{marginTop: 3, width: 20, flex: "none"}}>{running ? <Spinner t={t}/> : <Check p={prog(t, s.t + 0.2, 0.3)}/>}</div>
                 <div style={{font: `450 18.5px/1.34 ${FONT_MONO}`, color: "#e6ebff"}}>
-                  <span style={{color: "#8fa8ff", whiteSpace: "nowrap"}}>pecofence-cli</span>{s.args.split(" ").map((tok, k) => <React.Fragment key={k}> <span style={{whiteSpace: "nowrap"}}>{tok}</span></React.Fragment>)}
+                  <span style={{color: "#8fa8ff", whiteSpace: "nowrap"}}>coredesk-cli</span>{s.args.split(" ").map((tok, k) => <React.Fragment key={k}> <span style={{whiteSpace: "nowrap"}}>{tok}</span></React.Fragment>)}
                 </div>
               </div>
               <div style={{marginLeft: 34, marginTop: 1, font: `450 16px/1.3 ${FONT_MONO}`, color: "#79d6a8",
@@ -158,7 +158,7 @@ export const Agent: React.FC = () => {
             style={{font: `650 104px/1.04 ${FONT_DISPLAY}`, color: INK, letterSpacing: "-0.032em", marginTop: i ? 4 : 0}}/>
         ))}
         <Fade start={23.9} end={25.35} style={{marginTop: 34, font: `450 33px/1.38 ${FONT_TEXT}`, color: INK_SOFT, maxWidth: 700}}>
-          pecofence-cli is built in, ready for Claude Code, Codex and Cursor.
+          coredesk-cli is built in, ready for Claude Code, Codex and Cursor.
         </Fade>
       </div>
     </AbsoluteFill>

@@ -22,10 +22,10 @@ for(const clip of clips){
 const config=JSON.parse(fs.readFileSync(path.join(root,".capture","launch","hero","app","config","config.json"),"utf8").replace(/^\uFEFF/,""));
 const manifest={
   capturedAt:new Date().toISOString(),
-  buildModifiedAt:fs.statSync(path.join(root,".capture","launch","hero","app","pecofence.exe")).mtime.toISOString(),
+  buildModifiedAt:fs.statSync(path.join(root,".capture","launch","hero","app","coredesk.exe")).mtime.toISOString(),
   language:config.settings.language,
   themeStyle:config.settings.themeStyle,
-  source:"Native Windows recordings of isolated portable PecoFence demo instances",
+  source:"Native Windows recordings of isolated portable CoreDesk demo instances",
   stagedWindow:"Launchpad project board rendered in a Windows Forms window",
   editorialClips:clips,
 };

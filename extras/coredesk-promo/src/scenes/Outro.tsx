@@ -13,7 +13,7 @@ export const Outro = () => {
     <Reveal delay={7} style={{position:"absolute",top:246,left:0,width:"100%",
       display:"flex",alignItems:"center",justifyContent:"center",gap:33}}>
       <Mark size={105}/>
-      <span style={{fontSize:132,fontWeight:650,letterSpacing:-7.5}}>PecoFence</span>
+      <span style={{fontSize:132,fontWeight:650,letterSpacing:-7.5}}>CoreDesk</span>
     </Reveal>
     <Reveal delay={21} style={{position:"absolute",left:0,top:470,width:"100%",
       textAlign:"center",fontSize:83,fontWeight:580,letterSpacing:-3.5,lineHeight:1.12}}>

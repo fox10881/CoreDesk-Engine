@@ -241,7 +241,7 @@ export const Opening: React.FC = () => {
           <div style={{opacity: prog(t, 4.62, 0.3, ease.linear), transform: `scale(${mix(0.6, 1, prog(t, 4.62, 0.7))})`}}>
             <Mark size={96} color={mixInk(t)} draw={prog(t, 4.62, 0.8)} tiles={prog(t, 4.95, 0.7, ease.linear)}/>
           </div>
-          <Words text="PecoFence" start={4.7} end={7.72} dur={0.8}
+          <Words text="CoreDesk" start={4.7} end={7.72} dur={0.8}
             style={{font: `650 118px/1 ${FONT_DISPLAY}`, color: mixInk(t), letterSpacing: "-0.03em"}}/>
         </div>
         <div style={{position: "absolute", top: 262, width: "100%", display: "flex", justifyContent: "center"}}>

@@ -164,16 +164,7 @@ impl DesktopIcons {
             Ok(n) if !n.trim().is_empty() => format!("icons-hidden.{}.marker", n.trim()),
             _ => "icons-hidden.marker".to_string(),
         };
-        let current = base.join(&marker);
-        let legacy = coredesk_core::brand::LEGACY_DATA_DIRS
-            .iter()
-            .map(|name| base.with_file_name(name).join(&marker))
-            .find(|p| p.exists());
-        let marker = if !current.exists() {
-            legacy.unwrap_or(current)
-        } else {
-            current
-        };
+        let marker = base.join(&marker);
         Self {
             we_hid_them: false,
             marker,

@@ -13,8 +13,8 @@ const trailer=process.argv.includes("--trailer");
 const preview=process.argv.includes("--preview");
 const nameArg=process.argv.find(a=>a.startsWith("--name="))?.slice(7);
 if(nameArg&&!/^[A-Za-z0-9_-]+$/.test(nameArg))throw new Error("Output name must be a simple filename stem.");
-const id=trailer?"PecoFence-Trailer":reviewed?"PecoFence-Reviewed":launch?"PecoFence-Launch":features?"PecoFence-Features":"PecoFence-Promo";
-const outputName=nameArg??(preview?"trailer-v3/work/trailer-v3-preview":trailer?"trailer-v3/work/PecoFence-trailer-v3-1080p60-picture":reviewed?"PecoFence-autosort-en-1080p":launch?"PecoFence-launch-en-1080p":features?"PecoFence-features-en-1080p":"PecoFence-promo-en-1080p");
+const id=trailer?"CoreDesk-Trailer":reviewed?"CoreDesk-Reviewed":launch?"CoreDesk-Launch":features?"CoreDesk-Features":"CoreDesk-Promo";
+const outputName=nameArg??(preview?"trailer-v3/work/trailer-v3-preview":trailer?"trailer-v3/work/CoreDesk-trailer-v3-1080p60-picture":reviewed?"CoreDesk-autosort-en-1080p":launch?"CoreDesk-launch-en-1080p":features?"CoreDesk-features-en-1080p":"CoreDesk-promo-en-1080p");
 const posterFrame=trailer?1680:reviewed?835:launch?760:features?2200:835;
 fs.mkdirSync(out, {recursive:true});
 const browserExecutable = process.env.REMOTION_BROWSER_EXECUTABLE ??
@@ -54,7 +54,7 @@ try {
         if (percent>last) {last=percent;console.log(`Rendering ${percent}%`);}
       },
     });
-    await renderStill({serveUrl,composition,frame:posterFrame,output:path.join(out,reviewed||trailer?`${outputName}-poster.png`:launch?"PecoFence-launch-poster.png":features?"PecoFence-features-poster.png":"PecoFence-poster.png"),
+    await renderStill({serveUrl,composition,frame:posterFrame,output:path.join(out,reviewed||trailer?`${outputName}-poster.png`:launch?"CoreDesk-launch-poster.png":features?"CoreDesk-features-poster.png":"CoreDesk-poster.png"),
       imageFormat:"png",browserExecutable,puppeteerInstance:browser});
     console.log("Exported MP4 and poster.");
   }

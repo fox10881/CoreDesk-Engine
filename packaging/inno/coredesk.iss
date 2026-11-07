@@ -12,17 +12,13 @@
 #define ProductId "DayuanJiang.CoreDesk"
 #define ProductName "CoreDesk Engine"
 #define CurrentRunName "CoreDeskEngine"
-#define LegacyRunName1 "PecoFence"
-#define LegacyRunName2 "openFence"
-#define AppMutexNames "Local\CoreDeskEngine.SingleInstance,Local\PecoFence.SingleInstance,Local\openFence.SingleInstance"
+#define AppMutexNames "Local\CoreDeskEngine.SingleInstance"
 ; Integration tests compile this same script with an isolated identity. The public
 ; packaging command never sets TestIdentity; test installers must never be shipped.
 #ifdef TestIdentity
   #define ProductId "CoreDeskEngine.InstallerTest." + TestIdentity
   #define ProductName "CoreDesk Engine Installer Test " + TestIdentity
   #define CurrentRunName ProductId
-  #define LegacyRunName1 ProductId + ".legacy1"
-  #define LegacyRunName2 ProductId + ".legacy2"
   #define AppMutexNames "Local\" + ProductId
 #endif
 
@@ -307,8 +303,6 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then begin
     RemoveOwnedStartupValue('{#CurrentRunName}');
-    RemoveOwnedStartupValue('{#LegacyRunName1}');
-    RemoveOwnedStartupValue('{#LegacyRunName2}');
   end;
   if CurUninstallStep = usDone then
     Log('CoreDesk Engine uninstall cleanup completed');

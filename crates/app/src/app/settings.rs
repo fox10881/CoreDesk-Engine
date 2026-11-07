@@ -3599,9 +3599,9 @@ impl App {
             .join("themes")
     }
 
-    /// One-time library migration: PecoFence-era `*.peco` archives are the same
-    /// uncompressed-ZIP container as `.cde`, so adoption is a rename. `active_theme_path`
-    /// moves with the file it pointed at; anything already migrated is left alone.
+    /// One-time library migration: `*.peco` archives are the same uncompressed-ZIP
+    /// container as `.cde`, so adoption is a rename. `active_theme_path` moves with
+    /// the file it pointed at; anything already migrated is left alone.
     pub(crate) fn migrate_theme_library(&mut self) {
         let dir = self.themes_dir();
         let Ok(rd) = std::fs::read_dir(&dir) else {

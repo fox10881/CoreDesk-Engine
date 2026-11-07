@@ -1,4 +1,4 @@
-//! Product identity and narrowly scoped compatibility with pre-rename installs.
+//! Product identity.
 
 use std::env::VarError;
 use std::ffi::OsString;
@@ -9,36 +9,10 @@ pub const ID: &str = "CoreDeskEngine";
 /// Microsoft Store product id (Partner Center, packaging/msix/identity.json).
 pub const STORE_PRODUCT_ID: &str = "9MV6WG3XNWSX";
 pub const REPOSITORY_URL: &str = "https://github.com/fox10881/CoreDesk-Engine";
-/// Previous AppData folder names, newest first: PecoFence was the identity
-/// before CoreDesk Engine, OpenFence before PecoFence. Configuration migrates
-/// forward from whichever one still holds saved data.
-pub const LEGACY_DATA_DIRS: &[&str] = &["PecoFence", "OpenFence"];
-pub const LEGACY_DATA_DIR: &str = "OpenFence";
-pub const LEGACY_AUTOSTART: &[&str] = &["PecoFence", "openFence"];
-pub const LEGACY_MUTEX: &[&str] = &["PecoFence", "openFence"];
-/// Environment prefix chain: `COREDESK_X` wins, then the older
-/// `PECOFENCE_X`/`OPENFENCE_X` overrides.
-const ENV_PREFIXES: &[&str] = &["COREDESK_", "PECOFENCE_", "OPENFENCE_"];
 
-fn lookup_env(name: &str, lookup: impl Fn(&str) -> Option<OsString>) -> Option<OsString> {
-    if let Some(v) = lookup(name) {
-        return Some(v);
-    }
-    for prefix in ENV_PREFIXES {
-        if let Some(suffix) = name.strip_prefix(prefix) {
-            for alt in ENV_PREFIXES.iter().filter(|p| *p != prefix) {
-                if let Some(v) = lookup(&format!("{alt}{suffix}")) {
-                    return Some(v);
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Canonical variables take priority; old environment overrides keep working.
+/// `COREDESK_*` environment overrides.
 pub fn var_os(name: &str) -> Option<OsString> {
-    lookup_env(name, |key| std::env::var_os(key))
+    std::env::var_os(name)
 }
 
 pub fn var(name: &str) -> Result<String, VarError> {
@@ -48,17 +22,10 @@ pub fn var(name: &str) -> Result<String, VarError> {
         .map_err(VarError::NotUnicode)
 }
 
-/// Hold every generational name so a renamed build and any older executable
-/// cannot concurrently manage the same desktop. Named test instances remain
+/// The single-instance lock this build holds. Named test instances remain
 /// independent of the main app.
-pub fn instance_mutex_names(instance: Option<&str>) -> Vec<String> {
-    let suffix = instance_suffix(instance);
-    let mut names = Vec::with_capacity(LEGACY_MUTEX.len() + 1);
-    names.push(format!(r"Local\{ID}.SingleInstance{suffix}"));
-    for legacy in LEGACY_MUTEX {
-        names.push(format!(r"Local\{legacy}.SingleInstance{suffix}"));
-    }
-    names
+pub fn instance_mutex_name(instance: Option<&str>) -> String {
+    format!(r"Local\{ID}.SingleInstance{}", instance_suffix(instance))
 }
 
 /// Named pipe the CLI (`coredesk-cli`) talks to: `CoreDeskEngine.<user SID>[.<instance>]`.
@@ -93,50 +60,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_environment_overrides_legacy_without_mutating_process_environment() {
-        let both = |name: &str| match name {
-            "COREDESK_INSTANCE" => Some(OsString::from("new")),
-            "PECOFENCE_INSTANCE" => Some(OsString::from("mid")),
-            "OPENFENCE_INSTANCE" => Some(OsString::from("old")),
-            _ => None,
-        };
-        assert_eq!(lookup_env("COREDESK_INSTANCE", both), Some("new".into()));
+    fn instance_names_use_the_normalized_suffix() {
         assert_eq!(
-            lookup_env("COREDESK_INSTANCE", |name| {
-                match name {
-                    "PECOFENCE_INSTANCE" => Some(OsString::from("mid")),
-                    "OPENFENCE_INSTANCE" => Some(OsString::from("old")),
-                    _ => None,
-                }
-            }),
-            Some("mid".into())
+            instance_mutex_name(None),
+            r"Local\CoreDeskEngine.SingleInstance"
         );
+        assert_eq!(instance_mutex_name(None), instance_mutex_name(Some("  ")));
         assert_eq!(
-            lookup_env("COREDESK_INSTANCE", |name| {
-                (name == "OPENFENCE_INSTANCE").then(|| OsString::from("legacy"))
-            }),
-            Some("legacy".into())
+            instance_mutex_name(Some(" test ")),
+            r"Local\CoreDeskEngine.SingleInstance.test"
         );
-        assert_eq!(
-            lookup_env("COREDESK_INSTANCE", |name| {
-                (name == "COREDESK_INSTANCE").then(OsString::new)
-            }),
-            Some(OsString::new())
-        );
-        assert_eq!(lookup_env("UNRELATED", both), None);
-    }
-
-    #[test]
-    fn legacy_and_current_instance_names_use_the_same_normalized_suffix() {
-        let main = instance_mutex_names(None);
-        assert_eq!(main[0], r"Local\CoreDeskEngine.SingleInstance");
-        assert_eq!(main[1], r"Local\PecoFence.SingleInstance");
-        assert_eq!(main[2], r"Local\openFence.SingleInstance");
-        assert_eq!(main, instance_mutex_names(Some("  ")));
-        let named = instance_mutex_names(Some(" test "));
-        assert_eq!(named[0], r"Local\CoreDeskEngine.SingleInstance.test");
-        assert_eq!(named[2], r"Local\openFence.SingleInstance.test");
-        assert_ne!(main, named);
+        assert_ne!(instance_mutex_name(None), instance_mutex_name(Some("x")));
     }
 
     #[test]

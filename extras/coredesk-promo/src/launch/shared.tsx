@@ -23,7 +23,7 @@ export const Signature = () => <div style={{
   gap: 19, alignItems: "center", color: "#f4f8ff",
 }}>
   <Mark size={43} color="#a9d1ff"/>
-  <span style={{fontSize: 42, fontWeight: 600, letterSpacing: -1.6}}>PecoFence</span>
+  <span style={{fontSize: 42, fontWeight: 600, letterSpacing: -1.6}}>CoreDesk</span>
 </div>;
 
 export const Headline: React.FC<{children: React.ReactNode; size?: number}> =

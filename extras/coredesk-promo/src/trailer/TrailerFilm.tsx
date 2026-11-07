@@ -9,7 +9,7 @@ import {Tabs} from "./scenes/Tabs";
 import {clamp01, ease, FPS, mix} from "./timing";
 
 /**
- * PecoFence trailer v3 — 30 s, 1920 × 1080, 60 fps.
+ * CoreDesk trailer v3 — 30 s, 1920 × 1080, 60 fps.
  * Every product pixel is a native capture (public/trailer-v3/*.mp4); the camera,
  * typography, flying file cues and light effects are editorial.
  */

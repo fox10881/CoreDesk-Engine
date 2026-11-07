@@ -1,25 +1,13 @@
 # Upgrading to CoreDesk Engine
 
-CoreDesk Engine is the new name of this project. The executable is now `coredesk.exe`,
+CoreDesk Engine is the new name of this project. The executable is `coredesk.exe`,
 with `coredesk-watchdog.exe` beside it.
 
-## Existing installations
+## Data locations
 
-Exit the older openFence application before starting CoreDeskEngine. Both names share
-a compatibility instance lock so two versions cannot manage the same desktop at once.
-
-New installations save configuration in `%APPDATA%\CoreDeskEngine`. If that location
-has no configuration or backups and `%APPDATA%\OpenFence` contains an existing
-installation, CoreDesk Engine continues using the old directory **in place**. Nothing
-is copied or rewritten simply to change the product name. Existing CoreDesk Engine data
-always takes priority.
-
-This preserves fence layouts, rules, language preferences, snapshots and backups.
-Filenames and custom fence/rule names are not renamed. Portable mode continues
-using the `config` directory beside the executable.
-
-New logs and WebView2 profiles use `%LOCALAPPDATA%\CoreDeskEngine`. An outstanding
-desktop-icon recovery marker from the older name is recognized.
+Configuration lives in `%APPDATA%\CoreDeskEngine`; logs and WebView2 profiles in
+`%LOCALAPPDATA%\CoreDeskEngine`. Both are created fresh on first launch.
+Portable mode uses the `config` directory beside the executable instead.
 
 ## Switching between the ZIP and the installer
 
@@ -37,27 +25,16 @@ settings. Exit CoreDesk Engine from its tray menu first.
   folder beside the executable, which other copies do not read. Use **Export or
   import configuration** in Settings to carry it over.
 
-## Going back to 0.1.3 or earlier
-
-Versions after 0.1.3 know a monitor by its model and connection. 0.1.3 and
-earlier do not, so with a configuration a newer version has saved they show no
-fences. Nothing is lost: the fences come back as soon as the newer version runs
-again. To stay on the older version, restore a daily backup from before the
-upgrade with `coredesk-cli backup list` and `backup restore` (the files are in
-the `backups` folder next to `config.json`).
-
 ## Windows startup
 
-A normal release launch registers the `CoreDesk Engine` startup entry when required.
-The legacy `openFence` entry is removed only after a replacement was registered
-successfully, or when startup is disabled. When startup is on, the running release
-points the entry at its own executable, so the copy that ran last starts with Windows.
+A normal release launch registers the `CoreDeskEngine` startup entry when required.
+When startup is on, the running release points the entry at its own executable, so
+the copy that ran last starts with Windows.
 
 Portable and development launches do not change startup entries. Changing the
 autostart switch in Settings remains an explicit opt-in/out.
 
 ## Environment overrides
 
-Use the `COREDESK_` prefix for application overrides, for example `COREDESK_INSTANCE` and
-`COREDESK_ACRYLIC`. Existing `OPENFENCE_` overrides are still accepted; when both
-are defined, the `COREDESK_` value wins.
+Use the `COREDESK_` prefix for application overrides, for example
+`COREDESK_INSTANCE` and `COREDESK_ACRYLIC`.

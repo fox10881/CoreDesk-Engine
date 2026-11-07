@@ -15,7 +15,7 @@ LANGUAGES = ("en", "ja", "zh-TW", "ko", "de", "fr", "es", "pt-BR", "ru", "zh-CN"
 
 def autostart_value():
     values = {}
-    for name in ("CoreDesk", "openFence"):
+    for name in ("CoreDeskEngine",):
         try:
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as key:
                 values[name] = winreg.QueryValueEx(key, name)
@@ -27,7 +27,6 @@ def autostart_value():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, default=ROOT / "target/package/release/coredesk.exe")
-    parser.add_argument("--legacy-env", action="store_true", help="Exercise the previous instance-variable prefix")
     args = parser.parse_args()
     binary = args.binary.resolve()
     instance = "locale-smoke-" + uuid.uuid4().hex[:12]
@@ -40,9 +39,6 @@ def main():
         os.environ, COREDESK_INSTANCE=instance, RUST_LOG="info",
         LOCALAPPDATA=str(stage / "local-appdata"), APPDATA=str(stage / "roaming-appdata"),
     )
-    if args.legacy_env:
-        environment.pop("COREDESK_INSTANCE", None)
-        environment["OPENFENCE_INSTANCE"] = instance
     before = autostart_value()
 
     def run(*extra):
@@ -76,7 +72,7 @@ def main():
     script.write_text("\n".join(lines), encoding="utf-8")
     run("--open-settings", "--test-script", str(script), "--exit-after", "18000")
     saved = json.loads(config_path.read_text(encoding="utf-8"))
-    log_path = Path(environment["LOCALAPPDATA"]) / "CoreDesk" / f"coredesk.{instance}.log"
+    log_path = Path(environment["LOCALAPPDATA"]) / "CoreDeskEngine" / f"coredesk.{instance}.log"
     log = log_path.read_text(encoding="utf-8")
     assert "settings: page ready" in log, "Embedded Settings document did not initialize"
     for language in LANGUAGES:

@@ -78,12 +78,11 @@ impl Paths {
 }
 
 /// Pure: the default locations from the two profile folders and the instance name (the app's
-/// `log_dir` / `ConfigStore::with_legacy` rules, without touching the disk for the config).
+/// `log_dir` / `ConfigStore` rules, without touching the disk for the config).
 pub fn default_paths(
     local_appdata: Option<&Path>,
     appdata: Option<&Path>,
     instance: Option<&str>,
-    legacy_config_exists: impl Fn(&Path) -> bool,
 ) -> (PathBuf, PathBuf, PathBuf) {
     let local = local_appdata
         .map(Path::to_path_buf)
@@ -93,16 +92,7 @@ pub fn default_paths(
         .unwrap_or_else(|| PathBuf::from("."));
     let log_dir = local.join(brand::ID);
     let log_name = brand::log_file_name(instance, brand::LOG);
-    let preferred = roaming.join(brand::ID);
-    let config_dir = if legacy_config_exists(&preferred) {
-        preferred
-    } else {
-        brand::LEGACY_DATA_DIRS
-            .iter()
-            .map(|name| roaming.join(name))
-            .find(|dir| legacy_config_exists(dir))
-            .unwrap_or(preferred)
-    };
+    let config_dir = roaming.join(brand::ID);
     (
         config_dir.join("config.json"),
         log_dir.join(log_name),
@@ -114,13 +104,8 @@ pub fn default_paths(
 pub fn resolve(instance: Option<&str>, status_config_path: Option<String>) -> Paths {
     let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
     let roaming = std::env::var_os("APPDATA").map(PathBuf::from);
-    let has_data = |dir: &Path| {
-        dir.join("config.json").is_file()
-            || dir.join("config.bak").is_file()
-            || dir.join("backups").is_dir()
-    };
     let (default_config, log, log_dir) =
-        default_paths(local.as_deref(), roaming.as_deref(), instance, has_data);
+        default_paths(local.as_deref(), roaming.as_deref(), instance);
     match status_config_path {
         Some(p) => Paths {
             instance: instance.map(str::to_string),
@@ -277,7 +262,7 @@ mod tests {
     fn default_paths_follow_the_apps_rules() {
         let local = Path::new("C:\\Users\\me\\AppData\\Local");
         let roaming = Path::new("C:\\Users\\me\\AppData\\Roaming");
-        let (config, log, log_dir) = default_paths(Some(local), Some(roaming), None, |_| false);
+        let (config, log, log_dir) = default_paths(Some(local), Some(roaming), None);
         assert_eq!(
             config,
             PathBuf::from("C:\\Users\\me\\AppData\\Roaming\\CoreDeskEngine\\config.json")
@@ -292,19 +277,8 @@ mod tests {
         );
 
         // A named instance logs to its own file; the config folder is shared.
-        let (_, log, _) = default_paths(Some(local), Some(roaming), Some(" test "), |_| false);
+        let (_, log, _) = default_paths(Some(local), Some(roaming), Some(" test "));
         assert!(log.ends_with("coredesk.test.log"), "{log:?}");
-
-        // Legacy data folder is used only when the new one has nothing.
-        let (config, _, _) = default_paths(Some(local), Some(roaming), None, |dir| {
-            dir.ends_with("OpenFence")
-        });
-        assert!(config.ends_with("OpenFence\\config.json"), "{config:?}");
-        let (config, _, _) = default_paths(Some(local), Some(roaming), None, |_| true);
-        assert!(
-            config.ends_with("CoreDeskEngine\\config.json"),
-            "{config:?}"
-        );
     }
 
     #[test]

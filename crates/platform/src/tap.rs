@@ -446,25 +446,8 @@ pub(crate) fn unload_foreign_residents_matching(pid: u32, keep: HWND, base: &str
     }
 }
 
-/// Residents injected by a previous product generation register `PecoFenceTAP*`
-/// classes and only understand the `PecoFence.TAP.Unload` wire. They can't be
-/// unmapped (the diagnostics session pins the module), so they go inert here —
-/// otherwise an upgraded shell would run two stylers over the same visual tree.
-fn unload_legacy_residents(pid: u32) {
-    let msg = unsafe { RegisterWindowMessageW(PCWSTR(wide("PecoFence.TAP.Unload").as_ptr())) };
-    if msg == 0 {
-        return;
-    }
-    for base in ["PecoFenceTAP", "PecoFenceTAPSM", "PecoFenceTAPNC"] {
-        for h in resident_windows_matching(pid, base) {
-            let _ = send_cmd(h, msg, 0, 0);
-        }
-    }
-}
-
 fn unload_foreign_residents(pid: u32, keep: HWND) {
     unload_foreign_residents_matching(pid, keep, "CoreDeskTAP");
-    unload_legacy_residents(pid);
 }
 
 /// Command-protocol build the resident DLL must report via its

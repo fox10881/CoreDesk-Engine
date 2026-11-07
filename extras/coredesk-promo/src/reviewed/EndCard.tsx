@@ -15,7 +15,7 @@ export const EndCard = () => {
     <Interactive.Div name="Closing product name" data-review-text="end-brand"
       style={{position: "absolute", left: 150, top: 245, fontFamily: "Segoe UI",
         fontSize: 150, fontWeight: 600, lineHeight: 1.1, letterSpacing: -6}}>
-      PecoFence
+      CoreDesk
     </Interactive.Div>
     <Interactive.Div name="Closing purpose" data-review-text="end-purpose"
       style={{position: "absolute", left: 150, top: 450, fontFamily: "Segoe UI",

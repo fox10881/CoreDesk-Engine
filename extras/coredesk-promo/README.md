@@ -78,7 +78,7 @@ Kick/impact accents align with 7, 15 and 23 seconds.
 | 15–23 s | Native groups merge and switch; the camera closes in on the tabbed panel |
 | 23–30 s | Panels reassemble beside the brand, closing promise and availability |
 
-`review/PECOFENCE-AUTO-PLAN.md` records the current update;
+`review/COREDESK-AUTO-PLAN.md` records the current update;
 `review/TECH-PLAN.md` records the independently reviewed visual direction. Projected
 wireframes, orbital rings, optical particles, angular HUD brackets, holographic
 panel scans, electronic scan gates and synchronized grouping signals provide motion.
@@ -93,7 +93,7 @@ trims. `src/reviewed/ReviewedFilm.tsx` forwards the existing preview route to th
 `scripts/verify-reviewed.mjs` checks the actual MP4, fully decodes it, checks audio
 and black frames, and creates timestamped frame samples plus a SHA-256 report.
 The automatic-routing evidence and final export review are documented in
-`review/PECOFENCE-AUTO-REVIEW.md`. The music revision is documented in
+`review/COREDESK-AUTO-REVIEW.md`. The music revision is documented in
 `review/ENERGY-AUDIO-REVIEW.md`; the preceding visual review is in
 `review/TECH-REVIEW.md`. Earlier verdicts remain in
 `review/MOTION-REVIEW.md`, `review/READABILITY-REVIEW.md` and `review/FINAL-REVIEW.md`.
@@ -127,7 +127,7 @@ The exact capture build command and source identity are recorded in
 `public/autosort/auto-v2/capture-manifest.json`. The capture scripts and source
 snapshot remain local under `.capture/`. Rendering needs only the saved assets.
 Earlier exports keep their original filenames, including
-`out/openFence-tech-energy-en-1080p.mp4`.
+`out/CoreDesk-tech-energy-en-1080p.mp4`.
 
 ## Earlier 28-second launch film
 

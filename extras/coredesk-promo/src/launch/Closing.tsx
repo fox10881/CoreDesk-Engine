@@ -18,7 +18,7 @@ export const Closing = () => {
       translate: interpolate(frame, [0, 28], ["0px 22px", "0px 0px"], motion),
     }}>
       <Mark size={112} color="#b3dcff"/>
-      <span style={{fontSize: 156, fontWeight: 650, letterSpacing: -9}}>PecoFence</span>
+      <span style={{fontSize: 156, fontWeight: 650, letterSpacing: -9}}>CoreDesk</span>
     </div>
     <div style={{
       position: "absolute", left: 130, top: 475, fontSize: 83,

@@ -37,7 +37,7 @@ export const Brand: React.FC<{dark?: boolean; section?: string}> = ({dark, secti
     color: dark ? "#fff" : ink}}>
     <div style={{display: "flex", alignItems: "center", gap: 15}}>
       <Mark size={34} color={dark ? "#8bc5ff" : blue}/>
-      <span style={{fontSize: 32, fontWeight: 650, letterSpacing: -1.2}}>PecoFence</span>
+      <span style={{fontSize: 32, fontWeight: 650, letterSpacing: -1.2}}>CoreDesk</span>
     </div>
     <span style={{fontSize: 21, fontWeight: 600, letterSpacing: 3.3,
       color: dark ? "#aac0d6" : "#6d7c8e"}}>{section}</span>

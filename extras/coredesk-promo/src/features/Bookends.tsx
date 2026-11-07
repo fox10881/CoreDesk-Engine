@@ -18,7 +18,7 @@ export const FeatureIntro=()=> <Base dark>
 export const FeatureOutro=()=> <Base>
   <Reveal style={{position:"absolute",top:163,left:0,width:"100%",display:"flex",
     justifyContent:"center",alignItems:"center",gap:24}}>
-    <Mark size={75}/><span style={{fontSize:96,fontWeight:650,letterSpacing:-5}}>PecoFence</span>
+    <Mark size={75}/><span style={{fontSize:96,fontWeight:650,letterSpacing:-5}}>CoreDesk</span>
   </Reveal>
   <Reveal delay={8} style={{position:"absolute",top:322,width:"100%",textAlign:"center",
     fontSize:65,fontWeight:580,letterSpacing:-2.2}}>An organized desktop. <span style={{color:blue}}>A smoother workflow.</span></Reveal>

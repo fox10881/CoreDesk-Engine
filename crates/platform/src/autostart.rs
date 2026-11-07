@@ -11,7 +11,6 @@ const RRF_RT_REG_SZ: u32 = 0x0000_0002;
 struct StartupActions {
     register_current: bool,
     remove_current: bool,
-    remove_legacy: bool,
 }
 
 /// `current_is_this_exe`: `None` when nothing is registered, `Some(true)` when the entry
@@ -21,7 +20,6 @@ fn startup_actions(
     wanted: bool,
     development: bool,
     current_is_this_exe: Option<bool>,
-    legacy: bool,
 ) -> StartupActions {
     if development {
         return StartupActions::default();
@@ -29,16 +27,14 @@ fn startup_actions(
     StartupActions {
         register_current: wanted && current_is_this_exe != Some(true),
         remove_current: !wanted && current_is_this_exe.is_some(),
-        remove_legacy: legacy,
     }
 }
 
 /// The release that is running owns login startup: an entry pointing at another copy (an
 /// older version left in Downloads, a moved folder) is re-pointed here, so upgrading by
-/// unzipping a new build and launching it is enough. Also adopts the previous product
-/// name's entry and removes it only after the new one is written.
+/// unzipping a new build and launching it is enough.
 pub fn reconcile_product(wanted: bool, development: bool) -> Result<()> {
-    use coredesk_core::brand::{ID as NAME, LEGACY_AUTOSTART};
+    use coredesk_core::brand::ID as NAME;
     if crate::process::is_packaged() {
         return Ok(());
     }
@@ -49,9 +45,6 @@ pub fn reconcile_product(wanted: bool, development: bool) -> Result<()> {
         current
             .as_deref()
             .map(|path| same_executable(path, &exe_path())),
-        LEGACY_AUTOSTART
-            .iter()
-            .any(|name| registered_path(name).is_some()),
     );
     if actions.register_current {
         set_enabled(NAME, true, false)?;
@@ -59,29 +52,17 @@ pub fn reconcile_product(wanted: bool, development: bool) -> Result<()> {
     if actions.remove_current {
         set_enabled(NAME, false, false)?;
     }
-    if actions.remove_legacy {
-        for name in LEGACY_AUTOSTART {
-            set_enabled(name, false, false)?;
-        }
-    }
     Ok(())
 }
 
-/// Explicit settings changes address both names, avoiding duplicate login launches.
 /// Store (MSIX) installs leave the registry alone: the package startup task owns autostart.
 /// A portable copy's entry starts it with `--portable`, so it opens its own configuration.
 pub fn set_product_enabled(enabled: bool, portable: bool) -> Result<()> {
-    use coredesk_core::brand::{ID as NAME, LEGACY_AUTOSTART};
+    use coredesk_core::brand::ID as NAME;
     if crate::process::is_packaged() {
         return Ok(());
     }
-    set_enabled(NAME, enabled, portable)?;
-    for name in LEGACY_AUTOSTART {
-        if registered_path(name).is_some() {
-            set_enabled(name, false, false)?;
-        }
-    }
-    Ok(())
+    set_enabled(NAME, enabled, portable)
 }
 
 /// Whether the startup entry starts this portable copy. An entry from 0.2.2 or earlier starts
@@ -244,22 +225,18 @@ mod tests {
     #[test]
     fn startup_follows_the_running_release_and_removes_duplicates() {
         assert_eq!(
-            startup_actions(true, false, None, true),
+            startup_actions(true, false, None),
             StartupActions {
                 register_current: true,
-                remove_legacy: true,
                 ..Default::default()
             }
         );
         assert_eq!(
-            startup_actions(true, false, Some(true), true),
-            StartupActions {
-                remove_legacy: true,
-                ..Default::default()
-            }
+            startup_actions(true, false, Some(true)),
+            StartupActions::default()
         );
         // Registered to another copy (older version elsewhere, or deleted): take over.
-        assert!(startup_actions(true, false, Some(false), false).register_current);
+        assert!(startup_actions(true, false, Some(false)).register_current);
     }
 
     #[test]
@@ -277,16 +254,15 @@ mod tests {
     #[test]
     fn disabled_and_development_startup_do_not_enable_the_application() {
         assert_eq!(
-            startup_actions(false, false, Some(true), true),
+            startup_actions(false, false, Some(true)),
             StartupActions {
                 remove_current: true,
-                remove_legacy: true,
                 ..Default::default()
             }
         );
         for wanted in [true, false] {
             assert_eq!(
-                startup_actions(wanted, true, Some(false), true),
+                startup_actions(wanted, true, Some(false)),
                 StartupActions::default()
             );
         }

@@ -16,7 +16,7 @@ export const Hero = () => {
       textShadow:"0 0 30px #22e4f322",
       opacity: interpolate(frame, [0, 24], [0, 1], {extrapolateLeft: "clamp", extrapolateRight: "clamp"}),
       translate: interpolate(frame, [0, 24], ["0px 35px", "0px 0px"], {extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.bezier(.16, 1, .3, 1)}),
-    }}>PecoFence</Interactive.Div>
+    }}>CoreDesk</Interactive.Div>
     <Interactive.Div name="Opening definition" data-review-text="motion-definition" style={{
       position: "absolute", left: 158, top: 522, fontFamily: "Bahnschrift",
       fontSize: 78, fontWeight: 400, letterSpacing: -2, lineHeight: 1.2, color: "#a8dce3",

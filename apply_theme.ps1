@@ -12,7 +12,7 @@ $root = $PSScriptRoot
 # --- 1. Wallpaper -----------------------------------------------------------
 Add-Type -TypeDefinition @'
 using System.Runtime.InteropServices;
-public static class PecofenceWallpaper {
+public static class CoreDeskWallpaper {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
 }
@@ -20,7 +20,7 @@ public static class PecofenceWallpaper {
 $wall = Join-Path $root 'assets\themes\Top Shelf Desktop Wallpaper Full HD 4k To Use.jpg'
 if (-not (Test-Path $wall)) { throw "Wallpaper not found: $wall" }
 # SPI_SETDESKWALLPAPER = 0x0014; SPIF_UPDATEINIFILE | SPIF_SENDCHANGE = 0x03
-[PecofenceWallpaper]::SystemParametersInfo(0x0014, 0, $wall, 0x03) | Out-Null
+[CoreDeskWallpaper]::SystemParametersInfo(0x0014, 0, $wall, 0x03) | Out-Null
 Write-Host "Wallpaper applied: $wall"
 
 # --- 2. Stop the running app -------------------------------------------------
@@ -28,7 +28,7 @@ Get-Process coredesk -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 400
 
 # --- 3. Rewrite config.json --------------------------------------------------
-$cfgPath = Join-Path $env:APPDATA 'CoreDesk\config.json'
+$cfgPath = Join-Path $env:APPDATA 'CoreDeskEngine\config.json'
 if (-not (Test-Path $cfgPath)) { throw "Config not found: $cfgPath (run CoreDesk once first)" }
 Copy-Item $cfgPath "$cfgPath.bak-invisible" -Force
 

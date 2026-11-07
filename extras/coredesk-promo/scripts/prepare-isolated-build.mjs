@@ -46,7 +46,7 @@ const replacements=[
       "pub fn user_desktop() -> Option<PathBuf> {",
       "    // Capture-only source snapshot: use an isolated demo directory.",
       "    #[cfg(debug_assertions)]",
-      "    if let Some(root) = std::env::var_os(\"PECOFENCE_DEMO_DESKTOP\") {",
+      "    if let Some(root) = std::env::var_os(\"COREDESK_DEMO_DESKTOP\") {",
       "        let path = PathBuf::from(root);",
       "        assert!(path.is_absolute() && path.is_dir(), \"Invalid demo desktop root\");",
       `        let approved = PathBuf::from(r"${path.join(project,".capture","reviewed")}").canonicalize().expect("Missing approved fixture area");`,
@@ -64,7 +64,7 @@ const replacements=[
     after:[
       "pub fn public_desktop() -> Option<PathBuf> {",
       "    #[cfg(debug_assertions)]",
-      "    if std::env::var_os(\"PECOFENCE_DEMO_DESKTOP\").is_some() {",
+      "    if std::env::var_os(\"COREDESK_DEMO_DESKTOP\").is_some() {",
       "        return None;",
       "    }",
       "    known_folder(&FOLDERID_PUBLIC_DESKTOP)",

@@ -1,4 +1,4 @@
-// A staged foreground application for the promo. This is not a PecoFence feature.
+// A staged foreground application for the promo. This is not a CoreDesk feature.
 // It reads an actual sample document and records when its window has been shown.
 using System;
 using System.Collections.Generic;

@@ -94,32 +94,6 @@ impl ConfigStore {
         }
     }
 
-    /// Reuse an existing installation's data in place. No copying, rewriting or
-    /// renaming of user files is needed just because the product name changed.
-    pub fn with_legacy(preferred: impl Into<PathBuf>, legacy: impl Into<PathBuf>) -> Self {
-        Self::with_legacies(preferred, [legacy.into()])
-    }
-
-    /// Same as [`Self::with_legacy`] across every previous folder name: the
-    /// first entry with saved data wins, oldest-generation fallback last.
-    pub fn with_legacies(preferred: impl Into<PathBuf>, legacies: impl Into<Vec<PathBuf>>) -> Self {
-        let preferred = Self::new(preferred);
-        if preferred.has_saved_data() {
-            return preferred;
-        }
-        for dir in legacies.into() {
-            let legacy = Self::new(dir);
-            if legacy.has_saved_data() {
-                return legacy;
-            }
-        }
-        preferred
-    }
-
-    fn has_saved_data(&self) -> bool {
-        self.primary_path().exists() || self.bak_path().exists() || !self.list_backups().is_empty()
-    }
-
     pub fn dir(&self) -> &Path {
         &self.dir
     }
@@ -2399,57 +2373,6 @@ mod tests {
     fn nothing_usable_gives_fresh() {
         let store = ConfigStore::new(tmpdir("fresh"));
         assert!(matches!(store.load(), LoadOutcome::Fresh(_)));
-    }
-
-    #[test]
-    fn renamed_product_reuses_old_configuration_without_changing_it() {
-        let parent = tmpdir("rebrand");
-        let old = ConfigStore::new(parent.join(crate::brand::LEGACY_DATA_DIR));
-        let mut config = sample();
-        config.layouts[0].fences[0].title = "My OpenFence files {1}".into();
-        config.settings.language = crate::i18n::Language::Japanese;
-        old.save(&config).unwrap();
-        let original = fs::read(old.primary_path()).unwrap();
-        let preferred = parent.join(crate::brand::NAME);
-        let selected = ConfigStore::with_legacy(&preferred, old.dir());
-        assert_eq!(selected.dir(), old.dir());
-        let mut loaded = selected.load().into_config();
-        // Saving stamps the published schema URL; everything else is untouched.
-        assert_eq!(
-            loaded.schema.as_deref(),
-            Some(crate::model::CONFIG_SCHEMA_URL)
-        );
-        loaded.schema = None;
-        assert_eq!(
-            serde_json::to_value(loaded).unwrap(),
-            serde_json::to_value(config).unwrap()
-        );
-        assert_eq!(fs::read(old.primary_path()).unwrap(), original);
-        assert!(!preferred.exists());
-    }
-
-    #[test]
-    fn current_product_data_wins_and_old_backup_only_installs_still_load() {
-        let parent = tmpdir("rebrand-precedence");
-        let old = ConfigStore::new(parent.join(crate::brand::LEGACY_DATA_DIR));
-        old.save(&sample()).unwrap();
-        old.save(&sample()).unwrap();
-        fs::remove_file(old.primary_path()).unwrap();
-        let preferred = ConfigStore::new(parent.join(crate::brand::NAME));
-        let selected = ConfigStore::with_legacy(preferred.dir(), old.dir());
-        assert!(matches!(selected.load(), LoadOutcome::Recovered(..)));
-        preferred.save(&sample()).unwrap();
-        // Even a damaged new config belongs to the new installation. Its normal
-        // backup recovery must not silently switch to a stale legacy layout.
-        fs::write(preferred.primary_path(), "{ bad json").unwrap();
-        assert_eq!(
-            ConfigStore::with_legacy(preferred.dir(), old.dir()).dir(),
-            preferred.dir()
-        );
-        assert_eq!(
-            ConfigStore::with_legacy(parent.join("fresh"), parent.join("missing")).dir(),
-            parent.join("fresh")
-        );
     }
 
     #[test]

@@ -506,7 +506,7 @@ main > .lesson:first-child { border-top: 0 }
 
 .ico.ghost span { text-shadow: none }
 
-/* marquee: PecoFence draws its own while desktop icons are hidden */
+/* marquee: CoreDesk Engine draws its own while desktop icons are hidden */
 
 .marquee {
     left: 0;

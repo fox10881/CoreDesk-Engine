@@ -107,20 +107,7 @@ fn in_package_folder(path: &Path) -> bool {
 impl AppState {
     pub fn load(work_areas: Vec<WorkArea>, portable: bool) -> Self {
         let directory = config_dir(portable);
-        let store = if portable {
-            ConfigStore::new(&directory)
-        } else {
-            ConfigStore::with_legacies(
-                &directory,
-                coredesk_core::brand::LEGACY_DATA_DIRS
-                    .iter()
-                    .map(|name| directory.with_file_name(name))
-                    .collect::<Vec<_>>(),
-            )
-        };
-        if store.dir() != directory {
-            tracing::info!(path = %store.dir().display(), "reusing pre-rename configuration");
-        }
+        let store = ConfigStore::new(&directory);
         let (outcome, unreadable_moved_to) = store.load_reporting();
         let (config, first_run, recovered_from) = match outcome {
             LoadOutcome::Primary(c) => (c, false, None),
@@ -191,24 +178,16 @@ impl AppState {
     }
 
     /// Where the configuration lives, as a fixed name for the log and feedback: the portable
-    /// folder next to the program, %APPDATA% (under the old OpenFence name when that is
-    /// reused), or the Store package's private copy of %APPDATA%.
+    /// folder next to the program, %APPDATA%, or the Store package's private copy of %APPDATA%.
     pub fn storage_kind(&self) -> &'static str {
         let dir = self.store.dir();
         if dir == config_dir(true) {
             return "portable";
         }
-        let in_package = in_package_folder(&self.store.primary_path()) || in_package_folder(dir);
-        let old_name = dir.file_name().is_some_and(|n| {
-            coredesk_core::brand::LEGACY_DATA_DIRS
-                .iter()
-                .any(|name| n == std::ffi::OsStr::new(name))
-        });
-        match (in_package, old_name) {
-            (false, false) => "appdata",
-            (false, true) => "appdata, old folder name",
-            (true, false) => "store package",
-            (true, true) => "store package, old folder name",
+        if in_package_folder(&self.store.primary_path()) || in_package_folder(dir) {
+            "store package"
+        } else {
+            "appdata"
         }
     }
 

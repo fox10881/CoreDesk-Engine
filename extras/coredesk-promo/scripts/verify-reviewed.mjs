@@ -7,7 +7,7 @@ import {fileURLToPath} from "node:url";
 
 const exec = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const stem = process.argv[2] ?? "PecoFence-autosort-en-1080p";
+const stem = process.argv[2] ?? "CoreDesk-autosort-en-1080p";
 const expectedSeconds = Number(process.argv[3] ?? 30);
 if (!/^[A-Za-z0-9_-]+$/.test(stem)) throw Error("Expected a filename stem.");
 if (![25,30,36].includes(expectedSeconds)) throw Error("Expected a 25-, 30- or 36-second delivery specification.");

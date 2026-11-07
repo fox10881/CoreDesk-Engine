@@ -47,7 +47,7 @@ export const EndCard: React.FC = () => {
           <AppIcon size={210} draw={prog(t, 26.35, 0.7)} tiles={prog(t, 26.6, 0.6, ease.linear)}/>
         </div>
         <div style={{marginTop: 44}}>
-          <Words text="PecoFence" start={26.45} dur={0.8}
+          <Words text="CoreDesk" start={26.45} dur={0.8}
             style={{font: `650 150px/1 ${FONT_DISPLAY}`, color: INK, letterSpacing: "-0.035em", justifyContent: "center"}}/>
         </div>
         <Fade start={26.9} style={{marginTop: 28, font: `500 46px/1.2 ${FONT_DISPLAY}`, color: INK_SOFT, letterSpacing: "-0.01em"}}>
@@ -55,7 +55,7 @@ export const EndCard: React.FC = () => {
         </Fade>
         <Fade start={27.3} style={{marginTop: 60, display: "flex", gap: 26}}>
           <Pill strong><StoreGlyph/>Microsoft Store</Pill>
-          <Pill>pecofence.jiang.jp</Pill>
+          <Pill>coredesk.jiang.jp</Pill>
         </Fade>
       </AbsoluteFill>
     </AbsoluteFill>

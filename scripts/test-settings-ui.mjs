@@ -8,7 +8,7 @@ const settingsUrl = new URL('../ui/settings.html', import.meta.url);
 const languageTags = ['en', 'ja', 'zh-TW', 'ko', 'de', 'fr', 'es', 'pt-BR', 'ru'];
 const catalogs = Object.fromEntries(await Promise.all(languageTags.map(async language =>
   [language, JSON.parse(await readFile(new URL('../locales/' + language + '.json', import.meta.url), 'utf8'))])));
-const port = Number(process.env.PECOFENCE_UI_TEST_PORT || 43190);
+const port = Number(process.env.COREDESK_UI_TEST_PORT || 43190);
 const fixture = {
   type: 'state',
   locale: 'zh-CN', translations: {},
@@ -37,7 +37,7 @@ const fixture = {
   snapshots: [{ id: 'snapshot-a', name: 'Before changes', date: '2026-09-09', fenceCount: 4 }],
   monitors: [{ id: 'one', label: 'Display 1' }, { id: 'two', label: 'Display 2' }],
   desktopIconsHidden: false,
-  version: 'test', configPath: 'C:\\PecoFence\\config.json', memoryMb: 28, itemCount: 12,
+  version: 'test', configPath: 'C:\\CoreDeskEngine\\config.json', memoryMb: 28, itemCount: 12,
   themeMode: 'dark', accent: '#60CDFF',
   peekHotkey: {
     chosen: { mods: 3, vk: 32, keys: ['Ctrl', 'Alt', '空格'], label: 'Ctrl+Alt+空格' },
@@ -115,8 +115,8 @@ function bridge() {
         if (message.name === 'feedbackInfo') {
           // Mirror the host: what may be sent besides the user's text.
           setTimeout(() => receive({ data: { type: 'feedbackInfo', url: 'https://feedback.test/feedback', app: '0.1.4', language: state.locale,
-            crashed: !!state.crashed, system: { app: 'PecoFence 0.1.4 (ZIP / winget)', windows: 'build 26200' },
-            log: 'INFO pecofence::app: config loaded fences=4' } }), 0);
+            crashed: !!state.crashed, system: { app: 'CoreDesk Engine 1.1.0 (ZIP)', windows: 'build 26200' },
+            log: 'INFO coredesk::app: config loaded fences=4' } }), 0);
         }
         if (message.name === 'deleteSnapshot') state.snapshots = state.snapshots.filter(s => s.id !== message.id);
         if (['ready', 'patchSettings', 'setRules', 'setFence'].includes(message.type) || message.type === 'action') {
@@ -1002,11 +1002,11 @@ async function runTests() {
       await settle();
       const locale = language === 'system' ? 'en' : language;
       assert(doc.documentElement.lang === locale, 'Wrong document language: ' + language);
-      assert(doc.querySelector('[data-page=general]').textContent.includes(win.PecoFenceI18n.text('常规')), 'Navigation was not translated: ' + language);
+      assert(doc.querySelector('[data-page=general]').textContent.includes(win.CoreDeskI18n.text('常规')), 'Navigation was not translated: ' + language);
       assert(doc.getElementById('nrName').value === 'My rule 中文 {0}' && doc.querySelector('#nrCats input').checked, 'Draft rule input lost: ' + language);
       assert(current().fences[0].title === '名称' && current().rules.list[0].name === '保存快照' && current().snapshots[0].name === '桌面 {1}', 'User data changed: ' + language);
       assert(doc.querySelector('#ruleList .t').textContent === '保存快照', 'User rule name translated: ' + language);
-      assert(win.PecoFenceI18n.format('{0} 个栅栏', 'title {1}').includes('title {1}'), 'User placeholder was reinterpreted');
+      assert(win.CoreDeskI18n.format('{0} 个栅栏', 'title {1}').includes('title {1}'), 'User placeholder was reinterpreted');
       for (const page of ['general', 'fences', 'rules', 'layout', 'about']) {
         doc.querySelector(`[data-page=${page}]`).click();
         const main = doc.querySelector('main');
@@ -1041,7 +1041,7 @@ const server = http.createServer(async (request, response) => {
       initial.locale = language;
       initial.translations = catalogs[language] || {};
       if (url.pathname === '/preview') {
-        html = html.replace('<title>PecoFence 设置</title>', '<title>PecoFence · 设计预览</title>');
+        html = html.replace('<title>CoreDesk Engine | 设置</title>', '<title>CoreDesk Engine · 设计预览</title>');
         if (url.searchParams.get('style') === 'liquidGlass') initial.settings.themeStyle = 'liquidGlass';
         if (url.searchParams.get('mode') === 'light') {
           initial.settings.theme = 'light';
@@ -1050,7 +1050,7 @@ const server = http.createServer(async (request, response) => {
         }
       }
       const safeJson = value => JSON.stringify(value).replace(/</g, '\\u003c');
-      html = html.replace('<!-- PECOFENCE_LOCALE -->', `<script>window.PECOFENCE_LOCALE=${safeJson({locale: language, translations: initial.translations})};</script>`);
+      html = html.replace('<!-- COREDESK_LOCALE -->', `<script>window.COREDESK_LOCALE=${safeJson({locale: language, translations: initial.translations})};</script>`);
       const setup = `<script type="application/json" id="fixture">${safeJson(initial)}</script><script type="application/json" id="fixture-catalogs">${safeJson(catalogs)}</script><script>(${bridge})();</script>`;
       response.end(html.replace('<body>', '<body>' + setup).replace('<html lang="zh-CN">', '<html lang="zh-CN" class="no-mica">'));
     } else {

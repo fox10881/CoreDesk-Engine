@@ -16,15 +16,15 @@ import { DURATION, FPS } from "./trailer/timing";
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      <Composition id="PecoFence-Trailer" component={TrailerFilm}
+      <Composition id="CoreDesk-Trailer" component={TrailerFilm}
         durationInFrames={DURATION} fps={FPS} width={1920} height={1080} />
-      <Composition id="PecoFence-Reviewed" component={ReviewedFilm}
+      <Composition id="CoreDesk-Reviewed" component={ReviewedFilm}
         durationInFrames={900} fps={30} width={1920} height={1080} />
-      <Composition id="PecoFence-Launch" component={LaunchFilm}
+      <Composition id="CoreDesk-Launch" component={LaunchFilm}
         durationInFrames={840} fps={30} width={1920} height={1080} />
-      <Composition id="PecoFence-Features" component={FeatureFilm}
+      <Composition id="CoreDesk-Features" component={FeatureFilm}
         durationInFrames={2250} fps={30} width={1920} height={1080} />
-      <Composition id="PecoFence-Promo" component={Promo}
+      <Composition id="CoreDesk-Promo" component={Promo}
         durationInFrames={900} fps={30} width={1920} height={1080} />
       <Folder name="Scenes">
         <Composition id="01-Clarity" component={Intro} durationInFrames={141} fps={30} width={1920} height={1080} />
@@ -32,7 +32,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition id="03-Native-Glass" component={Glass} durationInFrames={162} fps={30} width={1920} height={1080} />
         <Composition id="04-Tabs" component={Tabs} durationInFrames={177} fps={30} width={1920} height={1080} />
         <Composition id="05-Focus" component={Focus} durationInFrames={147} fps={30} width={1920} height={1080} />
-        <Composition id="06-PecoFence" component={Outro} durationInFrames={144} fps={30} width={1920} height={1080} />
+        <Composition id="06-CoreDesk" component={Outro} durationInFrames={144} fps={30} width={1920} height={1080} />
       </Folder>
     </>
   );

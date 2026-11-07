@@ -134,7 +134,7 @@ def main():
     fixture = stage / "payload"
     shutil.copytree(payload, fixture)
     report = stage / "report.json"
-    actual_startup = {name: reg_value(RUN, name) for name in ("CoreDeskEngine", "PecoFence", "openFence")}
+    actual_startup = {name: reg_value(RUN, name) for name in ("CoreDeskEngine",)}
     assert reg_value(uninstall_key, "InstallLocation") is None
     assert all(reg_value(RUN, name) is None for name in run_names)
     desktop_link = shell_folder(0x10) / f"{product_name}.lnk"
