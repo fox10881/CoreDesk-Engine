@@ -119,9 +119,9 @@ struct State {
     readvising: bool,
     /// The theme's WebView2 CSS (`W` wire section) — armed for injection.
     web_css: Option<String>,
-    /// Injected WebView2 handle -> its `AddScriptToExecuteOnDocumentCreated`
-    /// script id ("" until the async id lands).
-    web_injected: BTreeMap<u64, String>,
+    /// Injected WebView2 handle -> what `inject` left behind (script id /
+    /// nav token) for `uninject` on resync/reset.
+    web_injected: BTreeMap<u64, crate::webview::InjectState>,
     /// WebView2 handles whose `CoreWebView2` wasn't initialized yet —
     /// retried on later visual-tree traffic.
     web_pending: std::collections::BTreeSet<u64>,
@@ -3970,7 +3970,9 @@ fn restore_all() {
 /// `AddScriptToExecuteOnDocumentCreated` completion — the issued script id,
 /// kept for `RemoveScriptToExecuteOnDocumentCreated` on resync/reset.
 fn record_script_id(handle: u64, id: String) {
-    state().web_injected.insert(handle, id);
+    if let Some(entry) = state().web_injected.get_mut(&handle) {
+        entry.script_id = id;
+    }
 }
 
 /// `on_element` hook — inject the armed CSS when this handle is a WebView2
@@ -3984,24 +3986,48 @@ fn webview_maybe_inject(diagnostics: &IXamlDiagnostics, handle: u64) {
     if state().web_injected.contains_key(&handle) {
         return;
     }
-    let Some(cwv) = crate::webview::core_webview2(diagnostics, handle) else {
-        // One log per element — enough to tell "element seen, CoreWebView2
-        // not ready" from "element never reported" in the field.
+    if MARSHAL_ON_ELEMENT {
+        // `GetIInspectableFromHandle`/`CoreWebView2` on the diagnostics
+        // callback thread throws `RPC_E_WRONG_THREAD` for island elements —
+        // ride the engine dispatcher (same island → same queue).
+        if let Some(d) = state().dispatcher.clone() {
+            let payload = UiBound(diagnostics.clone());
+            post_ui(&d, Prio::Normal, move || {
+                let p = &payload;
+                webview_maybe_inject_ui(&p.0, handle, &css);
+                Ok(())
+            });
+            return;
+        }
+        // No dispatcher yet — a failed touch below just parks the handle.
+    }
+    webview_maybe_inject_ui(diagnostics, handle, &css);
+}
+
+fn webview_maybe_inject_ui(diagnostics: &IXamlDiagnostics, handle: u64, css: &str) {
+    let Some(wv) = crate::webview::resolve(diagnostics, handle) else {
+        // One log per element — enough to tell "element seen, core not
+        // ready" from "element never reported" in the field.
         if state().web_pending.insert(handle) {
             crate::tap_log!("webview: element seen but CoreWebView2 unavailable handle={handle}");
         }
         return;
     };
     state().web_pending.remove(&handle);
-    if crate::webview::inject(&cwv, handle, &css, record_script_id) {
-        // Mark before the async id lands so retries don't double-inject.
-        state().web_injected.entry(handle).or_default();
+    if let Some(injected) = crate::webview::inject(&wv, handle, css, record_script_id) {
+        state().web_injected.insert(handle, injected);
         crate::tap_log!("webview: injected css handle={handle}");
+    } else {
+        // Resolved but the core refused the script (still initializing) —
+        // keep retrying on later visual-tree traffic.
+        if state().web_pending.insert(handle) {
+            crate::tap_log!("webview: element resolved but injection refused handle={handle}");
+        }
     }
 }
 
 /// UI-thread resync on theme apply/reset — for every known WebView2 handle
-/// drop the previous document-script and either re-inject the armed CSS or
+/// drop the previous injection and either re-inject the armed CSS or
 /// blank the live `<style>` when the new theme carries none.
 fn webview_resync() {
     let (diag, css, handles) = {
@@ -4016,18 +4042,24 @@ fn webview_resync() {
         state().web_injected.clear();
         return;
     };
-    for (handle, old_id) in handles {
-        let Some(cwv) = crate::webview::core_webview2(&diag, handle) else {
+    for (handle, old) in handles {
+        let Some(wv) = crate::webview::resolve(&diag, handle) else {
             state().web_injected.remove(&handle);
             continue;
         };
         match &css {
             Some(css) => {
-                crate::webview::uninject(&cwv, &old_id);
-                crate::webview::inject(&cwv, handle, css, record_script_id);
+                crate::webview::uninject(&wv, &old);
+                if let Some(injected) =
+                    crate::webview::inject(&wv, handle, css, record_script_id)
+                {
+                    state().web_injected.insert(handle, injected);
+                } else {
+                    state().web_injected.remove(&handle);
+                }
             }
             None => {
-                crate::webview::uninject(&cwv, &old_id);
+                crate::webview::uninject(&wv, &old);
                 state().web_injected.remove(&handle);
             }
         }
@@ -4080,6 +4112,12 @@ pub fn apply_wire(text: &str) {
     }
     dispatch_apply();
 }
+
+/// The search-results `WebView2Standalone.Controls.WebView2` element
+/// reports on the same WUX session as its `HostedWebView2Control` parent,
+/// so no cross-engine arming is needed — `apply_wire`'s own `web_css`
+/// handles it. `wants_session`'s `web_css` clause exists for the mux
+/// engine's own `W`-carrying wires (`FES1`).
 
 /// `windowsDefault` theme / reset — restore originals, disarm the detour.
 pub fn reset() {
@@ -4396,10 +4434,11 @@ pub fn is_armed() -> bool {
 
 /// Whether this engine needs a live diagnostics session — a theme is
 /// armed or one is waiting for the session to appear (e.g. `FEST`
-/// delivered before any File Explorer window opened).
+/// delivered before any File Explorer window opened, or Start Menu
+/// WebView2 CSS armed for a search island that hasn't spawned yet).
 pub fn wants_session() -> bool {
     let eng = state();
-    eng.pending.is_some() || eng.applied.is_some()
+    eng.pending.is_some() || eng.applied.is_some() || eng.web_css.is_some()
 }
 
 /// Full teardown on unload/host-death.
