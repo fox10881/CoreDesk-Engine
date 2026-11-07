@@ -141,7 +141,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "coredesk"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "coredesk-core",
  "coredesk-ipc",
@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-cli"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "clap",
  "coredesk-core",
@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-core"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-ipc"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "coredesk-core",
  "schemars",
@@ -194,7 +194,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-platform"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "coredesk-core",
  "tracing",
@@ -208,7 +208,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-render"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "bezier_easing",
  "coredesk-core",
@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-tap"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "retour",
  "windows-collections 0.100.0",
@@ -236,7 +236,7 @@ dependencies = [
 
 [[package]]
 name = "coredesk-watchdog"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "coredesk-core",
  "coredesk-platform",
