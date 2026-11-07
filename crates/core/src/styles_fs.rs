@@ -1,10 +1,8 @@
 //! Filesystem-backed style catalogs — the data-driven modding layer.
 //!
-//! Three fixed category directories hold one `<id>.json` per style:
-//!
-//! - [`TASKBAR_DIR`] — `"Taskbar style"`
-//! - [`START_MENU_DIR`] — `"Start Menu style"`
-//! - [`NOTIFICATION_CENTER_DIR`] — `"Notification Center style"`
+//! Six fixed category directories ([`CATEGORY_DIRS`]) hold one file per
+//! style: `<id>.json` for the three shell surfaces and the live-effect
+//! presets, `<id>.html` for the two widget design catalogs.
 //!
 //! Each is resolved across two layers: the factory set shipped with the app
 //! at `<exe dir>\Styles\<category>\` and the user's editable set at
@@ -58,6 +56,18 @@ pub const VISUALIZER_WIDGET_DIR: &str = "Visualizer Widget";
 /// Live-desktop-effect presets — one `<id>.json` per entry
 /// (`{base, label, params}` composing a compiled `Effect` variant).
 pub const LIVE_EFFECTS_DIR: &str = "Live Effects";
+
+/// All six category directories in canonical order — the layout the
+/// installers ship under `{app}\Styles\` and the scaffold the user layer
+/// gets so an empty config still shows modders where files land.
+pub const CATEGORY_DIRS: [&str; 6] = [
+    TASKBAR_DIR,
+    START_MENU_DIR,
+    NOTIFICATION_CENTER_DIR,
+    CLOCK_WIDGET_DIR,
+    VISUALIZER_WIDGET_DIR,
+    LIVE_EFFECTS_DIR,
+];
 
 /// A hand-edited style bigger than this is a mistake (the shipped set tops
 /// out near 65 KB); refuse rather than stall the UI thread parsing it.
@@ -130,6 +140,9 @@ matching Settings dropdown automatically. No restart, no registration.
 
 Folders
 -------
+The engine creates all six for you — empty is normal, they mark where
+each kind of file belongs.
+
   Taskbar style              Windows 11 taskbar visuals — one .json per style
   Start Menu style           Start menu visuals — one .json per style
   Notification Center style  Notification center visuals — one .json per style
@@ -187,15 +200,18 @@ A .cde theme stores only ids — never file contents. A theme referencing
 that slot silently falls back to the default.
 ";
 
-/// Drops [`MODDING_GUIDE`] into the user layer root (creating the folder
-/// so the About-page shortcut always has somewhere to land). Rewrites
-/// only when the on-disk text differs — a user edit holds until the
-/// shipped guide itself changes.
+/// Scaffolds the user layer so the folder explains itself the moment a
+/// modder opens it: every [`CATEGORY_DIRS`] subdirectory (empty dirs are
+/// fine — they only mark where files land) plus [`MODDING_GUIDE`] at the
+/// root. The guide rewrites only when the on-disk text differs — a user
+/// edit holds until the shipped guide itself changes.
 pub fn ensure_modding_guide() {
     let Some(root) = user_styles_root() else {
         return;
     };
-    let _ = std::fs::create_dir_all(&root);
+    for category in CATEGORY_DIRS {
+        let _ = std::fs::create_dir_all(root.join(category));
+    }
     let path = root.join("MODDING_GUIDE.txt");
     if std::fs::read_to_string(&path).ok().as_deref() != Some(MODDING_GUIDE) {
         let _ = std::fs::write(&path, MODDING_GUIDE);
@@ -673,6 +689,22 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn user_layer_scaffolds_all_categories_and_guide() {
+        let base = std::env::temp_dir().join(format!("stylesfs-scaffold-{}", std::process::id()));
+        let root = base.join("Styles");
+        set_user_styles_root(root.clone());
+        ensure_modding_guide();
+        for category in CATEGORY_DIRS {
+            assert!(
+                root.join(category).is_dir(),
+                "category {category} must be scaffolded"
+            );
+        }
+        assert!(root.join("MODDING_GUIDE.txt").is_file());
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]

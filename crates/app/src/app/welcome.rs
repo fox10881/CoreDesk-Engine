@@ -21,16 +21,20 @@ impl App {
     }
 
     /// The user's Styles layer in Explorer — the welcome notice and the
-    /// About card both land modders here; created on demand so the folder
-    /// exists even before the first file is dropped in.
+    /// About card both land modders here; re-scaffolds on every open so
+    /// an emptied folder still lands on the full category layout + guide.
     pub(super) fn open_styles_folder(&self) {
-        let dir = coredesk_core::styles_fs::user_styles_root().unwrap_or_else(|| {
-            self.state
-                .config_path_on_disk()
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .join("Styles")
-        });
+        if let Some(dir) = coredesk_core::styles_fs::user_styles_root() {
+            coredesk_core::styles_fs::ensure_modding_guide();
+            let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
+            return;
+        }
+        let dir = self
+            .state
+            .config_path_on_disk()
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join("Styles");
         let _ = std::fs::create_dir_all(&dir);
         let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
     }
