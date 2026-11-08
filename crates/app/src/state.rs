@@ -383,6 +383,13 @@ impl AppState {
             for fence in &mut layout.fences {
                 for m in &mut fence.items {
                     remap_id(&mut self.config.items, &live, items, &mut m.item_id);
+                    // A placement restored from the saved state IS a manual placement —
+                    // that's what the user saved. Stamping `User` makes the post-copy rules
+                    // pass treat it like a dragged item (untouchable), so the spliced rules
+                    // only file items the layout left loose; a `Rule`/`Migration` stamp from
+                    // the source would let a no-rule `Default` decision evict it to the
+                    // inbox fence.
+                    m.assigned_by = AssignedBy::User;
                 }
             }
             layout.desktop_items = std::mem::take(&mut layout.desktop_items)
@@ -2777,14 +2784,43 @@ mod tests {
             FenceKind::Virtual,
             state.config.layouts[0].fences[0].geometry.clone(),
         );
-        for item_id in [shared_src, foreign] {
-            fence.items.push(ItemRef {
-                item_id,
-                manual_index: None,
-                assigned_by: AssignedBy::User,
-            });
-        }
+        fence.items.push(ItemRef {
+            item_id: shared_src,
+            manual_index: None,
+            assigned_by: AssignedBy::User,
+        });
         let fid = fence.id;
+        // A rule-stamped member too: like a drag it must survive the post-copy rules pass.
+        let ruled = uuid::Uuid::new_v4();
+        src_items.insert(
+            ruled,
+            Item {
+                id: ruled,
+                key: ItemKey::from_path("C:/Theirs/Ruled.exe"),
+                origin: Origin::UserDesktop,
+                display_name: "Ruled".to_string(),
+                file_id: None,
+                mtime: 1,
+                is_folder: false,
+                attrs: 0,
+                icon_key: IconKey::ByExt(".exe".into()),
+                orphaned_since: None,
+                size: 0,
+                open_count: 0,
+                last_opened: None,
+                path: None,
+            },
+        );
+        fence.items.push(ItemRef {
+            item_id: ruled,
+            manual_index: None,
+            assigned_by: AssignedBy::Rule(uuid::Uuid::new_v4()),
+        });
+        fence.items.push(ItemRef {
+            item_id: foreign,
+            manual_index: None,
+            assigned_by: AssignedBy::Migration,
+        });
         src_layout.fences.push(fence);
         src_layout.desktop_items.insert(foreign, None);
         let mut rules = coredesk_core::rules::RuleSet::default();
@@ -2812,7 +2848,16 @@ mod tests {
         // Shared re-pointed at the live record; Foreign kept its source id and was adopted.
         assert!(ids.contains(&live) && !ids.contains(&shared_src));
         assert!(ids.contains(&foreign));
+        assert!(ids.contains(&ruled));
         assert!(state.config.items.contains_key(&foreign));
+        // Every restored membership is a manual placement now: the post-copy rules pass
+        // skips them like dragged items, whatever the source's stamp was.
+        assert!(
+            fence
+                .items
+                .iter()
+                .all(|r| r.assigned_by == AssignedBy::User)
+        );
         let loose = state
             .config
             .layouts
