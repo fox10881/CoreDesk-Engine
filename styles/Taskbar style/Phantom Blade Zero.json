@@ -424,7 +424,24 @@
       "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel",
       "styles": [
         "Width=48",
-        "Background:=$pbzButton"
+        "Background:=$Background"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Grid > Border#BackgroundElement, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Border#BackgroundElement",
+      "styles": [
+        "Margin=2",
+        "BorderThickness=0",
+        "Background:=$pbzButton",
+        "Background@ActiveNormal:=$pbzButton",
+        "Background@ActivePointerOver:=$pbzButton",
+        "Background@ActivePressed:=$pbzButton",
+        "Background@InactiveNormal:=$pbzButton",
+        "Background@InactivePointerOver:=$pbzButton",
+        "Background@InactivePressed:=$pbzButton",
+        "Background@MultiWindowNormal:=$pbzButton",
+        "Background@MultiWindowPointerOver:=$pbzButton",
+        "Background@MultiWindowActive:=$pbzButton"
       ]
     },
     {
