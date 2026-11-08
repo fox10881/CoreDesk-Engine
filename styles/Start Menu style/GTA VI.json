@@ -79,6 +79,46 @@
       ]
     },
     {
+      "target": "Grid#MainMenu > Border#AcrylicBorder",
+      "styles": [
+        "Visibility=0",
+        "Background:=$phWallCombined",
+        "BorderBrush:=$phBezel",
+        "BorderThickness=11",
+        "CornerRadius=$phRadius"
+      ]
+    },
+    {
+      "target": "Border#AppBorder",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0"
+      ]
+    },
+    {
+      "target": "Cortana.UI.Views.TaskbarSearchPage > Grid#RootGrid > Grid#OuterBorderGrid > Grid#BorderGrid",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0"
+      ]
+    },
+    {
+      "target": "Cortana.UI.Views.TaskbarSearchPage > Grid#RootGrid > Grid#HCOuterBorderGrid, Cortana.UI.Views.TaskbarSearchPage > Grid#RootGrid > Grid#HCOuterBorderGrid > Border#HCBorder",
+      "styles": [
+        "Background:=Transparent",
+        "BorderThickness=0"
+      ]
+    },
+    {
+      "target": "Grid#Root > Border",
+      "styles": [
+        "Background:=$Background",
+        "BorderBrush:=$BorderBrush",
+        "BorderThickness=$BorderThickness",
+        "CornerRadius=$CornerRadius"
+      ]
+    },
+    {
       "target": "Grid#MediaControlsContainer",
       "styles": [
         "Visibility=0",
@@ -168,15 +208,6 @@
       ]
     },
     {
-      "target": "Grid#Root > Border",
-      "styles": [
-        "Background:=$phWallCombined",
-        "BorderBrush:=$phBezel",
-        "BorderThickness=11",
-        "CornerRadius=$phRadius"
-      ]
-    },
-    {
       "target": "StartMenu.ExpandedFolderList",
       "styles": [
         "Margin=0,30,0,-120"
@@ -240,12 +271,6 @@
       ]
     },
     {
-      "target": "Border#AppBorder",
-      "styles": [
-        "Visibility=1"
-      ]
-    },
-    {
       "target": "ToolTip > ContentPresenter#LayoutRoot",
       "styles": [
         "Background:=$Background",
@@ -262,21 +287,6 @@
     },
     {
       "target": "Border#LayerBorder",
-      "styles": [
-        "Visibility=1"
-      ]
-    },
-    {
-      "target": "Border#AppBorder",
-      "styles": [
-        "Background:=$Background",
-        "BorderBrush:=$BorderBrush",
-        "BorderThickness=$BorderThickness",
-        "CornerRadius=$CornerRadius"
-      ]
-    },
-    {
-      "target": "Grid#MainMenu > Border#AcrylicBorder",
       "styles": [
         "Visibility=1"
       ]
@@ -491,7 +501,8 @@
       "target": "Grid#MainMenu",
       "styles": [
         "Width=470",
-        "Height=740"
+        "Height=740",
+        "Background:=$phWallCombined"
       ]
     },
     {

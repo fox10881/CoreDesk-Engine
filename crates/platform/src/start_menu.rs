@@ -478,7 +478,7 @@ mod tests {
     #[test]
     #[ignore]
     fn probe_apply() {
-        let ok = apply_start_menu_theme("TranslucentStartMenu");
+        let ok = apply_start_menu_theme("GTA VI");
         eprintln!("apply -> {ok}");
         let g = lock();
         if let Some(s) = g.as_ref() {
