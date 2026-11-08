@@ -80,6 +80,11 @@
     transform: skewX(-8deg);
   }
   .sm2-time {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: baseline;
+    direction: ltr;
+    unicode-bidi: isolate;
     font-size: 27vmin;
     font-weight: 900;
     font-stretch: condensed;
@@ -193,7 +198,7 @@
     <div class="sm2-header"><span>SPIDER-SENSE // OS</span></div>
 
     <div class="sm2-time-row">
-      <div class="sm2-time"><span class="js-hh"></span><span class="sm2-colon">:</span><span class="js-mm"></span></div>
+      <div class="sm2-time" dir="ltr"><span class="js-hh"></span><span class="sm2-colon">:</span><span class="js-mm"></span></div>
       <div class="sm2-ampm js-ap"></div>
     </div>
 
