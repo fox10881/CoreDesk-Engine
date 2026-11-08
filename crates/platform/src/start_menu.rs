@@ -467,8 +467,9 @@ mod tests {
     #[test]
     #[ignore]
     fn probe_smeh() {
-        eprintln!("find_smeh_pid -> {:?}", find_smeh_pid());
-        if let Some(pid) = find_smeh_pid() {
+        let pid = find_pid("startmenuexperiencehost.exe");
+        eprintln!("find_pid -> {pid:?}");
+        if let Some(pid) = pid {
             eprintln!("cmd_window -> {:?}", find_cmd_window(pid).map(|h| h.0));
         }
     }
@@ -481,7 +482,9 @@ mod tests {
         eprintln!("apply -> {ok}");
         let g = lock();
         if let Some(s) = g.as_ref() {
-            eprintln!("pid={} cmd={:?}", s.pid, s.cmd_hwnd.0);
+            for h in &s.hosts {
+                eprintln!("host pid={} cmd={:?}", h.pid, h.cmd_hwnd.0);
+            }
         }
     }
 }

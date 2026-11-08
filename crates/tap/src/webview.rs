@@ -50,8 +50,12 @@ pub struct IStandaloneWebView2_Vtbl {
         *mut core::ffi::c_void,
         *mut *mut core::ffi::c_void,
     ) -> windows_core::HRESULT,
-    /// `get_Source` … `Close` — methods 4-14.
-    _m4: UnusedSlot,
+    /// `get_Source(IInspectable**)` — method 4 (a `Windows.Foundation.Uri`).
+    pub Source: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        *mut *mut core::ffi::c_void,
+    ) -> windows_core::HRESULT,
+    /// `put_Source` … `Close` — methods 5-14.
     _m5: UnusedSlot,
     _m6: UnusedSlot,
     _m7: UnusedSlot,
@@ -74,7 +78,41 @@ pub struct IStandaloneWebView2_Vtbl {
         i64,
     ) -> windows_core::HRESULT,
 }
+// `IStringable` — to read a `Windows.Foundation.Uri`'s display string.
+windows_core::imp::define_interface!(
+    IStringable,
+    IStringable_Vtbl,
+    0x96369f54_8eb6_48f0_abce_c1b2_11e627c3
+);
+#[repr(C)]
+pub struct IStringable_Vtbl {
+    pub base__: windows_core::IInspectable_Vtbl,
+    pub ToString: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        *mut *mut core::ffi::c_void,
+    ) -> windows_core::HRESULT,
+}
+
 impl IStandaloneWebView2 {
+    /// `get_Source` → `Uri::ToString()` — the document the element currently
+    /// shows ("" when the core hasn't navigated yet).
+    pub fn source_uri(&self) -> Option<String> {
+        unsafe {
+            let mut uri = core::ptr::null_mut();
+            (Interface::vtable(self).Source)(Interface::as_raw(self), &mut uri)
+                .ok()
+                .ok()?;
+            let obj: IInspectable = windows_core::imp::Type::from_abi(uri).ok()?;
+            let s = obj.cast::<IStringable>().ok()?;
+            let mut hs = core::mem::zeroed();
+            (Interface::vtable(&s).ToString)(Interface::as_raw(&s), &mut hs)
+                .ok()
+                .ok()?;
+            let text: windows_core::HSTRING = core::mem::transmute(hs);
+            Some(text.to_string_lossy())
+        }
+    }
+
     /// `ExecuteScriptAsync` — fire-and-forget: the returned operation is
     /// released immediately (the style node install is idempotent).
     fn exec_script(&self, js: &windows_core::HSTRING) -> windows_core::Result<()> {
@@ -377,6 +415,18 @@ pub fn inject(
 ) -> Option<InjectState> {
     match webview {
         WebView::Standalone(wv) => {
+            // The mod's gate: `Source` is empty until `CoreWebView2` has
+            // navigated — `ExecuteScriptAsync` before then is accepted by
+            // the element but dropped inside the async op, so the style
+            // would never reach the page (the report reads `injected` yet
+            // nothing applied). Refuse → the caller parks the handle and
+            // retries on later visual-tree traffic once the doc is live.
+            let source = wv.source_uri().unwrap_or_default();
+            if source.is_empty() {
+                crate::tap_log!("webview: no source yet handle={handle}");
+                return None;
+            }
+            crate::tap_log!("webview: inject handle={handle} source={source}");
             let js = windows_core::HSTRING::from(injector_js(css));
             wv.exec_script(&js).ok()?;
             let js2 = js.clone();
@@ -385,6 +435,10 @@ pub fn inject(
                     if let Some(s) = sender.cloned()
                         && let Ok(w) = s.cast::<IStandaloneWebView2>()
                     {
+                        crate::tap_log!(
+                            "webview: nav re-inject source={:?}",
+                            w.source_uri()
+                        );
                         let _ = w.exec_script(&js2);
                     }
                     Ok(())
