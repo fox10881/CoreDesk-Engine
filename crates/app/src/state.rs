@@ -333,6 +333,82 @@ impl AppState {
         self.dirty = true;
     }
 
+    /// 「复制栅栏布局与排序规则」: splices another saved state's layouts — and its rules when
+    /// the source carries them (snapshots store none) — into the live config. Each incoming
+    /// membership re-points at the live item table by `ItemKey`: a file the user already has
+    /// keeps its own record and assignment history, so the familiar layout lands on their
+    /// icons instead of scattering them under new ids. Source records for keys the table
+    /// lacks are adopted under their own id so those memberships stay resolvable if the
+    /// files appear later. Settings, snapshots and visuals are untouched. Returns the
+    /// spliced-in fence count.
+    pub fn merge_layout_and_rules(
+        &mut self,
+        mut layouts: Vec<Layout>,
+        items: &HashMap<ItemId, Item>,
+        rules: Option<RuleSet>,
+    ) -> usize {
+        // Live ItemKey → ItemId snapshot, taken before any adoption mutates the table.
+        let live: HashMap<ItemKey, ItemId> = self
+            .config
+            .items
+            .iter()
+            .map(|(id, it)| (it.key.clone(), *id))
+            .collect();
+        // Re-points `id` at the live record of the same file, adopting the source record
+        // when the file is unknown here. A source id already taken by a *different* live
+        // record gets a fresh id — the collision is effectively impossible but overwriting
+        // a live record would corrupt the memberships referencing it.
+        fn remap_id(
+            table: &mut HashMap<ItemId, Item>,
+            live: &HashMap<ItemKey, ItemId>,
+            src: &HashMap<ItemId, Item>,
+            id: &mut ItemId,
+        ) {
+            let Some(rec) = src.get(id) else {
+                return;
+            };
+            if let Some(l) = live.get(&rec.key) {
+                *id = *l;
+                return;
+            }
+            let adopt = if table.get(id).is_some_and(|it| it.key != rec.key) {
+                uuid::Uuid::new_v4()
+            } else {
+                *id
+            };
+            table.entry(adopt).or_insert_with(|| rec.clone());
+            *id = adopt;
+        }
+        for layout in &mut layouts {
+            for fence in &mut layout.fences {
+                for m in &mut fence.items {
+                    remap_id(&mut self.config.items, &live, items, &mut m.item_id);
+                }
+            }
+            layout.desktop_items = std::mem::take(&mut layout.desktop_items)
+                .into_iter()
+                .map(|(mut id, pos)| {
+                    remap_id(&mut self.config.items, &live, items, &mut id);
+                    (id, pos)
+                })
+                .collect();
+        }
+        let n: usize = layouts.iter().map(|l| l.fences.len()).sum();
+        self.config.layouts = layouts;
+        if let Some(rules) = rules {
+            self.config.rules = rules;
+        }
+        // Two source memberships can land on one live record; keep the first.
+        self.config.drop_duplicates();
+        self.rebuild_catalog();
+        self.layout = 0;
+        self.ensure_layout();
+        self.normalize_tabs();
+        self.portal_cwd.clear();
+        self.dirty = true;
+        n
+    }
+
     /// Renames the snapshot; `name` is stored trimmed. False when `id` is unknown or the
     /// trimmed name is empty or unchanged. The automatic restore backup's name is a
     /// locale-resolved label, never user text, so it refuses a rename.
@@ -2654,6 +2730,101 @@ mod tests {
         assert_eq!(state.config.snapshots.len(), 2);
         assert!(!state.rename_snapshot(coredesk_core::AUTO_BACKUP_SNAPSHOT_ID, "nope"));
         assert!(state.rename_snapshot(target, "mine"));
+    }
+
+    /// 「复制栅栏布局与排序规则」: the source's layouts and rules splice in, each
+    /// membership re-points at the live record of the same file (the user's own item ids
+    /// and history survive), files unknown here are adopted under their source id, and
+    /// settings are untouched.
+    #[test]
+    fn merge_layout_and_rules_repoints_memberships_and_keeps_settings() {
+        let mut state = test_state();
+        let home = state.fences()[0].id;
+        // The same file lives in both configs under different ids.
+        let live = add_item(&mut state, home, "Shared");
+        let shared_src = uuid::Uuid::new_v4();
+        let foreign = uuid::Uuid::new_v4();
+        let mut src_items: HashMap<ItemId, Item> = HashMap::new();
+        for (id, path, name) in [
+            (shared_src, "C:/Users/Me/Desktop/Shared.txt", "Shared"),
+            (foreign, "C:/Theirs/Foreign.exe", "Foreign"),
+        ] {
+            src_items.insert(
+                id,
+                Item {
+                    id,
+                    key: ItemKey::from_path(path),
+                    origin: Origin::UserDesktop,
+                    display_name: name.to_string(),
+                    file_id: None,
+                    mtime: 1,
+                    is_folder: false,
+                    attrs: 0,
+                    icon_key: IconKey::ByExt(".exe".into()),
+                    orphaned_since: None,
+                    size: 0,
+                    open_count: 0,
+                    last_opened: None,
+                    path: None,
+                },
+            );
+        }
+        let mut src_layout = state.config.layouts[0].clone();
+        src_layout.fences.clear();
+        src_layout.desktop_items.clear();
+        let mut fence = Fence::new(
+            "Imported",
+            FenceKind::Virtual,
+            state.config.layouts[0].fences[0].geometry.clone(),
+        );
+        for item_id in [shared_src, foreign] {
+            fence.items.push(ItemRef {
+                item_id,
+                manual_index: None,
+                assigned_by: AssignedBy::User,
+            });
+        }
+        let fid = fence.id;
+        src_layout.fences.push(fence);
+        src_layout.desktop_items.insert(foreign, None);
+        let mut rules = coredesk_core::rules::RuleSet::default();
+        rules.list.push(coredesk_core::rules::Rule::new(
+            "exe files",
+            Target::Fence(fid),
+            vec![Cond::Ext(vec!["exe".into()])],
+        ));
+
+        let icon_size = state.config.settings.icon_size;
+        let snapshots = state.config.snapshots.len();
+        assert_eq!(
+            state.merge_layout_and_rules(vec![src_layout], &src_items, Some(rules)),
+            1
+        );
+
+        let fence = state
+            .config
+            .layouts
+            .iter()
+            .flat_map(|l| &l.fences)
+            .find(|f| f.id == fid)
+            .expect("the spliced fence exists");
+        let ids: Vec<ItemId> = fence.items.iter().map(|r| r.item_id).collect();
+        // Shared re-pointed at the live record; Foreign kept its source id and was adopted.
+        assert!(ids.contains(&live) && !ids.contains(&shared_src));
+        assert!(ids.contains(&foreign));
+        assert!(state.config.items.contains_key(&foreign));
+        let loose = state
+            .config
+            .layouts
+            .iter()
+            .flat_map(|l| l.desktop_items.keys())
+            .copied()
+            .collect::<Vec<_>>();
+        assert!(loose.contains(&foreign));
+        // Rules came across; settings and snapshots did not move.
+        assert_eq!(state.config.rules.list.len(), 1);
+        assert_eq!(state.config.settings.icon_size, icon_size);
+        assert_eq!(state.config.snapshots.len(), snapshots);
     }
 
     /// Pre-import backups (theme apply, config import) share the same fixed slot too, and

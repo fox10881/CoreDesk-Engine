@@ -484,6 +484,7 @@
   "已恢复备份": "Backup restaurado",
   "导入配置前": "Antes de importar a configuração",
   "恢复备份前": "Antes de restaurar o backup",
+  "复制布局与规则前": "Antes de copiar layout e regras",
   "新建\u0004文件夹": "Pasta",
   "新建\u0004标签页": "Aba",
   "栅栏名称": "Nome do grupo",
@@ -738,5 +739,11 @@
   "更新外观": "Atualizar aparência",
   "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Reinicia o Explorer para um estado limpo — efeitos e o papel de parede em vídeo são restaurados automaticamente. A atualização é necessária para a estabilidade do sistema e pode levar 30 segundos.",
   "更换主题后自动刷新外观": "Atualizar aparência ao trocar de tema",
-  "应用主题时自动重启资源管理器，确保新外观干净生效": "Reinicia o Explorer ao aplicar um tema para que a nova aparência fique limpa"
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Reinicia o Explorer ao aplicar um tema para que a nova aparência fique limpa",
+  "从已保存的配置": "De uma configuração salva",
+  "复制栅栏布局与排序规则": "Copiar layout de cercas e regras de ordenação",
+  "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Traz apenas cercas e regras de um tema ou snapshot salvo; aparência, estilos e papel de parede permanecem do tema atual",
+  "复制布局与规则的来源": "Origem da cópia de layout e regras",
+  "复制到当前": "Copiar para a atual",
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Layout de cercas e regras de ordenação copiados ({0} cercas)"
 }

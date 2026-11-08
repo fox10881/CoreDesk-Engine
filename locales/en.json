@@ -109,6 +109,7 @@
   "恢复快照前": "Before snapshot restore",
   "导入配置前": "Before import",
   "恢复备份前": "Before backup restore",
+  "复制布局与规则前": "Before copying layout & rules",
   "导出 CoreDesk Engine 配置": "Export CoreDesk Engine configuration",
   "导入 CoreDesk Engine 配置": "Import CoreDesk Engine configuration",
   "JSON 文件 (*.json)": "JSON files (*.json)",
@@ -738,5 +739,11 @@
   "更新外观": "Refresh appearance",
   "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Restarts Explorer for a clean state — effects and the video wallpaper recover automatically. Refreshing is needed for system stability and can take up to 30 seconds.",
   "更换主题后自动刷新外观": "Auto-refresh appearance when the theme changes",
-  "应用主题时自动重启资源管理器，确保新外观干净生效": "Restarts Explorer when a theme is applied so the new look lands cleanly"
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Restarts Explorer when a theme is applied so the new look lands cleanly",
+  "从已保存的配置": "From a saved setup",
+  "复制栅栏布局与排序规则": "Copy fence layout & sorting rules",
+  "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Bring back only fences and rules from a saved theme or snapshot; visuals, styles and wallpaper stay the current theme's",
+  "复制布局与规则的来源": "Source to copy layout and rules from",
+  "复制到当前": "Copy to current",
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Copied fence layout & sorting rules ({0} fences)"
 }

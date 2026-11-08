@@ -109,6 +109,7 @@
   "恢复快照前": "Prima del ripristino dell'istantanea",
   "导入配置前": "Prima dell'importazione",
   "恢复备份前": "Prima del ripristino del backup",
+  "复制布局与规则前": "Prima di copiare layout e regole",
   "导出 CoreDesk Engine 配置": "Esporta la configurazione di CoreDesk Engine",
   "导入 CoreDesk Engine 配置": "Importa la configurazione di CoreDesk Engine",
   "JSON 文件 (*.json)": "File JSON (*.json)",
@@ -738,5 +739,11 @@
   "更新外观": "Aggiorna aspetto",
   "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Riavvia Explorer per uno stato pulito — effetti e sfondo video si ripristinano automaticamente. L'aggiornamento è necessario per la stabilità del sistema e può richiedere 30 secondi.",
   "更换主题后自动刷新外观": "Aggiorna l'aspetto a ogni cambio di tema",
-  "应用主题时自动重启资源管理器，确保新外观干净生效": "Riavvia Explorer quando applichi un tema, per un aspetto pulito"
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Riavvia Explorer quando applichi un tema, per un aspetto pulito",
+  "从已保存的配置": "Da una configurazione salvata",
+  "复制栅栏布局与排序规则": "Copia layout recinti e regole di ordinamento",
+  "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Ripristina solo recinti e regole da un tema o snapshot salvato; aspetto, stili e sfondo restano quelli del tema corrente",
+  "复制布局与规则的来源": "Sorgente per copiare layout e regole",
+  "复制到当前": "Copia nell'attuale",
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Layout recinti e regole di ordinamento copiati ({0} recinti)"
 }

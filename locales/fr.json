@@ -109,6 +109,7 @@
   "恢复快照前": "Avant la restauration de l’instantané",
   "导入配置前": "Avant l’importation de la configuration",
   "恢复备份前": "Avant la restauration de la sauvegarde",
+  "复制布局与规则前": "Avant la copie de la disposition et des règles",
   "已导入配置": "Configuration importée",
   "已恢复备份": "Sauvegarde restaurée",
   "导出 CoreDesk Engine 配置": "Exporter la configuration CoreDesk Engine",
@@ -738,5 +739,11 @@
   "更新外观": "Actualiser l'apparence",
   "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Redémarre l'Explorateur pour un état propre — les effets et le fond d'écran vidéo sont restaurés automatiquement. L'actualisation est nécessaire à la stabilité du système et peut prendre 30 secondes.",
   "更换主题后自动刷新外观": "Actualiser l'apparence à chaque changement de thème",
-  "应用主题时自动重启资源管理器，确保新外观干净生效": "Redémarre l'Explorateur à l'application d'un thème pour un rendu propre"
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Redémarre l'Explorateur à l'application d'un thème pour un rendu propre",
+  "从已保存的配置": "Depuis une configuration enregistrée",
+  "复制栅栏布局与排序规则": "Copier la disposition et les règles de tri",
+  "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Récupère uniquement les clôtures et les règles d'un thème ou instantané enregistré ; l'apparence, les styles et le fond d'écran restent ceux du thème actuel",
+  "复制布局与规则的来源": "Source de la copie de disposition et de règles",
+  "复制到当前": "Copier vers l'actuelle",
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Disposition et règles de tri copiées ({0} clôtures)"
 }

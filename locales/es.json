@@ -468,6 +468,7 @@
   "已恢复备份": "Copia de seguridad restaurada",
   "导入配置前": "Antes de importar la configuración",
   "恢复备份前": "Antes de restaurar la copia de seguridad",
+  "复制布局与规则前": "Antes de copiar diseño y reglas",
   "名称包含“{0}”": "El nombre contiene «{0}»",
   "名称不包含“{0}”": "El nombre no contiene «{0}»",
   "名称开头是“{0}”": "El nombre empieza por «{0}»",
@@ -738,5 +739,11 @@
   "更新外观": "Actualizar apariencia",
   "重启资源管理器以获得干净状态 — 特效和视频壁纸会自动恢复。刷新对系统稳定很有必要，可能需要 30 秒。": "Reinicia el Explorador para un estado limpio: los efectos y el fondo de vídeo se restauran automáticamente. La actualización es necesaria para la estabilidad del sistema y puede tardar 30 segundos.",
   "更换主题后自动刷新外观": "Actualizar la apariencia al cambiar de tema",
-  "应用主题时自动重启资源管理器，确保新外观干净生效": "Reinicia el Explorador al aplicar un tema para que la nueva apariencia quede limpia"
+  "应用主题时自动重启资源管理器，确保新外观干净生效": "Reinicia el Explorador al aplicar un tema para que la nueva apariencia quede limpia",
+  "从已保存的配置": "Desde una configuración guardada",
+  "复制栅栏布局与排序规则": "Copiar diseño de vallas y reglas de ordenación",
+  "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Trae solo las vallas y las reglas de un tema o instantánea guardados; la apariencia, los estilos y el fondo siguen siendo los del tema actual",
+  "复制布局与规则的来源": "Origen de la copia de diseño y reglas",
+  "复制到当前": "Copiar a la actual",
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Diseño de vallas y reglas de ordenación copiados ({0} vallas)"
 }

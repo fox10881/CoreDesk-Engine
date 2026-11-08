@@ -660,6 +660,9 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
         </div>
         <div class="newrule-foot"><button class="accent" id="nrAdd">添加规则</button></div>
       </details>
+      <h3>从已保存的配置</h3>
+      <div class="card"><div class="l"><span class="ic">&#xE8FD;</span><div><div class="t">复制栅栏布局与排序规则</div><div class="s">从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变</div></div></div>
+        <div class="actions"><select id="layoutSrc" aria-label="复制布局与规则的来源"></select><button id="layoutSrcCopy">复制到当前</button></div></div>
     </section>
 
     <section class="page" id="page-layout">
@@ -1690,6 +1693,12 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       gg.appendChild(card);
     });
     restoreFocus(gg, focus);
+    // 「复制栅栏布局与排序规则」 on the rules page: the same saved states populate it.
+    const src = document.getElementById('layoutSrc');
+    const srcOpts = items.map(it => `<option value="${it.kind === 'theme' ? 't' : 's'}:${esc(it.kind === 'theme' ? it.path : it.id)}">${esc(it.name)}</option>`).join('');
+    if (src.innerHTML !== srcOpts) src.innerHTML = srcOpts;
+    src.disabled = !items.length;
+    document.getElementById('layoutSrcCopy').disabled = !items.length;
     const mons = state.monitors || [];
     document.getElementById('swapHeading').style.display = mons.length >= 2 ? '' : 'none';
     document.getElementById('swapCard').style.display = mons.length >= 2 ? '' : 'none';
@@ -1697,6 +1706,14 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     const a = document.getElementById('swapA'), b = document.getElementById('swapB');
     if (a.innerHTML !== opts) { a.innerHTML = opts; b.innerHTML = opts; if (mons.length >= 2) b.selectedIndex = 1; }
   }
+  // The value prefixes the source kind so one select carries themes and snapshots both.
+  document.getElementById('layoutSrcCopy').onclick = () => {
+    const v = document.getElementById('layoutSrc').value;
+    if (!v) return;
+    send(v[0] === 't'
+      ? { type: 'action', name: 'copyLayoutFrom', kind: 'theme', path: v.slice(2) }
+      : { type: 'action', name: 'copyLayoutFrom', kind: 'snapshot', id: v.slice(2) });
+  };
   document.getElementById('openCfg').onclick = () => send({ type: 'action', name: 'openConfigFolder' });
   document.getElementById('pickVideoWallpaper').onclick = () => send({ type: 'action', name: 'pickVideoWallpaper' });
   document.getElementById('themeImport').onclick = () => send({ type: 'action', name: 'importTheme' });

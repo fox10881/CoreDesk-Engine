@@ -289,6 +289,7 @@ pub(super) fn auto_backup_label(name: &str) -> String {
         "恢复快照前" => "恢复快照前",
         "导入配置前" => "导入配置前",
         "恢复备份前" => "恢复备份前",
+        "复制布局与规则前" => "复制布局与规则前",
         _ => "恢复快照前",
     };
     coredesk_core::i18n::text(key).to_string()
@@ -1687,6 +1688,23 @@ impl App {
                         self.settings_toast(coredesk_core::i18n::text("已恢复快照"));
                     }
                 }
+                Some("copyLayoutFrom") => match v.get("kind").and_then(|k| k.as_str()) {
+                    Some("theme") => {
+                        if let Some(p) = v.get("path").and_then(|p| p.as_str()) {
+                            self.copy_layout_from_theme(Path::new(p));
+                        }
+                    }
+                    Some("snapshot") => {
+                        if let Some(id) = v
+                            .get("id")
+                            .and_then(|i| i.as_str())
+                            .and_then(|i| uuid::Uuid::parse_str(i).ok())
+                        {
+                            self.copy_layout_from_snapshot(id);
+                        }
+                    }
+                    _ => {}
+                },
                 Some("deleteSnapshot") => {
                     if let Some(id) = v
                         .get("id")
@@ -3996,6 +4014,88 @@ impl App {
             }
         }
         self.push_settings_state();
+    }
+
+    /// 「复制栅栏布局与排序规则」 from a library `.cde`: reads only its layouts, rules and
+    /// item table out of the archive — styles, wallpaper and the rest of the archive's
+    /// payload never touch the live config. Library-only, like `delete_library_theme`.
+    fn copy_layout_from_theme(&mut self, path: &Path) {
+        if !self.theme_in_library(path) {
+            return;
+        }
+        let extracted = match coredesk_core::cde_theme::extract_cde_to_temp(path) {
+            Ok(ex) => ex,
+            Err(e) => {
+                self.settings_error(&coredesk_core::i18n::format(
+                    "无法使用此文件：{0}",
+                    std::slice::from_ref(&e),
+                ));
+                return;
+            }
+        };
+        let cfg = self.state.parse_import_file(&extracted.config_path);
+        let _ = std::fs::remove_dir_all(&extracted.temp_dir);
+        match cfg {
+            Ok(c) => self.splice_layout_and_rules(c.layouts, &c.items, Some(c.rules)),
+            Err(e) => self.settings_error(&coredesk_core::i18n::format(
+                "无法使用此文件：{0}",
+                std::slice::from_ref(&e),
+            )),
+        }
+    }
+
+    /// Same copy from a layout snapshot: it carries no rules, so only the fences move.
+    /// The item table is the live one already — the merge's key remap is a fast identity.
+    fn copy_layout_from_snapshot(&mut self, id: uuid::Uuid) {
+        let Some(snap) = self
+            .state
+            .config
+            .snapshots
+            .iter()
+            .find(|s| s.id == id && s.is_auto_backup != Some(true))
+            .cloned()
+        else {
+            return;
+        };
+        let items = self.state.config.items.clone();
+        self.splice_layout_and_rules(snap.layouts, &items, None);
+    }
+
+    /// The shared tail of both copy paths: an undo snapshot first (the same fixed-id slot
+    /// every restore/import writes, so no card pile-up), then the splice and the live
+    /// re-layout — the imported rules immediately re-file the desktop the way 「立即应用」
+    /// does, and portals coming back with the layout get enumerated.
+    fn splice_layout_and_rules(
+        &mut self,
+        layouts: Vec<coredesk_core::Layout>,
+        items: &std::collections::HashMap<ItemId, coredesk_core::Item>,
+        rules: Option<coredesk_core::rules::RuleSet>,
+    ) {
+        let has_backup = self
+            .state
+            .config
+            .snapshots
+            .iter()
+            .any(|s| s.id == coredesk_core::AUTO_BACKUP_SNAPSHOT_ID);
+        if !has_backup && !auto_snapshot_room(&mut self.state.config.snapshots, None) {
+            self.settings_error(&snapshot_limit_text());
+            return;
+        }
+        self.state.save_restore_backup("复制布局与规则前");
+        let n = self.state.merge_layout_and_rules(layouts, items, rules);
+        self.end_peek_now();
+        self.relayout_from_state();
+        self.refresh_portals();
+        // The rules just spliced in file the icons now — the same pass 「立即应用」 runs.
+        let entries = shell::enumerate_desktop();
+        self.state.apply_rules_all(&entries);
+        self.refresh_all();
+        self.schedule_save();
+        self.push_settings_state();
+        self.settings_toast(&coredesk_core::i18n::format(
+            "已复制栅栏布局与排序规则（{0} 个栅栏）",
+            &[n.to_string()],
+        ));
     }
 
     pub(crate) fn import_theme_from(&mut self, path: &Path) {
