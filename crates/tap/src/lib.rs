@@ -123,7 +123,8 @@ pub unsafe extern "system" fn DllMain(
         unsafe {
             let _ = win32::DisableThreadLibraryCalls(hinstance);
         }
-        if is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process() {
+        if is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process()
+        {
             // Self-pin: the host unhooks right after our command window
             // appears, and `InitializeXamlDiagnosticsEx` only pins us later,
             // inside `SetSite`. Without our own pin the gap between
@@ -145,7 +146,10 @@ pub unsafe extern "system" fn DllMain(
             std::thread::spawn(bootstrap);
         }
     } else if reason == 0
-        && (is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process())
+        && (is_explorer_process()
+            || is_smeh_process()
+            || is_nch_process()
+            || is_searchhost_process())
     {
         // DLL_PROCESS_DETACH — only meaningful inside a host; the host-side
         // `FreeLibrary(tap.lib)` in coredesk.exe would otherwise log the

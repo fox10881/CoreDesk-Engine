@@ -339,12 +339,8 @@ pub fn load_in(factory: &Path, user: Option<&Path>, category: &str, id: &str) ->
 fn resolve_relative_uris(value: &mut Value, dir: &Path) {
     match value {
         Value::String(s) => *s = rewrite_relative_uris_in_text(s, dir),
-        Value::Array(arr) => arr
-            .iter_mut()
-            .for_each(|v| resolve_relative_uris(v, dir)),
-        Value::Object(map) => map
-            .values_mut()
-            .for_each(|v| resolve_relative_uris(v, dir)),
+        Value::Array(arr) => arr.iter_mut().for_each(|v| resolve_relative_uris(v, dir)),
+        Value::Object(map) => map.values_mut().for_each(|v| resolve_relative_uris(v, dir)),
         _ => {}
     }
 }
@@ -409,15 +405,9 @@ fn file_uri(dir: &Path, name: &str) -> String {
     uri.push_str("file:///");
     for b in path.bytes() {
         match b {
-            b'A'..=b'Z'
-            | b'a'..=b'z'
-            | b'0'..=b'9'
-            | b'-'
-            | b'.'
-            | b'_'
-            | b'~'
-            | b'/'
-            | b':' => uri.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' | b':' => {
+                uri.push(b as char)
+            }
             _ => {
                 let _ = write!(uri, "%{b:02X}");
             }

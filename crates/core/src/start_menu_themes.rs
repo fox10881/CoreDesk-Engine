@@ -248,7 +248,9 @@ mod tests {
             { "target": ".suggContainer", "styles": ["background-color: rgba(0,0,0,.5) !important"] }
         ]);
         let wire = wire_from_payload(&doc);
-        assert!(wire.contains("W html{background: transparent !important;border: none !important}\n"));
+        assert!(
+            wire.contains("W html{background: transparent !important;border: none !important}\n")
+        );
         assert!(wire.contains("W .suggContainer{background-color: rgba(0,0,0,.5) !important}\n"));
         assert!(!wire.contains("W //"));
     }

@@ -73,10 +73,8 @@ pub struct IStandaloneWebView2_Vtbl {
         *mut i64,
     ) -> windows_core::HRESULT,
     /// `remove_NavigationCompleted(event_token)` — method 16.
-    pub RemoveNavigationCompleted: unsafe extern "system" fn(
-        *mut core::ffi::c_void,
-        i64,
-    ) -> windows_core::HRESULT,
+    pub RemoveNavigationCompleted:
+        unsafe extern "system" fn(*mut core::ffi::c_void, i64) -> windows_core::HRESULT,
 }
 // `IStringable` — to read a `Windows.Foundation.Uri`'s display string.
 windows_core::imp::define_interface!(
@@ -144,8 +142,8 @@ impl IStandaloneWebView2 {
             if op.is_null() {
                 return None;
             }
-            let deadline = std::time::Instant::now()
-                + std::time::Duration::from_millis(timeout_ms as u64);
+            let deadline =
+                std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64);
             let vt = &**(op as *const *const IAsyncOpVtbl);
             let mut status = 0i32;
             while status == 0 && std::time::Instant::now() < deadline {
@@ -208,8 +206,7 @@ struct IAsyncOpVtbl {
     _i1: usize,
     _i2: usize,
     _id: usize,
-    status:
-        unsafe extern "system" fn(*mut core::ffi::c_void, *mut i32) -> windows_core::HRESULT,
+    status: unsafe extern "system" fn(*mut core::ffi::c_void, *mut i32) -> windows_core::HRESULT,
     _ec: usize,
     _cancel: usize,
     _close: usize,
@@ -285,11 +282,10 @@ pub struct ICoreWebView2_Vtbl {
         *mut core::ffi::c_void,
         PCWSTR,
         *mut core::ffi::c_void,
-    ) -> windows_core::HRESULT,
-    pub RemoveScriptToExecuteOnDocumentCreated: unsafe extern "system" fn(
-        *mut core::ffi::c_void,
-        PCWSTR,
-    ) -> windows_core::HRESULT,
+    )
+        -> windows_core::HRESULT,
+    pub RemoveScriptToExecuteOnDocumentCreated:
+        unsafe extern "system" fn(*mut core::ffi::c_void, PCWSTR) -> windows_core::HRESULT,
     pub ExecuteScript: unsafe extern "system" fn(
         *mut core::ffi::c_void,
         PCWSTR,
@@ -490,10 +486,7 @@ pub fn inject(
                     if let Some(s) = sender.cloned()
                         && let Ok(w) = s.cast::<IStandaloneWebView2>()
                     {
-                        crate::tap_log!(
-                            "webview: nav re-inject source={:?}",
-                            w.source_uri()
-                        );
+                        crate::tap_log!("webview: nav re-inject source={:?}", w.source_uri());
                         let _ = w.exec_script(&js2);
                     }
                     Ok(())
