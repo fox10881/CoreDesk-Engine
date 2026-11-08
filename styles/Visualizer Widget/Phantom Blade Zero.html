@@ -55,9 +55,10 @@
 
   function draw(dt) {
     const hue = TH.adaptive ? TH.hue : DEF_HUE;
-    // fade trails — ink-black film
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(6, 7, 10, 0.28)';
+    // fade trails: erase alpha so strokes decay into real transparency —
+    // a dark source-over film would accumulate into an opaque black box.
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.30)';
     ctx.fillRect(0, 0, W, H);
 
     const n = BANDS;

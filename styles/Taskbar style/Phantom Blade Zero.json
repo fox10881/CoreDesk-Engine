@@ -419,25 +419,6 @@
       "styles": [
         "Visibility=1"
       ]
-    },
-    {
-      "target": "TextBlock#InnerTextBlock[Text=uE971]",
-      "styles": [
-        "Text=uED14"
-      ]
-    },
-    {
-      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel",
-      "styles": [
-        "Width=48",
-        "Background:=$pbzButton"
-      ]
-    },
-    {
-      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Grid > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon",
-      "styles": [
-        "Visibility=Collapsed"
-      ]
     }
   ],
   "styleConstants": [
@@ -454,7 +435,6 @@
     "BorderThickness=0.3,1,0.3,1",
     "R1=6",
     "R2=20",
-    "pbzTaskbarWall=<ImageBrush Stretch=\"UniformToFill\" AlignmentY=\"0.78\" ImageSource=\"pbz-taskbar-bg.jpg\" />",
-    "pbzButton=<ImageBrush Stretch=\"Uniform\" ImageSource=\"pbz-start-button.png\" />"
+    "pbzTaskbarWall=<ImageBrush Stretch=\"UniformToFill\" AlignmentY=\"0.78\" ImageSource=\"pbz-taskbar-bg.jpg\" />"
   ]
 }
