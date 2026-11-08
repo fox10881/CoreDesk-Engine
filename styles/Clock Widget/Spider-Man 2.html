@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- cde-meta {"id": "Spider-Man 2", "label": "Spider-Man 2", "author": "CoreDesk Engine", "version": 1} -->
+<!-- COREDESK_LOCALE -->
+<title data-i18n="Spider-Man 2 Clock">Spider-Man 2 Clock</title>
+<script src="i18n.js"></script>
+<style>
+  :root {
+    --accent: #e62429;
+    --accent-glow: rgba(230, 36, 41, 0.65);
+    --web-blue: #3b82f6;
+    --web-blue-glow: rgba(59, 130, 246, 0.45);
+    --silk: #f4f7fb;
+    --silk-muted: rgba(244, 247, 251, 0.72);
+    --web-stroke: rgba(230, 36, 41, 0.36);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+  html, body {
+    width: 100vw; height: 100vh; overflow: hidden;
+    background: transparent !important;
+    font-family: 'Bahnschrift', 'Impact', 'Segoe UI Black', system-ui, sans-serif;
+    color: var(--silk);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #widget-root {
+    width: 100vw; height: 100vh;
+    background: transparent !important;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    transform-origin: center;
+  }
+  /* Completely transparent outer container — no box, no border, no backdrop fill */
+  .sm2-face {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 3vmin 6vmin;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  /* Subtle decorative spider-web SVG filigree floating behind the typography */
+  .sm2-web-bg {
+    position: absolute;
+    inset: -4vmin -6vmin;
+    width: calc(100% + 12vmin);
+    height: calc(100% + 8vmin);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.85;
+    filter: drop-shadow(0 0 1.4vmin var(--accent-glow));
+  }
+  .sm2-header {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 2.2vmin;
+    font-size: 4.4vmin; font-weight: 800;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 1.8vmin var(--accent-glow), 0 0.3vmin 0.8vmin rgba(0,0,0,0.85);
+    transform: skewX(-10deg);
+    margin-bottom: 0.6vmin;
+  }
+  .sm2-header::before, .sm2-header::after {
+    content: "";
+    width: 7vmin; height: 0.45vmin;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--web-blue));
+    border-radius: 1vmin;
+    box-shadow: 0 0 1.2vmin var(--accent-glow);
+  }
+  .sm2-header::after {
+    background: linear-gradient(90deg, var(--web-blue), var(--accent), transparent);
+  }
+  .sm2-time-row {
+    position: relative; z-index: 1;
+    display: flex; align-items: baseline; justify-content: center;
+    gap: 1.2vmin;
+    transform: skewX(-8deg);
+  }
+  .sm2-time {
+    font-size: 27vmin;
+    font-weight: 900;
+    font-stretch: condensed;
+    line-height: 0.94;
+    letter-spacing: 0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--silk);
+    -webkit-text-stroke: 0.35vmin rgba(10, 18, 36, 0.85);
+    text-shadow:
+      0.55vmin 0.55vmin 0 var(--accent),
+      -0.3vmin -0.3vmin 0 var(--web-blue),
+      0 0 3.2vmin var(--accent-glow),
+      0 0.8vmin 2.4vmin rgba(0, 0, 0, 0.9);
+  }
+  .sm2-colon {
+    display: inline-block;
+    color: var(--accent);
+    text-shadow: 0 0 2.4vmin var(--accent-glow), 0 0.4vmin 1.2vmin rgba(0,0,0,0.9);
+    animation: spideyPulse 1.6s ease-in-out infinite;
+    margin: 0 0.4vmin;
+  }
+  .sm2-ampm {
+    font-size: 5.5vmin;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-shadow: 0 0 1.6vmin var(--accent-glow), 0 0.3vmin 0.9vmin rgba(0,0,0,0.9);
+  }
+  /* Web-strand divider with central spider emblem */
+  .sm2-divider {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
+    width: 100%;
+    margin: 1.2vmin 0 1vmin;
+    gap: 1.8vmin;
+  }
+  .sm2-strand {
+    flex: 1;
+    height: 0.4vmin;
+    background: linear-gradient(90deg, transparent, rgba(244,247,251,0.55) 35%, var(--accent) 85%, var(--web-blue));
+    box-shadow: 0 0 1.2vmin var(--accent-glow);
+  }
+  .sm2-strand.right {
+    background: linear-gradient(90deg, var(--web-blue), var(--accent) 15%, rgba(244,247,251,0.55) 65%, transparent);
+  }
+  .sm2-spider-icon {
+    width: 5.2vmin; height: 5.2vmin;
+    fill: var(--accent);
+    filter: drop-shadow(0 0 1.2vmin var(--accent-glow)) drop-shadow(0 0.2vmin 0.6vmin rgba(0,0,0,0.9));
+  }
+  .sm2-meta {
+    position: relative; z-index: 1;
+    display: flex; align-items: baseline; justify-content: center;
+    gap: 3vmin;
+    transform: skewX(-8deg);
+  }
+  .sm2-day {
+    font-size: 6.4vmin;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--silk);
+    text-shadow: 0.3vmin 0.3vmin 0 rgba(230, 36, 41, 0.75), 0 0.4vmin 1.4vmin rgba(0,0,0,0.9);
+  }
+  .sm2-date {
+    font-size: 5.6vmin;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--silk-muted);
+    text-shadow: 0 0 1.4vmin var(--web-blue-glow), 0 0.4vmin 1.4vmin rgba(0,0,0,0.9);
+  }
+  @keyframes spideyPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.92); }
+  }
+  body.light-backdrop {
+    --silk: #0b1326;
+    --silk-muted: rgba(11, 19, 38, 0.78);
+  }
+  body.light-backdrop .sm2-time {
+    -webkit-text-stroke: 0.3vmin rgba(255, 255, 255, 0.9);
+    text-shadow:
+      0.5vmin 0.5vmin 0 var(--accent),
+      -0.25vmin -0.25vmin 0 var(--web-blue),
+      0 0.5vmin 1.6vmin rgba(0, 0, 0, 0.35);
+  }
+</style>
+</head>
+<body>
+<div id="widget-root">
+  <div class="sm2-face">
+    <!-- Subtle spider-web SVG filaments behind the clock digits (transparent background) -->
+    <svg class="sm2-web-bg" viewBox="0 0 400 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g stroke="rgba(244, 247, 251, 0.16)" stroke-width="1.1">
+        <line x1="200" y1="90" x2="10" y2="10"/>
+        <line x1="200" y1="90" x2="390" y2="10"/>
+        <line x1="200" y1="90" x2="10" y2="170"/>
+        <line x1="200" y1="90" x2="390" y2="170"/>
+        <line x1="200" y1="90" x2="0" y2="90"/>
+        <line x1="200" y1="90" x2="400" y2="90"/>
+        <line x1="200" y1="90" x2="200" y2="0"/>
+        <line x1="200" y1="90" x2="200" y2="180"/>
+      </g>
+      <g stroke="var(--web-stroke)" stroke-width="1.25">
+        <path d="M135 55 Q168 68 200 50 Q232 68 265 55 Q255 90 265 125 Q232 112 200 130 Q168 112 135 125 Q145 90 135 55 Z"/>
+        <path d="M80 28 Q140 52 200 22 Q260 52 320 28 Q302 90 320 152 Q260 128 200 158 Q140 128 80 152 Q98 90 80 28 Z" stroke-opacity="0.55"/>
+      </g>
+    </svg>
+
+    <div class="sm2-header"><span>SPIDER-SENSE // OS</span></div>
+
+    <div class="sm2-time-row">
+      <div class="sm2-time"><span class="js-hh"></span><span class="sm2-colon">:</span><span class="js-mm"></span></div>
+      <div class="sm2-ampm js-ap"></div>
+    </div>
+
+    <div class="sm2-divider">
+      <div class="sm2-strand left"></div>
+      <svg class="sm2-spider-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <path d="M32 14 L37 24 L32 48 L27 24 Z"/>
+        <circle cx="32" cy="11" r="4.5"/>
+        <path d="M28 20 L10 6 L4 14 M27 25 L6 22 L2 32 M28 31 L9 40 L5 52 M29 36 L16 52 L14 62" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="color:var(--accent)"/>
+        <path d="M36 20 L54 6 L60 14 M37 25 L58 22 L62 32 M36 31 L55 40 L59 52 M35 36 L48 52 L50 62" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none" style="color:var(--accent)"/>
+      </svg>
+      <div class="sm2-strand right"></div>
+    </div>
+
+    <div class="sm2-meta">
+      <span class="sm2-day js-day"></span>
+      <span class="sm2-date js-date"></span>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('widget-root');
+  const wv = window.chrome && window.chrome.webview;
+  let locale = (window.COREDESK_LOCALE && COREDESK_LOCALE.locale) || 'en';
+  let dayFmt, dateFmt, ampmFmt;
+  function applyLocale(tag) {
+    locale = tag || 'en';
+    dayFmt  = new Intl.DateTimeFormat(locale, { weekday: 'long' });
+    dateFmt = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' });
+    ampmFmt = new Intl.DateTimeFormat(locale, { hour: 'numeric', hour12: true });
+  }
+  applyLocale(locale);
+  const pad = (n) => String(n).padStart(2, '0');
+  const ampm = (d) => {
+    const p = ampmFmt.formatToParts(d).find((x) => x.type === 'dayPeriod');
+    return p ? p.value : '';
+  };
+
+  let elsCfg = {}, adaptiveOn = false, fmt24 = true;
+  const EL_SELS = {
+    time: '.js-hh,.js-mm,.js-ap',
+    day: '.js-day',
+    date: '.js-date',
+  };
+  const $ = (sel) => root.querySelector(sel);
+  const $$ = (sel) => root.querySelectorAll(sel);
+
+  function applyEls() {
+    for (const name in EL_SELS) {
+      const p = elsCfg[name] || {};
+      const sc = (typeof p.scale === 'number' && isFinite(p.scale) && p.scale > 0) ? p.scale : 1;
+      const dx = (typeof p.offsetX === 'number' && isFinite(p.offsetX)) ? p.offsetX : 0;
+      const dy = (typeof p.offsetY === 'number' && isFinite(p.offsetY)) ? p.offsetY : 0;
+      $$(EL_SELS[name]).forEach((el) => {
+        el.style.fontSize = '';
+        const base = parseFloat(getComputedStyle(el).fontSize) || 0;
+        el.style.fontSize = sc !== 1 ? base * sc + 'px' : '';
+        el.style.color = adaptiveOn ? '' : (typeof p.color === 'string' ? p.color : '');
+        el.style.transform = (dx || dy) ? `translate(${dx}px, ${dy}px)` : '';
+        el.style.display = (dx || dy) ? 'inline-block' : '';
+      });
+    }
+  }
+
+  function refit() {
+    const face = root.firstElementChild;
+    if (!face) return;
+    face.style.transform = '';
+    const r = face.getBoundingClientRect();
+    const s = Math.min(innerWidth / (r.width || 1), innerHeight / (r.height || 1), 1) * 0.96;
+    face.style.transform = `scale(${s})`;
+  }
+
+  function tick() {
+    const d = new Date();
+    let h = d.getHours();
+    const apEl = $('.js-ap');
+    if (!fmt24) {
+      apEl.textContent = ampm(d);
+      h = h % 12 || 12;
+      $('.js-hh').textContent = String(h);
+    } else {
+      apEl.textContent = '';
+      $('.js-hh').textContent = pad(h);
+    }
+    $('.js-mm').textContent = pad(d.getMinutes());
+    $('.js-day').textContent = dayFmt.format(d);
+    $('.js-date').textContent = dateFmt.format(d);
+  }
+
+  if (wv) {
+    wv.addEventListener('message', (e) => {
+      const m = e.data || {};
+      if (m.t === 'clockStyle') {
+        if (m.els) elsCfg = m.els;
+        if (m.adaptive !== undefined) adaptiveOn = m.adaptive !== false;
+        if (m.use24Hour !== undefined) fmt24 = m.use24Hour !== false;
+        applyEls(); tick();
+      }
+      else if (m.t === 'clockTheme') {
+        const on = m.adaptive !== false;
+        adaptiveOn = on;
+        if (m.els) elsCfg = m.els;
+        if (m.use24Hour !== undefined && fmt24 !== (m.use24Hour !== false)) {
+          fmt24 = m.use24Hour !== false; tick();
+        }
+        if (m.isLightBackdrop !== undefined)
+          document.body.classList.toggle('light-backdrop', on && !!m.isLightBackdrop);
+        else if (!on)
+          document.body.classList.remove('light-backdrop');
+        if (!on || m.accent !== undefined) {
+          const accent = on && /^#[0-9a-fA-F]{6}$/.test(m.accent || '') ? m.accent : '#e62429';
+          const rs = document.documentElement.style;
+          rs.setProperty('--accent', accent);
+          const r = parseInt(accent.slice(1,3),16), g = parseInt(accent.slice(3,5),16), b = parseInt(accent.slice(5,7),16);
+          rs.setProperty('--accent-glow', `rgba(${r},${g},${b},0.65)`);
+        }
+        applyEls();
+      }
+      else if (m.t === 'clockLocale') {
+        window.COREDESK_LOCALE = { locale: m.locale, translations: m.translations };
+        if (window.CoreDeskI18n) CoreDeskI18n.set(m.locale, m.translations);
+        applyLocale(m.locale); tick();
+      }
+    });
+    wv.postMessage({ type: 'clockReady' });
+  }
+
+  window.addEventListener('resize', () => { applyEls(); refit(); });
+  tick(); refit();
+  setInterval(tick, 500);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+{
+  "id": "Spider-Man 2",
+  "label": "Spider-Man 2",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "targetStyles": [
+    {
+      "target": "Taskbar.TaskbarFrame",
+      "styles": [
+        "Width=Auto",
+        "HorizontalAlignment=Center",
+        "Margin=220,0,220,0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid",
+      "styles": [
+        "Background=Transparent",
+        "BorderBrush=#FF1E3254",
+        "BorderThickness=0",
+        "CornerRadius=0",
+        "Margin=0,4,0,4",
+        "Padding=24,0,24,0",
+        "ActualHeight=>gtaRailHeight"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground",
+      "styles": [
+        "Margin=-24,0,-24,0",
+        "IsHitTestVisible=False"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Visibility=Visible",
+        "Fill=#EE070B14",
+        "RadiusX=0",
+        "RadiusY=0",
+        "RenderTransformOrigin=0.5,0.5",
+        "RenderTransform:=<SkewTransform AngleX=\"-16\" />",
+        "Margin={{gtaRailHeight > 0 ? gtaRailHeight * 0.143373 + 1 : 7}},0,{{gtaRailHeight > 0 ? gtaRailHeight * 0.143373 + 1 : 7}},0",
+        "IsHitTestVisible=False"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarFrame > Grid#RootGrid > Taskbar.TaskbarBackground > Grid > Rectangle#BackgroundStroke",
+      "styles": [
+        "Visibility=Visible",
+        "Stroke=#FF1E3254",
+        "StrokeThickness=1",
+        "RadiusX=0",
+        "RadiusY=0",
+        "Height=Auto",
+        "VerticalAlignment=Stretch",
+        "HorizontalAlignment=Stretch",
+        "RenderTransformOrigin=0.5,0.5",
+        "RenderTransform:=<SkewTransform AngleX=\"-16\" />",
+        "Margin={{gtaRailHeight > 0 ? gtaRailHeight * 0.143373 + 1 : 7}},0,{{gtaRailHeight > 0 ? gtaRailHeight * 0.143373 + 1 : 7}},0",
+        "IsHitTestVisible=False",
+        "Fill:=<LinearGradientBrush StartPoint=\"0,0.5\" EndPoint=\"1,0.5\"><GradientStop Color=\"#FFE62429\" Offset=\"0\" /><GradientStop Color=\"#FFE62429\" Offset=\"{{gtaAccentWidth > 0 ? 4 / gtaAccentWidth : 0.01}}\" /><GradientStop Color=\"#00E62429\" Offset=\"{{gtaAccentWidth > 0 ? 4 / gtaAccentWidth : 0.01}}\" /><GradientStop Color=\"#00E62429\" Offset=\"{{gtaAccentWidth > 0 ? 1 - 4 / gtaAccentWidth : 0.99}}\" /><GradientStop Color=\"#FFE62429\" Offset=\"{{gtaAccentWidth > 0 ? 1 - 4 / gtaAccentWidth : 0.99}}\" /><GradientStop Color=\"#FFE62429\" Offset=\"1\" /></LinearGradientBrush>",
+        "ActualWidth=>gtaAccentWidth"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton",
+      "styles": [
+        "CornerRadius=0",
+        "Margin=0",
+        "Padding=0",
+        "MinHeight=0",
+        "Height={{gtaRailHeight > 0 ? gtaRailHeight : 40}}",
+        "VerticalAlignment=Center",
+        "VerticalContentAlignment=Stretch"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton",
+      "styles": [
+        "CornerRadius=0",
+        "MinHeight=0",
+        "Height={{gtaRailHeight > 0 ? gtaRailHeight : 40}}",
+        "VerticalAlignment=Center",
+        "VerticalContentAlignment=Stretch"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid#IconPanel@CommonStates > Border#BackgroundElement, Taskbar.TaskListButton > Taskbar.TaskListButtonPanel#IconPanel@CommonStates > Border#BackgroundElement, Taskbar.TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "CornerRadius=0",
+        "BorderThickness=0,0,1,0",
+        "BorderBrush=#551E3254",
+        "Background@InactiveNormal=Transparent",
+        "Background@ActiveNormal=#44C1121F",
+        "Background@InactivePointerOver=#FF121E33",
+        "Background@ActivePointerOver=#FF2B1420",
+        "Background@InactivePressed=#FF421522",
+        "Background@ActivePressed=#FF421522",
+        "Margin=0",
+        "Padding=0",
+        "Width=Auto",
+        "HorizontalAlignment=Stretch",
+        "VerticalAlignment=Stretch",
+        "Grid.Column=0",
+        "Grid.ColumnSpan=99",
+        "Grid.Row=0",
+        "Grid.RowSpan=99",
+        "Background@MultiWindowNormal=Transparent",
+        "Background@MultiWindowActive=#44C1121F",
+        "Background@MultiWindowPointerOver=#FF121E33",
+        "Background@MultiWindowPressed=#FF421522",
+        "BackgroundTransition:=<BrushTransition Duration=\"0:0:0\" />"
+      ]
+    },
+    {
+      "target": "Grid#IconPanel@RunningIndicatorStates > Rectangle#RunningIndicator, Taskbar.TaskListLabeledButtonPanel@RunningIndicatorStates > Rectangle#RunningIndicator",
+      "styles": [
+        "Height=2",
+        "RadiusX=0",
+        "RadiusY=0",
+        "Fill@InactiveRunningIndicator=#FF3B5998",
+        "Width@InactiveRunningIndicator=8",
+        "Fill@ActiveRunningIndicator=#FFE62429",
+        "Width@ActiveRunningIndicator=24",
+        "Fill@RequestingAttentionRunningIndicator=#FFFF3B30",
+        "Width@RequestingAttentionRunningIndicator=24"
+      ]
+    },
+    {
+      "target": "TextBlock#LabelControl",
+      "styles": [
+        "FontFamily=Bebas Neue",
+        "Foreground=#FFF0F4FA",
+        "FontSize=14"
+      ]
+    },
+    {
+      "target": "StackPanel#SystemTrayFrameGrid, Grid#SystemTrayFrameGrid",
+      "styles": [
+        "Background=#EE070B14",
+        "BorderBrush=#FF1E3254",
+        "BorderThickness=1",
+        "CornerRadius=0",
+        "Margin=8,2,12,6",
+        "Padding=5,0,5,0"
+      ]
+    },
+    {
+      "target": "SystemTray.ChevronIconView",
+      "styles": [
+        "Padding=0",
+        "MinWidth=26"
+      ]
+    },
+    {
+      "target": "SystemTray.NotifyIconView#NotifyItemIcon",
+      "styles": [
+        "Padding=0",
+        "MinWidth=26"
+      ]
+    },
+    {
+      "target": "Border#OverflowFlyoutBackgroundBorder",
+      "styles": [
+        "Background=#FF0A101D",
+        "BorderBrush=#FF1E3254",
+        "BorderThickness=1",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskbarBackground#HoverFlyoutBackgroundControl > Grid > Rectangle#BackgroundFill",
+      "styles": [
+        "Fill=#F50A101D"
+      ]
+    },
+    {
+      "target": "MenuFlyoutPresenter > Border",
+      "styles": [
+        "Background=#FF0A101D",
+        "BorderBrush=#FF1E3254",
+        "BorderThickness=1",
+        "CornerRadius=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid#IconPanel > Image#Icon, Taskbar.TaskListButton > Taskbar.TaskListButtonPanel#IconPanel > Image#Icon, Taskbar.TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel > Image#Icon",
+      "styles": [
+        "HorizontalAlignment=Center",
+        "VerticalAlignment=Center",
+        "Margin=0,0,1,0",
+        "Grid.Column=0",
+        "Grid.ColumnSpan=99",
+        "Grid.Row=0",
+        "Grid.RowSpan=99"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid#IconPanel@MarginStates > Border#BackgroundElement, Taskbar.TaskListButton > Taskbar.TaskListButtonPanel#IconPanel@MarginStates > Border#BackgroundElement, Taskbar.TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel@MarginStates > Border#BackgroundElement",
+      "styles": [
+        "Margin=0",
+        "Margin@NormalMargin=0",
+        "Margin@NormalMultiWindowMargin=0",
+        "Margin@LargeIconMultiWindowMargin=0",
+        "Margin@RequestingAttentionMultiWindowMargin=0"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid#IconPanel > Border#MultiWindowElement, Taskbar.TaskListButton > Taskbar.TaskListButtonPanel#IconPanel > Border#MultiWindowElement, Taskbar.TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel > Border#MultiWindowElement",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    },
+    {
+      "target": "Taskbar.TaskListButton > Grid#IconPanel, Taskbar.TaskListButton > Taskbar.TaskListButtonPanel#IconPanel, Taskbar.TaskListButton > Taskbar.TaskListLabeledButtonPanel#IconPanel",
+      "styles": [
+        "Margin=0",
+        "Padding=0",
+        "HorizontalAlignment=Stretch",
+        "VerticalAlignment=Stretch"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel",
+      "styles": [
+        "MinWidth=52",
+        "Margin=0,0,5,0",
+        "Background:=Transparent"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Grid > Border#BackgroundElement, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Border#BackgroundElement, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel@CommonStates > Grid > Border#BackgroundElement, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel@CommonStates > Border#BackgroundElement",
+      "styles": [
+        "Margin=2",
+        "CornerRadius=0",
+        "BorderBrush=#FF8C1D24",
+        "BorderThickness=0,0,1,0",
+        "Background:=$spideyButton",
+        "Background@ActiveNormal:=$spideyButton",
+        "Background@ActivePointerOver:=$spideyButton",
+        "Background@ActivePressed:=$spideyButton",
+        "Background@InactiveNormal:=$spideyButton",
+        "Background@InactivePointerOver:=$spideyButton",
+        "Background@InactivePressed:=$spideyButton",
+        "Background@MultiWindowNormal:=$spideyButton",
+        "Background@MultiWindowPointerOver:=$spideyButton",
+        "Background@MultiWindowActive:=$spideyButton"
+      ]
+    },
+    {
+      "target": "Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Grid > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon, Taskbar.ExperienceToggleButton#LaunchListButton[AutomationProperties.AutomationId=StartButton] > Taskbar.TaskListButtonPanel > Microsoft.UI.Xaml.Controls.AnimatedVisualPlayer#Icon",
+      "styles": [
+        "Visibility=Collapsed"
+      ]
+    }
+  ],
+  "styleConstants": [
+    "spideyButton=<ImageBrush Stretch=\"Uniform\" ImageSource=\"START ICON.png\" />"
+  ]
+}
