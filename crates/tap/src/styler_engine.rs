@@ -4032,6 +4032,31 @@ fn webview_maybe_inject_ui(diagnostics: &IXamlDiagnostics, handle: u64, css: &st
     if let Some(injected) = crate::webview::inject(&wv, handle, css, record_script_id) {
         state().web_injected.insert(handle, injected);
         crate::tap_log!("webview: injected css handle={handle}");
+        // One delayed re-apply: the first ExecuteScriptAsync can land before
+        // the document's DOM exists (the element accepts the call and drops
+        // it inside the op). NavigationCompleted covers real navigations;
+        // this covers the case where the page was already loading and never
+        // navigates again — the second exec lands once the DOM is up.
+        {
+            let css = css.to_string();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+                let Some(diag) = mod_diagnostics() else {
+                    return;
+                };
+                let Some(d) = state().dispatcher.clone() else {
+                    return;
+                };
+                let inner = UiBound((diag, css));
+                post_ui(&d, Prio::Normal, move || {
+                    let UiBound((diag, css)) = &inner;
+                    if let Some(wv) = crate::webview::resolve(diag, handle) {
+                        crate::webview::exec_once(&wv, css);
+                    }
+                    Ok(())
+                });
+            });
+        }
     } else {
         // Resolved but the core refused the script (still initializing) —
         // keep retrying on later visual-tree traffic.

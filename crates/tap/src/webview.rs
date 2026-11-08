@@ -415,18 +415,7 @@ pub fn inject(
 ) -> Option<InjectState> {
     match webview {
         WebView::Standalone(wv) => {
-            // The mod's gate: `Source` is empty until `CoreWebView2` has
-            // navigated — `ExecuteScriptAsync` before then is accepted by
-            // the element but dropped inside the async op, so the style
-            // would never reach the page (the report reads `injected` yet
-            // nothing applied). Refuse → the caller parks the handle and
-            // retries on later visual-tree traffic once the doc is live.
-            let source = wv.source_uri().unwrap_or_default();
-            if source.is_empty() {
-                crate::tap_log!("webview: no source yet handle={handle}");
-                return None;
-            }
-            crate::tap_log!("webview: inject handle={handle} source={source}");
+            crate::tap_log!("webview: inject handle={handle} source={:?}", wv.source_uri());
             let js = windows_core::HSTRING::from(injector_js(css));
             wv.exec_script(&js).ok()?;
             let js2 = js.clone();
@@ -479,6 +468,30 @@ pub fn inject(
                 nav_token: None,
                 _handler: None,
             })
+        }
+    }
+}
+
+/// Re-run the injector on an already-injected element — used by the
+/// delayed re-apply pass so a script that landed before the document's
+/// DOM existed still applies once the page is up, even when no further
+/// navigation happens. Idempotent: the `<style>` node is updated in place.
+pub fn exec_once(webview: &WebView, css: &str) {
+    let js = windows_core::HSTRING::from(injector_js(css));
+    match webview {
+        WebView::Standalone(wv) => {
+            let _ = wv.exec_script(&js);
+        }
+        WebView::Core(cwv) => {
+            let exec = new_handler(0, None);
+            let _ = unsafe {
+                (Interface::vtable(cwv).ExecuteScript)(
+                    Interface::as_raw(cwv),
+                    PCWSTR::from_raw(js.as_ptr()),
+                    exec.cast(),
+                )
+            };
+            unsafe { handler_release(exec) };
         }
     }
 }
