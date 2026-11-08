@@ -932,6 +932,7 @@ mod tests {
             None,
             Some((&name, &data)),
             b"\xFF\xD8\xFF\xE0preview",
+            &[],
         )
         .expect("write .cde");
         let ex = coredesk_core::cde_theme::extract_cde_to_temp(&cde).expect("extract");

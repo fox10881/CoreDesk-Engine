@@ -944,7 +944,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   function renderStartMenuStyles(m) {
     const sel = document.getElementById('startMenuStyleSel');
     const opts = m.startMenuStyles || [];
-    const sig = opts.map(o => o.id).join('');
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
     if (sel.dataset.opts !== sig) {
       sel.dataset.opts = sig;
       sel.replaceChildren(...opts.map(o => {
@@ -961,7 +961,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   function renderTaskbarStyles(m) {
     const sel = document.getElementById('taskbarStyleSel');
     const opts = m.taskbarStyles || [];
-    const sig = opts.map(o => o.id).join('');
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
     if (sel.dataset.opts !== sig) {
       sel.dataset.opts = sig;
       sel.replaceChildren(...opts.map(o => {
@@ -978,13 +978,13 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   function renderNotificationCenterStyles(m) {
     const sel = document.getElementById('notificationCenterStyleSel');
     const opts = m.notificationCenterStyles || [];
-    const sig = opts.map(o => o.id).join('');
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
     if (sel.dataset.opts !== sig) {
       sel.dataset.opts = sig;
       sel.replaceChildren(...opts.map(o => {
         const e = document.createElement('option');
         e.value = o.id;
-        e.textContent = o.label;
+        e.textContent = o.label + (o.custom ? ' (' + t('自定义') + ')' : '');
         return e;
       }));
     }

@@ -2835,6 +2835,7 @@ impl App {
             coredesk_core::config_store::SplitConfigJson,
             Option<(String, Vec<u8>)>,
             Vec<u8>,
+            Vec<(String, Vec<u8>)>,
         ),
         String,
     > {
@@ -2905,6 +2906,9 @@ impl App {
                 "packing theme asset: none — no usable background"
             );
         }
+        // Custom styles + their relative assets ride inside the archive so a
+        // theme using user-layer files stays whole on another machine.
+        let style_entries = Self::bundled_style_entries(&cfg);
         let config_json = coredesk_core::ConfigStore::to_json(&cfg).map_err(|e| e.to_string())?;
         let mut split = coredesk_core::config_store::split_config_json(&config_json);
         // Language is a global user preference, not theme content: the exported
@@ -2915,7 +2919,64 @@ impl App {
             coredesk_core::cde_theme::render_layout_preview_bgra(&cfg, bg_ref, 640, 360);
         let preview_jpg = coredesk_platform::wmf_wallpaper::encode_jpeg(640, 360, &preview_bgra)
             .map_err(|e| e.to_string())?;
-        Ok((split, bg_entry, preview_jpg))
+        Ok((split, bg_entry, preview_jpg, style_entries))
+    }
+
+    /// `styles/<category>/<file>` archive entries for every style the config
+    /// references that resolves inside the user's editable Styles layer —
+    /// the style document itself plus each local file it references through
+    /// relative `ImageSource=`/`Source=` attributes. Factory styles ship with
+    /// the app on every machine, so only user-layer files need to travel.
+    fn bundled_style_entries(cfg: &coredesk_core::Config) -> Vec<(String, Vec<u8>)> {
+        use coredesk_core::styles_fs as sfs;
+        let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        let mut pick = |id: &str, category: &str, ext: &str| {
+            if id.is_empty() || id == "none" || !sfs::is_valid_style_id(id) {
+                return;
+            }
+            let path = if ext == "html" {
+                sfs::resolve_widget_file(category, id)
+            } else {
+                sfs::resolve_file(category, id)
+            };
+            let Some(path) = path else { return };
+            if !sfs::is_user_layer_path(&path) {
+                return;
+            }
+            let mut files = vec![path.clone()];
+            if ext == "json" {
+                files.extend(sfs::referenced_assets(&path));
+            }
+            for file in files {
+                let Some(leaf) = file.file_name().and_then(|n| n.to_str()) else {
+                    continue;
+                };
+                let entry = format!("styles/{category}/{leaf}");
+                if !seen.insert(entry.clone()) {
+                    continue;
+                }
+                match std::fs::read(&file) {
+                    Ok(bytes) => out.push((entry, bytes)),
+                    Err(e) => tracing::warn!(
+                        file = %file.display(),
+                        error = %e,
+                        "theme export: style asset unreadable; skipped"
+                    ),
+                }
+            }
+        };
+        let s = &cfg.settings;
+        pick(&s.start_menu_style, sfs::START_MENU_DIR, "json");
+        pick(&s.taskbar_style, sfs::TASKBAR_DIR, "json");
+        pick(
+            &s.notification_center_style,
+            sfs::NOTIFICATION_CENTER_DIR,
+            "json",
+        );
+        pick(&s.clock_style, sfs::CLOCK_WIDGET_DIR, "html");
+        pick(&s.visualizer_style, sfs::VISUALIZER_WIDGET_DIR, "html");
+        out
     }
 
     /// Writes the split config trio + `bg_entry`/`preview_jpg` to `dest` and reports through the page.
@@ -2926,6 +2987,7 @@ impl App {
         meta_json: Option<&str>,
         bg_entry: Option<(String, Vec<u8>)>,
         preview_jpg: &[u8],
+        style_entries: &[(String, Vec<u8>)],
     ) -> bool {
         let bg_slice = bg_entry.as_ref().map(|(n, b)| (n.as_str(), b.as_slice()));
         let sidecars: [(&str, &str); 2] = [
@@ -2952,6 +3014,7 @@ impl App {
             meta_json,
             bg_slice,
             preview_jpg,
+            style_entries,
         ) {
             Ok(()) => {
                 self.settings_toast(&coredesk_core::i18n::format(
@@ -2994,13 +3057,14 @@ impl App {
             .then(|| serde_json::to_string(&meta).ok())
             .flatten();
         match self.cde_payload(&self.state.config, bg.as_deref(), live) {
-            Ok((split, bg_entry, preview_jpg)) => {
+            Ok((split, bg_entry, preview_jpg, style_entries)) => {
                 self.write_theme_archive(
                     dest,
                     &split,
                     meta_json.as_deref(),
                     bg_entry,
                     &preview_jpg,
+                    &style_entries,
                 );
             }
             Err(e) => self.settings_error(&coredesk_core::i18n::format("导出失败：{0}", &[e])),
@@ -3444,13 +3508,14 @@ impl App {
             })
             .flatten();
         let meta = self.theme_meta(bg.as_deref());
-        let (split, bg_entry, preview_jpg) = match self.cde_payload(&cfg, bg.as_deref(), live) {
-            Ok(p) => p,
-            Err(e) => {
-                self.settings_error(&coredesk_core::i18n::format("保存主题失败：{0}", &[e]));
-                return false;
-            }
-        };
+        let (split, bg_entry, preview_jpg, style_entries) =
+            match self.cde_payload(&cfg, bg.as_deref(), live) {
+                Ok(p) => p,
+                Err(e) => {
+                    self.settings_error(&coredesk_core::i18n::format("保存主题失败：{0}", &[e]));
+                    return false;
+                }
+            };
         let bg_slice = bg_entry.as_ref().map(|(n, b)| (n.as_str(), b.as_slice()));
         let meta_json = meta
             .source
@@ -3474,6 +3539,7 @@ impl App {
             meta_json.as_deref(),
             bg_slice,
             &preview_jpg,
+            &style_entries,
         ) {
             Ok(()) => true,
             Err(e) => {
@@ -3608,8 +3674,15 @@ impl App {
             "snapshot export: background source selected"
         );
         match self.cde_payload(&cfg, bg.as_deref(), None) {
-            Ok((split, bg_entry, preview_jpg)) => {
-                self.write_theme_archive(&dest, &split, None, bg_entry, &preview_jpg);
+            Ok((split, bg_entry, preview_jpg, style_entries)) => {
+                self.write_theme_archive(
+                    &dest,
+                    &split,
+                    None,
+                    bg_entry,
+                    &preview_jpg,
+                    &style_entries,
+                );
             }
             Err(e) => self.settings_error(&coredesk_core::i18n::format("导出失败：{0}", &[e])),
         }
@@ -3960,6 +4033,59 @@ impl App {
                     }
                 }
                 persisted_bg = Some(dest_bg);
+            }
+        }
+        // Bundled custom styles + their assets install into the user Styles
+        // layer before the temp dir is swept, so the config's style ids
+        // resolve when the theme applies. Each entry is `styles/<category>/<leaf>`
+        // with both segments validated (known category, plain leaf name,
+        // style/asset extension) — a crafted archive can't write elsewhere.
+        if let Some(root) = coredesk_core::styles_fs::user_styles_root() {
+            for (entry_name, src) in &extracted.style_files {
+                let mut parts = entry_name.splitn(3, '/');
+                let (_ns, cat, leaf) = (parts.next(), parts.next(), parts.next());
+                let (Some(cat), Some(leaf)) = (cat, leaf) else {
+                    continue;
+                };
+                let ok_cat = coredesk_core::styles_fs::CATEGORY_DIRS.contains(&cat);
+                let ok_leaf = !leaf.is_empty()
+                    && !leaf.contains(['/', '\\'])
+                    && leaf != ".."
+                    && leaf.rsplit('.').next().is_some_and(|e| {
+                        matches!(
+                            e.to_ascii_lowercase().as_str(),
+                            "json"
+                                | "html"
+                                | "jpg"
+                                | "jpeg"
+                                | "png"
+                                | "gif"
+                                | "webp"
+                                | "bmp"
+                                | "mp4"
+                                | "tif"
+                                | "tiff"
+                                | "svg"
+                        )
+                    });
+                if !(ok_cat && ok_leaf) {
+                    tracing::warn!(entry = %entry_name, "theme import: rejected style entry");
+                    continue;
+                }
+                let dest = root.join(cat).join(leaf);
+                if let Some(parent) = dest.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                match std::fs::copy(src, &dest) {
+                    Ok(_) => {
+                        tracing::info!(dest = %dest.display(), "theme import: installed style file")
+                    }
+                    Err(e) => tracing::warn!(
+                        dest = %dest.display(),
+                        error = %e,
+                        "theme import: style file copy failed"
+                    ),
+                }
             }
         }
         let _ = std::fs::remove_dir_all(&extracted.temp_dir);

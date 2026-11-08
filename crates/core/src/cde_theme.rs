@@ -36,6 +36,11 @@ pub struct ExtractedCdeTheme {
     pub preview_path: Option<PathBuf>,
     /// `theme.json`, when the archive carries adaptive-engine metadata.
     pub meta: Option<crate::adaptive::ThemeMeta>,
+    /// `styles/<category>/<file>` payloads extracted from the archive —
+    /// custom style files plus their referenced assets, bundled at export
+    /// so a theme that uses user-layer styles stays intact on another
+    /// machine. The importer installs them under the user styles root.
+    pub style_files: Vec<(String, PathBuf)>,
 }
 
 /// Standard IEEE 802.3 CRC-32 used by ZIP headers.
@@ -129,16 +134,35 @@ fn read_u32(buf: &[u8], off: usize) -> Option<u32> {
 }
 
 fn sanitize_entry_name(raw: &str) -> Option<String> {
-    let file_name = raw.rsplit(['/', '\\']).next()?.trim();
-    if file_name.is_empty()
-        || file_name == "."
-        || file_name == ".."
-        || file_name.contains(':')
-        || file_name.chars().any(|c| c.is_control())
-    {
-        return None;
+    fn clean_part(s: &str) -> Option<String> {
+        let s = s.trim();
+        (!s.is_empty()
+            && s != "."
+            && s != ".."
+            && !s.contains(':')
+            && !s.chars().any(|c| c.is_control()))
+        .then(|| s.to_string())
     }
-    Some(file_name.to_string())
+    // `styles/<category>/<file>` payloads keep their two-level path so the
+    // importer can route each file to its category dir. A `styles/` name in
+    // any other shape (deeper nesting, `..`, backslash tricks) is rejected
+    // outright — never flattened into a top-level entry.
+    if raw.len() > 7
+        && raw[..6].eq_ignore_ascii_case("styles")
+        && matches!(raw.as_bytes()[6], b'/' | b'\\')
+    {
+        let mut parts = raw[7..].split(['/', '\\']);
+        return match (parts.next(), parts.next(), parts.next()) {
+            (Some(cat), Some(leaf), None) => {
+                Some(format!("styles/{}/{}", clean_part(cat)?, clean_part(leaf)?))
+            }
+            _ => None,
+        };
+    }
+    // Every other entry flattens to its basename — the legacy behavior that
+    // also neutralizes `../../x` and `C:\x` tricks into a harmless leaf.
+    let file_name = raw.rsplit(['/', '\\']).next()?.trim();
+    clean_part(file_name)
 }
 
 /// Unpacks an uncompressed (`STORE`, method 0) ZIP archive into memory entries.
@@ -226,7 +250,9 @@ pub fn unpack_uncompressed_zip(archive: &[u8]) -> Result<Vec<CdeArchiveEntry>, S
 
 /// Writes a `.cde` theme archive containing `config.json`, the modder
 /// sidecars (`sidecars` — `Widget_config.json`, `Live_Effects_config.json`),
-/// optional `theme.json`, optional `background.<ext>`, and `preview.jpg`.
+/// optional `theme.json`, optional `background.<ext>`, `preview.jpg`, and
+/// `style_entries` — `styles/<category>/<file>` payloads bundling custom
+/// user-layer styles and their referenced assets.
 pub fn write_cde_file(
     path: &Path,
     config_json: &str,
@@ -234,8 +260,9 @@ pub fn write_cde_file(
     meta_json: Option<&str>,
     background: Option<(&str, &[u8])>,
     preview_jpg: &[u8],
+    style_entries: &[(String, Vec<u8>)],
 ) -> io::Result<()> {
-    let mut entries: Vec<(&str, &[u8])> = Vec::with_capacity(6);
+    let mut entries: Vec<(&str, &[u8])> = Vec::with_capacity(6 + style_entries.len());
     entries.push(("config.json", config_json.as_bytes()));
     for (name, text) in sidecars {
         entries.push((*name, text.as_bytes()));
@@ -247,6 +274,9 @@ pub fn write_cde_file(
         entries.push((bg_name, bg_bytes));
     }
     entries.push(("preview.jpg", preview_jpg));
+    for (name, bytes) in style_entries {
+        entries.push((name.as_str(), bytes.as_slice()));
+    }
     let zip_bytes = pack_uncompressed_zip(&entries);
     fs::write(path, zip_bytes)
 }
@@ -288,6 +318,11 @@ pub fn background_entry(cfg: &mut Config, src: &Path) -> Option<(String, Vec<u8>
 
 fn is_background_media_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
+    // Only a top-level entry can be the wallpaper — bundled style assets
+    // (`styles/<category>/<file>.jpg`) share the same extensions.
+    if lower.contains('/') || lower.contains('\\') {
+        return false;
+    }
     if lower == "config.json" || lower == "preview.jpg" || lower == "preview.jpeg" {
         return false;
     }
@@ -404,12 +439,32 @@ pub fn extract_cde_to_temp(cde_path: &Path) -> Result<ExtractedCdeTheme, String>
     let mut background_path = None;
     let mut preview_path = None;
     let mut meta = None;
+    let mut style_files = Vec::new();
 
     for entry in entries {
         let lower = entry.name.to_ascii_lowercase();
         // theme.json is parsed from memory — nothing on disk needs it.
         if lower == "theme.json" {
             meta = serde_json::from_slice(&entry.data).ok();
+            continue;
+        }
+        // Bundled style payloads land nested under `styles/`: write them
+        // only when every path component is a plain name (no `..`, no
+        // separators) so a crafted archive can't escape the temp dir.
+        if lower.starts_with("styles/") {
+            let rel = Path::new(&entry.name);
+            let safe = rel
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)));
+            if safe {
+                let dest = temp_dir.join(rel);
+                if let Some(parent) = dest.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                if fs::write(&dest, &entry.data).is_ok() {
+                    style_files.push((entry.name.clone(), dest));
+                }
+            }
             continue;
         }
         let dest = temp_dir.join(&entry.name);
@@ -434,6 +489,7 @@ pub fn extract_cde_to_temp(cde_path: &Path) -> Result<ExtractedCdeTheme, String>
         background_path,
         preview_path,
         meta,
+        style_files,
     })
 }
 
@@ -599,6 +655,51 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn style_entries_extract_nested_and_never_count_as_background() {
+        let cfg_json = r#"{"schemaVersion":1}"#;
+        let jpg = b"\xFF\xD8\xFF\xE0art\xFF\xD9";
+        let dir = std::env::temp_dir().join(format!("cde-styles-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let cde = dir.join("theme.cde");
+        write_cde_file(
+            &cde,
+            cfg_json,
+            &[],
+            None,
+            None,
+            b"\xFF\xD8\xFF\xE0preview",
+            &[
+                (
+                    "styles/Taskbar style/Mod.json".to_string(),
+                    br#"{"id":"Mod"}"#.to_vec(),
+                ),
+                ("styles/Taskbar style/bg.jpg".to_string(), jpg.to_vec()),
+                // A traversal name must be rejected on extract.
+                ("styles/../escape.json".to_string(), b"bad".to_vec()),
+            ],
+        )
+        .unwrap();
+        let ex = extract_cde_to_temp(&cde).expect("extract");
+        // The nested image is a style asset, not the desktop background.
+        assert!(ex.background_path.is_none());
+        assert_eq!(ex.style_files.len(), 2);
+        assert!(
+            ex.style_files
+                .iter()
+                .any(|(n, _)| n == "styles/Taskbar style/Mod.json")
+        );
+        let bg_entry = ex
+            .style_files
+            .iter()
+            .find(|(n, _)| n == "styles/Taskbar style/bg.jpg")
+            .map(|(_, p)| p)
+            .expect("bundled asset extracted");
+        assert_eq!(fs::read(bg_entry).unwrap(), jpg);
+        let _ = fs::remove_dir_all(&ex.temp_dir);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// Adaptive metadata: `theme.json` survives write → extract, and archives without it
     /// (everything written before the engine existed) read `meta == None` — the apply path
     /// then falls back to remapped geometry.
@@ -637,6 +738,7 @@ mod tests {
             Some(&meta_json),
             None,
             b"\xFF\xD8\xFF\xE0p",
+            &[],
         )
         .unwrap();
         let ex = extract_cde_to_temp(&with_meta).unwrap();
@@ -647,7 +749,16 @@ mod tests {
         let _ = fs::remove_dir_all(&ex.temp_dir);
 
         let legacy = dir.join("legacy.cde");
-        write_cde_file(&legacy, cfg_json, &[], None, None, b"\xFF\xD8\xFF\xE0p").unwrap();
+        write_cde_file(
+            &legacy,
+            cfg_json,
+            &[],
+            None,
+            None,
+            b"\xFF\xD8\xFF\xE0p",
+            &[],
+        )
+        .unwrap();
         let ex = extract_cde_to_temp(&legacy).unwrap();
         assert!(ex.meta.is_none());
         let _ = fs::remove_dir_all(&ex.temp_dir);
@@ -691,6 +802,7 @@ mod tests {
             None,
             None,
             b"\xFF\xD8\xFF\xE0p",
+            &[],
         )
         .unwrap();
         let ex = extract_cde_to_temp(&cde).unwrap();
@@ -732,7 +844,7 @@ mod tests {
         );
         // The FULL document — what old builds packed before the split existed.
         let mono = crate::ConfigStore::to_json(&legacy_cfg).unwrap();
-        write_cde_file(&legacy, &mono, &[], None, None, b"\xFF\xD8\xFF\xE0p").unwrap();
+        write_cde_file(&legacy, &mono, &[], None, None, b"\xFF\xD8\xFF\xE0p", &[]).unwrap();
         let ex2 = extract_cde_to_temp(&legacy).unwrap();
         let imported2 = store.import_file(&ex2.config_path).unwrap();
         assert_eq!(imported2.settings.desktop_effect, "sakura");

@@ -197,7 +197,11 @@ Failure behavior
 -----------
 A .cde theme stores only ids — never file contents. A theme referencing
 \"Neon Rain\" needs \"Neon Rain.json\" present on the target machine, or
-that slot silently falls back to the default.
+that slot silently falls back to the default. One exception: custom
+files in THIS folder (and the relative image assets they reference)
+are bundled inside the archive on export and unpacked back into this
+folder when the theme is applied — factory styles are not bundled
+since every install already ships them.
 ";
 
 /// Scaffolds the user layer so the folder explains itself the moment a
@@ -421,6 +425,108 @@ fn file_uri(dir: &Path, name: &str) -> String {
 /// shipped file.
 fn resolve_path(factory: &Path, user: Option<&Path>, category: &str, id: &str) -> Option<PathBuf> {
     resolve_path_ext(factory, user, category, id, "json")
+}
+
+/// The resolved `.json` path for `id` in `category` across both layers —
+/// the export side needs the file itself, not just its parsed payload.
+pub fn resolve_file(category: &str, id: &str) -> Option<PathBuf> {
+    resolve_path(
+        &factory_styles_root(),
+        user_styles_root().as_deref(),
+        category,
+        id,
+    )
+}
+
+/// Same for `.html` widget documents.
+pub fn resolve_widget_file(category: &str, id: &str) -> Option<PathBuf> {
+    resolve_path_ext(
+        &factory_styles_root(),
+        user_styles_root().as_deref(),
+        category,
+        id,
+        "html",
+    )
+}
+
+/// Whether `path` lives under the registered user styles root — the split
+/// that decides whether a `.cde` export must bundle a style file (factory
+/// files already ship with the app on every machine).
+pub fn is_user_layer_path(path: &Path) -> bool {
+    user_styles_root().is_some_and(|root| path.starts_with(&root))
+}
+
+/// Files a style document references through relative `ImageSource=` /
+/// `Source=` attributes, resolved to real files beside it — the assets a
+/// `.cde` archive must carry so the style travels intact.
+pub fn referenced_assets(style_path: &Path) -> Vec<PathBuf> {
+    let Some(text) = read_text(style_path) else {
+        return Vec::new();
+    };
+    let Some(dir) = style_path.parent() else {
+        return Vec::new();
+    };
+    // Attributes live inside JSON string values — parse first so `\"` escapes
+    // arrive as real quotes (matching `resolve_relative_uris`), then fall
+    // back to scanning raw text for non-JSON mod files.
+    let uris = match serde_json::from_str::<Value>(&text) {
+        Ok(doc) => {
+            let mut uris = Vec::new();
+            collect_relative_uris_in_value(&doc, &mut uris);
+            uris
+        }
+        Err(_) => collect_relative_attr_uris(&text),
+    };
+    let mut out = Vec::new();
+    for value in uris {
+        let path = dir.join(&value);
+        if path.is_file() && !out.contains(&path) {
+            out.push(path);
+        }
+    }
+    out
+}
+
+/// `collect_relative_attr_uris` over every string in a parsed document.
+fn collect_relative_uris_in_value(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::String(s) => out.extend(collect_relative_attr_uris(s)),
+        Value::Array(arr) => arr
+            .iter()
+            .for_each(|v| collect_relative_uris_in_value(v, out)),
+        Value::Object(map) => map
+            .values()
+            .for_each(|v| collect_relative_uris_in_value(v, out)),
+        _ => {}
+    }
+}
+
+/// Every scheme-less `ImageSource="x"`/`Source="x"` attribute value in
+/// `text` — the inverse of [`rewrite_relative_uris_in_text`], collecting
+/// rather than rewriting.
+fn collect_relative_attr_uris(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some(eq) = rest.find("=\"") {
+        let name_start = rest[..eq]
+            .rfind(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+            .map(|p| p + 1)
+            .unwrap_or(0);
+        let name = &rest[name_start..eq];
+        let val_start = eq + 2;
+        let Some(close) = rest[val_start..].find('"') else {
+            break;
+        };
+        let value = &rest[val_start..val_start + close];
+        if matches!(name, "ImageSource" | "Source")
+            && is_relative_uri(value)
+            && !out.iter().any(|v| v == value)
+        {
+            out.push(value.to_string());
+        }
+        rest = &rest[val_start + close + 1..];
+    }
+    out
 }
 
 /// [`resolve_path`] parameterized by file extension — `.json` style files
@@ -720,6 +826,34 @@ mod tests {
         assert!(txt.contains(&format!("file:///{dir}/icon.png")), "{txt}");
         assert!(txt.contains("file:///D:/abs.png"), "{txt}");
         assert!(txt.contains("data:image/png;base64,AAAA"), "{txt}");
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn referenced_assets_collects_only_existing_relative_files() {
+        let base = std::env::temp_dir().join(format!("stylesfs-refs-{}", std::process::id()));
+        let dir = base.join(TASKBAR_DIR);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("bg.jpg"), b"jpeg-bytes").unwrap();
+        fs::write(dir.join("icon.png"), b"png").unwrap();
+        let style = dir.join("Mod.json");
+        fs::write(
+            &style,
+            r#"{"styleConstants":[
+                "W=<ImageBrush ImageSource=\"bg.jpg\"/>",
+                "I=<ImageBrush ImageSource=\"icon.png\"/>",
+                "M=<ImageBrush ImageSource=\"missing.png\"/>",
+                "A=<ImageBrush ImageSource=\"data:image/png;base64,AAAA\"/>",
+                "B=<ImageBrush ImageSource=\"file:///D:/abs.png\"/>"
+            ]}"#,
+        )
+        .unwrap();
+        let mut names: Vec<_> = referenced_assets(&style)
+            .iter()
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect();
+        names.sort();
+        assert_eq!(names, ["bg.jpg", "icon.png"]);
         let _ = fs::remove_dir_all(&base);
     }
 
