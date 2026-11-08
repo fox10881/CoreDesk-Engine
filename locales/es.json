@@ -745,5 +745,6 @@
   "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Trae solo las vallas y las reglas de un tema o instantánea guardados; la apariencia, los estilos y el fondo siguen siendo los del tema actual",
   "复制布局与规则的来源": "Origen de la copia de diseño y reglas",
   "复制到当前": "Copiar a la actual",
-  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Diseño de vallas y reglas de ordenación copiados ({0} vallas)"
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Diseño de vallas y reglas de ordenación copiados ({0} vallas)",
+  "检测到资源管理器连续崩溃，已自动停用外壳样式以保护桌面": "Se detectaron bloqueos repetidos del Explorador: los estilos del shell se desactivaron automáticamente para proteger el escritorio"
 }

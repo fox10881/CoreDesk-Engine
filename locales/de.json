@@ -745,5 +745,6 @@
   "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Nur Zäune und Regeln aus gespeichertem Theme oder Snapshot übernehmen; Optik, Stile und Hintergrund bleiben unverändert",
   "复制布局与规则的来源": "Quelle für Layout- und Regelkopie",
   "复制到当前": "Auf aktuelle übertragen",
-  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Zaunlayout & Sortierregeln kopiert ({0} Zäune)"
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Zaunlayout & Sortierregeln kopiert ({0} Zäune)",
+  "检测到资源管理器连续崩溃，已自动停用外壳样式以保护桌面": "Wiederholte Explorer-Abstürze erkannt – Shell-Stile wurden automatisch deaktiviert, um den Desktop zu schützen"
 }

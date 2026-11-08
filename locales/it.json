@@ -745,5 +745,6 @@
   "从已保存的主题或快照只搬回栅栏和规则；外观、样式与壁纸保持当前主题不变": "Ripristina solo recinti e regole da un tema o snapshot salvato; aspetto, stili e sfondo restano quelli del tema corrente",
   "复制布局与规则的来源": "Sorgente per copiare layout e regole",
   "复制到当前": "Copia nell'attuale",
-  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Layout recinti e regole di ordinamento copiati ({0} recinti)"
+  "已复制栅栏布局与排序规则（{0} 个栅栏）": "Layout recinti e regole di ordinamento copiati ({0} recinti)",
+  "检测到资源管理器连续崩溃，已自动停用外壳样式以保护桌面": "Rilevati arresti ripetuti di Explorer: gli stili della shell sono stati disattivati automaticamente per proteggere il desktop"
 }

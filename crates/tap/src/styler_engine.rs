@@ -91,6 +91,12 @@ enum WireKind {
 struct State {
     /// Selected theme pending UI-thread apply.
     pending: Option<(WireKind, WireTheme)>,
+    /// Whether a `dispatch_apply` closure is already in flight on the UI queue
+    /// — coalesces the initial `AdviseVisualTreeChange` burst into one sweep.
+    apply_queued: bool,
+    /// Raw wire text of the currently applied/pending theme — idempotent
+    /// re-deliveries of the identical wire skip `restore_all` + `re-advise`.
+    applied_wire: String,
     /// Whether `pending` picks the classic-variant rules.
     pending_classic: bool,
     /// The applied theme kind (kept for arm/disarm checks).
@@ -137,6 +143,8 @@ unsafe impl Send for State {}
 fn state() -> std::sync::MutexGuard<'static, State> {
     static STATE: Mutex<State> = Mutex::new(State {
         pending: None,
+        apply_queued: false,
+        applied_wire: String::new(),
         pending_classic: false,
         applied: None,
         theme_dict: None,
@@ -1237,7 +1245,8 @@ fn node_for(dobj: &DependencyObject) -> Option<Rc<TreeNode>> {
 /// `EnsureElementTreeNode`.
 fn ensure_node(es: &mut ElemState) -> Option<Rc<TreeNode>> {
     if es.tree_node.as_ref().is_none_or(|n| is_stale_spine(n)) {
-        let dobj: DependencyObject = Interface::cast(&es.el).ok()?;
+        let el = es.upgrade_el()?;
+        let dobj: DependencyObject = Interface::cast(&el).ok()?;
         es.tree_node = node_for(&dobj);
     }
     es.tree_node.clone()
@@ -2313,16 +2322,19 @@ fn set_or_clear(
                 .map(|n| n.to_string_lossy() == "AllAppsRoot")
                 .unwrap_or(false)
             && let Some(disp) = elem_dispatcher(&fe)
+            && let Ok(el_weak) = el.downgrade()
         {
-            let payload = UiBound((el.clone(), dp.clone(), value.clone()));
+            let payload = UiBound((el_weak, dp.clone(), value.clone()));
             post_ui(&disp, Prio::High, move || {
                 // Move `payload` wholesale — field paths would capture the
                 // tuple's !Send COM objects instead of the `Send` wrapper.
                 let p = &payload;
-                let (el_c, dp_c, v_c) = &p.0;
-                MODIFYING.store(true, Ordering::Relaxed);
-                let _ = el_c.SetValue(dp_c, v_c);
-                MODIFYING.store(false, Ordering::Relaxed);
+                let (el_w, dp_c, v_c) = &p.0;
+                if let Some(el_c) = el_w.upgrade() {
+                    MODIFYING.store(true, Ordering::Relaxed);
+                    let _ = el_c.SetValue(dp_c, v_c);
+                    MODIFYING.store(false, Ordering::Relaxed);
+                }
                 Ok(())
             });
             return None;
@@ -2422,13 +2434,16 @@ struct CaptureSlot {
 }
 
 struct VsgSub {
-    vsg: xb::VisualStateGroup,
     #[allow(dead_code)]
     revoker: Option<windows_core::EventRevoker>,
 }
 
 struct ElemState {
-    el: FrameworkElement,
+    /// Weak reference (`winrt::weak_ref<FrameworkElement>` in the Windhawk
+    /// mod) — holding a strong `FrameworkElement` across layout/flyout
+    /// teardown keeps detached XAML subtrees alive in a zombie state and
+    /// triggers fatal stowed exceptions (`0xc000027b`) in `Windows.UI.Xaml`.
+    el: windows_core::Weak<FrameworkElement>,
     /// The reported `element.Type` — `fallbackClassName` for re-resolves.
     fallback: String,
     /// `(vsg_name, dp_raw) -> slot`.
@@ -2440,6 +2455,12 @@ struct ElemState {
     size_revoker: Option<windows_core::EventRevoker>,
     /// The element's spine node — built lazily on first use.
     tree_node: Option<Rc<TreeNode>>,
+}
+
+impl ElemState {
+    fn upgrade_el(&self) -> Option<FrameworkElement> {
+        self.el.upgrade()
+    }
 }
 
 fn get_vsg(el: &FrameworkElement, name: &str) -> Option<xb::VisualStateGroup> {
@@ -2591,7 +2612,10 @@ fn adopt_external(handle: u64, vsg: &str, dp_raw: usize) {
         let Some((dp, name)) = es.dp_meta.get(&dp_raw) else {
             return;
         };
-        (es.el.clone(), dp.clone(), name.clone())
+        let Some(el) = es.upgrade_el() else {
+            return;
+        };
+        (el, dp.clone(), name.clone())
     };
     let dobj: DependencyObject = match Interface::cast(&el) {
         Ok(d) => d,
@@ -2640,7 +2664,10 @@ fn unapply_slot(handle: u64, vsg: &str, dp_raw: usize) {
         let Some((dp, name)) = es.dp_meta.get(&dp_raw) else {
             return;
         };
-        (es.el.clone(), dp.clone(), name.clone())
+        let Some(el) = es.upgrade_el() else {
+            return;
+        };
+        (el, dp.clone(), name.clone())
     };
     let dobj: DependencyObject = match Interface::cast(&el) {
         Ok(d) => d,
@@ -2715,6 +2742,7 @@ fn resolve_dyn(handle: u64, vsg: &str, dp_raw: usize) -> Option<StyleVal> {
             return None;
         };
         let node = ensure_node(es);
+        let el = es.upgrade_el()?;
         let Some((dp, name)) = es.dp_meta.get(&dp_raw).cloned() else {
             return None;
         };
@@ -2726,7 +2754,7 @@ fn resolve_dyn(handle: u64, vsg: &str, dp_raw: usize) -> Option<StyleVal> {
         };
         let fallback = es.fallback.clone();
         (
-            es.el.clone(),
+            el,
             dp,
             name,
             fallback,
@@ -2792,7 +2820,10 @@ fn commit_resolved(handle: u64, vsg: &str, dp_raw: usize, val: StyleVal) {
         let Some((dp, name)) = es.dp_meta.get(&dp_raw).cloned() else {
             return;
         };
-        (es.el.clone(), dp, name)
+        let Some(el) = es.upgrade_el() else {
+            return;
+        };
+        (el, dp, name)
     };
     let dobj: DependencyObject = match Interface::cast(&el) {
         Ok(d) => d,
@@ -2863,7 +2894,10 @@ fn reapply_dp(handle: u64, dp: &DependencyProperty) {
         let Some((dp, name)) = es.dp_meta.get(&dp_raw) else {
             return;
         };
-        (es.el.clone(), vn.clone(), dp.clone(), name.clone(), custom)
+        let Some(el) = es.upgrade_el() else {
+            return;
+        };
+        (el, vn.clone(), dp.clone(), name.clone(), custom)
     };
     let dobj: DependencyObject = match Interface::cast(&el) {
         Ok(d) => d,
@@ -2889,8 +2923,11 @@ fn capture_changed(handle: u64, var: &str, dp: &DependencyProperty) {
         let Some(es) = eng.elements.get_mut(&handle) else {
             return;
         };
+        let Some(el) = es.upgrade_el() else {
+            return;
+        };
         let node = ensure_node(es);
-        (es.el.clone(), scope_of(node.as_ref()))
+        (el, scope_of(node.as_ref()))
     };
     let val = read_captured(&el, dp);
     {
@@ -2966,8 +3003,11 @@ fn propagate_core(var: &str, changed_owner: Option<u64>, scope: usize) {
             let Some(es) = eng.elements.get_mut(&consumer.handle) else {
                 continue;
             };
+            let Some(el) = es.upgrade_el() else {
+                continue;
+            };
             let node = ensure_node(es);
-            (es.el.clone(), node)
+            (el, node)
         };
         let winning_owner = match changed_owner {
             Some(_) => 0,
@@ -3263,8 +3303,11 @@ fn apply_element(
         Ok(d) => d,
         Err(_) => return,
     };
+    let Ok(el_weak) = el.downgrade() else {
+        return;
+    };
     let mut es = ElemState {
-        el: el.clone(),
+        el: el_weak,
         fallback: fallback_type.to_string(),
         props: BTreeMap::new(),
         dp_meta: BTreeMap::new(),
@@ -3386,7 +3429,7 @@ fn apply_element(
                     on_vsg_state_changed(handle, vn.clone(), old, new);
                 })
                 .ok();
-            es.vsg_subs.push(VsgSub { vsg, revoker });
+            es.vsg_subs.push(VsgSub { revoker });
         }
     }
     // `SetUpCapturesForElement` — seed all captures in one batch, then
@@ -3829,7 +3872,12 @@ fn drain_releases() {
 /// captures (propagating each removal), unregister reapply callbacks + drop
 /// consumer entries, restore originals, drop the element state.
 fn cleanup_element(handle: u64, es: &ElemState) {
-    let dobj = Interface::cast::<DependencyObject>(&es.el).ok();
+    let dobj = es
+        .upgrade_el()
+        .and_then(|el| Interface::cast::<DependencyObject>(&el).ok());
+    let live_in_tree = dobj
+        .as_ref()
+        .is_some_and(|d| VisualTreeHelper::GetParent(d).is_ok());
     // 1. RestoreCapturesForElement — unregister per-DP capture callbacks.
     if let Some(d) = &dobj {
         for cap in &es.captures {
@@ -3867,7 +3915,9 @@ fn cleanup_element(handle: u64, es: &ElemState) {
         }
     }
     // 3. RestoreCustomizationsForVisualStateGroup — unregister reapply
-    // callbacks, drop consumer registrations, restore originals.
+    // callbacks, drop consumer registrations, restore originals (only when
+    // the element is still attached to a live visual tree; writing to a
+    // detached/dying subtree during Remove triggers stowed XAML faults).
     {
         let mut eng = state();
         for ((_vn, dp_raw), slot) in &es.props {
@@ -3884,7 +3934,9 @@ fn cleanup_element(handle: u64, es: &ElemState) {
             if slot.token != 0 {
                 let _ = d.UnregisterPropertyChangedCallback(dp, slot.token);
             }
-            if let Some(orig) = &slot.original {
+            if live_in_tree
+                && let Some(orig) = &slot.original
+            {
                 MODIFYING.store(true, Ordering::Relaxed);
                 let _ = set_or_clear(d, dp, name, &StyleVal::Ready(Some(orig.clone())), false);
                 MODIFYING.store(false, Ordering::Relaxed);
@@ -3900,7 +3952,10 @@ fn cleanup_element(handle: u64, es: &ElemState) {
 
 /// One element's undo pass — unregister callbacks + restore originals.
 fn restore_element(es: &ElemState) {
-    let dobj: DependencyObject = match Interface::cast(&es.el) {
+    let Some(el) = es.upgrade_el() else {
+        return;
+    };
+    let dobj: DependencyObject = match Interface::cast(&el) {
         Ok(d) => d,
         Err(_) => return,
     };
@@ -3945,7 +4000,12 @@ fn restore_all() {
         if MARSHAL_ON_ELEMENT {
             // Elements may live on different island dispatchers — restore
             // each on its own UI thread.
-            if let Some(d) = elem_dispatcher(&es.el).or_else(|| state().dispatcher.clone()) {
+            if let Some(d) = es
+                .upgrade_el()
+                .as_ref()
+                .and_then(elem_dispatcher)
+                .or_else(|| state().dispatcher.clone())
+            {
                 let payload = UiBound(es);
                 post_ui(&d, Prio::Normal, move || {
                     // Borrow `payload` first — `payload.0` alone would be a
@@ -4160,6 +4220,13 @@ fn webview_resync() {
 /// Command-thread entry: parse the wire, handle the layout override
 /// (StartMenu only), dispatch the apply sweep to the XAML UI thread.
 pub fn apply_wire(text: &str) {
+    {
+        let eng = state();
+        if eng.applied.is_some() && eng.pending.is_none() && eng.applied_wire == text {
+            crate::tap_log!("styler: identical wire already applied — skipping");
+            return;
+        }
+    }
     let (kind, theme) = match parse_wire(text) {
         Ok(t) => t,
         Err(e) => {
@@ -4194,11 +4261,13 @@ pub fn apply_wire(text: &str) {
         let is_redesigned = forced || win_default_new;
         eng.pending_classic = !is_redesigned && !theme.classic.is_empty();
         eng.web_css = (!theme.web_css.is_empty()).then(|| theme.web_css.clone());
+        eng.applied_wire = text.to_string();
         eng.pending = Some((kind, theme));
     } else {
         let mut eng = state();
         eng.pending_classic = false;
         eng.web_css = (!theme.web_css.is_empty()).then(|| theme.web_css.clone());
+        eng.applied_wire = text.to_string();
         eng.pending = Some((kind, theme));
     }
     dispatch_apply();
@@ -4216,6 +4285,8 @@ pub fn reset() {
     {
         let mut eng = state();
         eng.pending = None;
+        eng.apply_queued = false;
+        eng.applied_wire.clear();
         eng.applied = None;
         eng.wire_rules = None;
         eng.rules_gen += 1;
@@ -4243,9 +4314,10 @@ pub fn reset() {
 /// fresh `AdviseVisualTreeChange` replay re-reports the new tree and
 /// `on_element` restyles each element against the live rules.
 pub fn session_reset() {
-    {
+    let old_elements = {
         let mut eng = state();
-        eng.elements.clear();
+        let old = core::mem::take(&mut eng.elements);
+        eng.apply_queued = false;
         eng.to_release.clear();
         eng.variables.clear();
         eng.consumers.clear();
@@ -4257,15 +4329,25 @@ pub fn session_reset() {
         eng.web_injected.clear();
         eng.web_pending.clear();
         eng.web_inflight.clear();
-    }
+        old
+    };
+    drop(old_elements);
     known().clear();
 }
 
 /// dispatcher; without one the pending theme sits until the first element.
 pub(crate) fn dispatch_apply() {
-    let Some(dispatcher) = state().dispatcher.clone() else {
-        crate::tap_log!("styler: no dispatcher yet — apply deferred");
-        return;
+    let dispatcher = {
+        let mut eng = state();
+        if eng.pending.is_none() || eng.apply_queued {
+            return;
+        }
+        let Some(d) = eng.dispatcher.clone() else {
+            crate::tap_log!("styler: no dispatcher yet — apply deferred");
+            return;
+        };
+        eng.apply_queued = true;
+        d
     };
     // Low priority: the sweep is one long dispatcher item (restore_all +
     // restyle); during back-to-back theme applies queued input must get
@@ -4279,15 +4361,16 @@ pub(crate) fn dispatch_apply() {
 
 /// The apply sweep — UI thread.
 fn apply_theme_ui() {
-    restore_all();
     let (kind, theme, use_classic) = {
         let mut eng = state();
+        eng.apply_queued = false;
         let Some((kind, theme)) = eng.pending.take() else {
             return;
         };
         eng.applied = Some(kind);
         (kind, theme, eng.pending_classic)
     };
+    restore_all();
     let wire_rules = if use_classic && !theme.classic.is_empty() {
         &theme.classic
     } else {
@@ -4355,6 +4438,10 @@ fn apply_theme_ui() {
 /// Tests an element against every ruleset (reverse file order → later rules
 /// win); applies on match. `fallback_type` = the reported `element.Type`.
 fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _parent: u64) -> bool {
+    let prev = state().elements.remove(&handle);
+    if let Some(old) = prev {
+        cleanup_element(handle, &old);
+    }
     let eng_rules = rules_for_thread();
     let matched: Vec<(usize, Vec<Option<FrameworkElement>>)> = {
         (0..eng_rules.len())
@@ -4475,21 +4562,40 @@ pub fn on_element(
             return;
         }
     }
-    if MARSHAL_ON_ELEMENT {
-        // `SetValue` on the diagnostics callback thread throws
-        // RPC_E_WRONG_THREAD — marshal the whole match+apply to the
-        // element's own dispatcher.
+    // Never write inside `OnVisualTreeChange` itself: the service reports
+    // elements while their subtree is still mid-construction (a flyout
+    // arriving floods the callback with its parts), and `SetValue` calls
+    // that land during the build leave XAML's later layout pass walking a
+    // half-initialized surface. Capture only a WEAK `FrameworkElement`
+    // reference across the deferral — holding a strong UI reference while
+    // XAML tears down or recycles the subtree causes fatal Explorer crashes.
+    let d = if MARSHAL_ON_ELEMENT {
+        el_disp.or_else(|| state().dispatcher.clone())
+    } else {
+        state().dispatcher.clone()
+    };
+    if let Some(d) = d {
+        let Ok(el_weak) = el.downgrade() else {
+            drop(el);
+            drop(obj);
+            return;
+        };
+        drop(el);
+        drop(obj);
         let handle = element.Handle.0;
         let ty = reported_type.to_string();
-        if let Some(d) = el_disp.or_else(|| state().dispatcher.clone()) {
-            let payload = UiBound(el);
-            post_ui(&d, Prio::Normal, move || {
-                let p = &payload;
-                let _ = style_element(handle, &p.0, &ty, parent);
-                Ok(())
-            });
-            return;
-        }
+        let payload = UiBound(el_weak);
+        post_ui(&d, Prio::Normal, move || {
+            if !known().contains_key(&handle) || state().applied.is_none() {
+                return Ok(());
+            }
+            let p = &payload;
+            if let Some(el) = p.0.upgrade() {
+                let _ = style_element(handle, &el, &ty, parent);
+            }
+            Ok(())
+        });
+        return;
     }
     let _ = style_element(element.Handle.0, &el, reported_type, parent);
 }
@@ -4516,9 +4622,15 @@ pub fn on_element_removed(handle: u64) {
         eng.elements.remove(&handle)
     };
     if let Some(es) = es {
-        if MARSHAL_ON_ELEMENT
-            && let Some(d) = elem_dispatcher(&es.el).or_else(|| state().dispatcher.clone())
-        {
+        let d = if MARSHAL_ON_ELEMENT {
+            es.upgrade_el()
+                .as_ref()
+                .and_then(elem_dispatcher)
+                .or_else(|| state().dispatcher.clone())
+        } else {
+            state().dispatcher.clone()
+        };
+        if let Some(d) = d {
             let payload = UiBound(es);
             post_ui(&d, Prio::Normal, move || {
                 let p = &payload;
@@ -4576,15 +4688,19 @@ pub fn shutdown() {
             let _ = win32::CloseHandle(done);
         }
     }
-    {
+    let old_elements = {
         let mut eng = state();
         eng.pending = None;
+        eng.apply_queued = false;
+        eng.applied_wire.clear();
         eng.applied = None;
         eng.dispatcher = None;
         eng.wire_rules = None;
         eng.rules_gen += 1;
         eng.to_release.clear();
-    }
+        core::mem::take(&mut eng.elements)
+    };
+    drop(old_elements);
     known().clear();
     immersive().clear();
     TL_RULES.with(|t| *t.borrow_mut() = (0, Rc::new(Vec::new())));

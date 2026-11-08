@@ -437,6 +437,11 @@ pub struct App {
     /// still coming back would leave a half-dead shell, so callers coalesce
     /// through `request_shell_restart`.
     shell_restart_at: Option<std::time::Instant>,
+    /// Rolling window of `TaskbarCreated` respawns. An injected styler that
+    /// keeps crashing Explorer produces one every ~30 s — each death blacks
+    /// the desktop out and reloads it. Past the trip count the breaker drops
+    /// the armed XAML/FE styles to stock so the loop cannot sustain itself.
+    shell_respawns: VecDeque<std::time::Instant>,
 }
 
 pub type AppCell = Rc<RefCell<Option<App>>>;
@@ -1075,6 +1080,7 @@ impl App {
                                 // Wallpaper-signal suppression window starts at the
                                 // respawn, not the deferred poke.
                                 app.shell_respawn_wall = Some(std::time::SystemTime::now());
+                                app.note_shell_respawn();
                             } else {
                                 window::set_timer(hwnd, TIMER_SHELL_WATCH_RETRY, 250);
                             }
@@ -1434,6 +1440,7 @@ impl App {
             cut_paste: None,
             restart_shell_on_exit: false,
             shell_restart_at: None,
+            shell_respawns: VecDeque::new(),
             wallpaper_sig: None,
             wallpaper_cache: BackdropCache::default(),
             live_wallpaper: live_wallpaper::LiveBackdrop::default(),
@@ -2381,6 +2388,55 @@ impl App {
             a.reanchor("shell respawn");
         }
         tracing::info!("shell recovery poke: stylers + desktop layer re-ensured");
+    }
+
+    /// A `TaskbarCreated` just arrived — count it in the respawn window.
+    /// `TRIP` respawns inside `WINDOW` while a XAML/FE style is armed means
+    /// an injected styler is crash-looping the shell: disarm every armed
+    /// styler to Windows Default so the loop cannot sustain itself, persist
+    /// the disarm, and let normal recovery proceed on a stock shell.
+    /// (`request_shell_restart` self-limits to one kill per 90 s, so our own
+    /// restarts can never reach the trip count alone.)
+    fn note_shell_respawn(&mut self) {
+        const WINDOW: std::time::Duration = std::time::Duration::from_secs(180);
+        const TRIP: usize = 4;
+        let now = std::time::Instant::now();
+        self.shell_respawns.push_back(now);
+        while self
+            .shell_respawns
+            .front()
+            .is_some_and(|t| now.duration_since(*t) > WINDOW)
+        {
+            self.shell_respawns.pop_front();
+        }
+        if self.shell_respawns.len() < TRIP {
+            return;
+        }
+        let s = &mut self.state.config.settings;
+        if s.taskbar_style.is_empty()
+            && s.start_menu_style.is_empty()
+            && s.notification_center_style.is_empty()
+            && s.fe_effect.is_empty()
+        {
+            return; // stylers already stock — this churn is not ours to fix
+        }
+        tracing::error!(
+            count = self.shell_respawns.len(),
+            "shell crash loop detected — disarming XAML/File-Explorer styles"
+        );
+        s.taskbar_style.clear();
+        s.start_menu_style.clear();
+        s.notification_center_style.clear();
+        s.fe_effect.clear();
+        coredesk_platform::taskbar_styler::reset();
+        coredesk_platform::start_menu::apply_start_menu_theme("");
+        coredesk_platform::notification_center::apply("");
+        coredesk_platform::file_explorer_styler::reset();
+        self.shell_respawns.clear();
+        self.settings_mutated();
+        self.settings_toast(coredesk_core::i18n::text(
+            "检测到资源管理器连续崩溃，已自动停用外壳样式以保护桌面",
+        ));
     }
 
     /// One shell restart at a time (~90 s covers kill + respawn + the recovery
