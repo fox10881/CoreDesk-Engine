@@ -667,6 +667,28 @@ impl App {
         }
     }
 
+    /// Clock/visualizer hosts join the anchored desktop band as widget
+    /// surfaces: pinned just above the icon host like a fence, so the
+    /// `KeepVisible` show-desktop path floats them over the raised desktop
+    /// on Win+D instead of leaving them covered. The reanchor seats the
+    /// fresh HWND immediately rather than waiting for the next poll.
+    fn register_widget(&self, hwnd: HWND, reason: &'static str) {
+        if let Some(a) = self.anchor.borrow_mut().as_mut() {
+            a.register_desktop_widget(hwnd);
+            a.reanchor(reason);
+        }
+    }
+
+    /// `unregister_fence` also drops the surface/quick-hide set entries.
+    /// Called before `close()` — the HWND still identifies the window —
+    /// because the `WindowGone` command arrives after `take()` already
+    /// detached the host.
+    fn unregister_widget(&self, hwnd: HWND) {
+        if let Some(a) = self.anchor.borrow_mut().as_mut() {
+            a.unregister_fence(hwnd);
+        }
+    }
+
     /// Desktop clock widget: `""`/`"none"` closes it; any other design id
     /// swaps the page's design in place on the single widget window — its
     /// position and size are untouched. Called from `apply_settings`' diff
@@ -675,6 +697,7 @@ impl App {
         let s = style.trim();
         if s.is_empty() || s == "none" {
             if let Some(h) = self.clock.take() {
+                self.unregister_widget(h.hwnd());
                 h.close();
             }
             window::kill_timer(self.control.hwnd(), super::TIMER_CLOCK_PROBE);
@@ -708,6 +731,7 @@ impl App {
             s,
         ) {
             Ok(host) => {
+                self.register_widget(host.hwnd(), "clock widget registered");
                 self.clock = Some(host);
                 // Probe cadence lives for as long as the widget does;
                 // `clockReady` fires the first sample once the page listens.
@@ -726,6 +750,7 @@ impl App {
         let s = style.trim();
         if s.is_empty() || s == "none" {
             if let Some(h) = self.visualizer_host.take() {
+                self.unregister_widget(h.hwnd());
                 h.close();
             }
             // A running `le_*` desktop effect still owns the spectrum feed —
@@ -785,6 +810,7 @@ impl App {
             s,
         ) {
             Ok(host) => {
+                self.register_widget(host.hwnd(), "visualizer widget registered");
                 self.visualizer_host = Some(host);
                 if let Some(e) = self.visualizer.as_mut() {
                     e.set_active(true);
@@ -818,6 +844,7 @@ impl App {
         }
         // Right-click refresh is the modder's "pick up my edits" gesture.
         merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
+        self.unregister_widget(h.hwnd());
         h.close();
         let style = self.state.config.settings.visualizer_style.clone();
         self.apply_visualizer_style(&style);
@@ -840,6 +867,7 @@ impl App {
         // Right-click refresh is the modder's "pick up my edits" gesture —
         // pull sidecar deltas authored while the app ran before rebuilding.
         merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
+        self.unregister_widget(h.hwnd());
         h.close();
         let style = self.state.config.settings.clock_style.clone();
         self.apply_clock_style(&style);

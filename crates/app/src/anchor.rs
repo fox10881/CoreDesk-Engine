@@ -372,6 +372,20 @@ impl DesktopAnchor {
         self.set_quick_hide_excluded(hwnd, true);
     }
 
+    /// An interactive desktop widget (clock, visualizer): a band member like
+    /// a fence, but pushed to the band's top slot so it keeps the spawn-on-top
+    /// z-order it had while unanchored (a fence may not cover it), and flagged
+    /// as a desktop surface — quick hide cannot remove it, peek leaves it
+    /// dimmed with the desktop, its own `clockReady`/`vizReady` reveal stays
+    /// authoritative over the unhide recovery, and a `KeepVisible` show
+    /// desktop floats it above the raised desktop exactly like a fence.
+    pub fn register_desktop_widget(&mut self, hwnd: HWND) {
+        self.fences.retain(|(h, _)| *h != hwnd);
+        self.fences.push((hwnd, None));
+        self.desktop_surfaces.insert(hwnd.0 as isize);
+        self.set_quick_hide_excluded(hwnd, true);
+    }
+
     /// Puts `hwnd` above the other fences (clicked / newly created), keeping all of them just
     /// above the icon host.
     pub fn raise_fence(&mut self, hwnd: HWND) {

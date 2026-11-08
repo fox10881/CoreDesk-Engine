@@ -2294,6 +2294,9 @@ impl App {
                 if self.clock.as_ref().is_some_and(|h| h.hwnd() == hwnd) {
                     self.clock = None;
                     window::kill_timer(self.control.hwnd(), TIMER_CLOCK_PROBE);
+                    if let Some(a) = self.anchor.borrow_mut().as_mut() {
+                        a.unregister_fence(hwnd);
+                    }
                 }
                 if self
                     .visualizer_host
@@ -2302,6 +2305,9 @@ impl App {
                 {
                     self.visualizer_host = None;
                     window::kill_timer(self.control.hwnd(), TIMER_VIZ_PROBE);
+                    if let Some(a) = self.anchor.borrow_mut().as_mut() {
+                        a.unregister_fence(hwnd);
+                    }
                 }
                 if self.settings.is_none()
                     && self.fe_glass.is_none()
