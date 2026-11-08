@@ -128,6 +128,49 @@ impl IStandaloneWebView2 {
         }
     }
 
+    /// `ExecuteScriptAsync` that polls the op's `IAsyncInfo::Status` and
+    /// returns the script's JSON result — the only result channel on the
+    /// standalone element (WebMessage is disabled on this control).
+    fn exec_script_result(&self, js: &windows_core::HSTRING, timeout_ms: u32) -> Option<String> {
+        unsafe {
+            let mut op = core::ptr::null_mut();
+            (windows_core::Interface::vtable(self).ExecuteScriptAsync)(
+                windows_core::Interface::as_raw(self),
+                core::mem::transmute_copy(js),
+                &mut op,
+            )
+            .ok()
+            .ok()?;
+            if op.is_null() {
+                return None;
+            }
+            let deadline = std::time::Instant::now()
+                + std::time::Duration::from_millis(timeout_ms as u64);
+            let vt = &**(op as *const *const IAsyncOpVtbl);
+            let mut status = 0i32;
+            while status == 0 && std::time::Instant::now() < deadline {
+                let _ = (vt.status)(op, &mut status);
+                if status == 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                }
+            }
+            let out = if status == 1 {
+                let mut res = core::ptr::null_mut();
+                let _ = (vt.get_results)(op, &mut res);
+                if res.is_null() {
+                    None
+                } else {
+                    let hs: windows_core::HSTRING = core::mem::transmute(res);
+                    Some(hs.to_string_lossy())
+                }
+            } else {
+                None
+            };
+            release_raw(op);
+            out
+        }
+    }
+
     /// `add_NavigationCompleted` → `EventRegistrationToken`.
     fn add_navigation_completed(
         &self,
@@ -152,6 +195,30 @@ impl IStandaloneWebView2 {
             );
         }
     }
+}
+
+/// `IAsyncOperation<HSTRING>` vtable subset — inherited `IAsyncInfo`
+/// members come before the operation's own `put/get_Completed`/`GetResults`.
+#[repr(C)]
+struct IAsyncOpVtbl {
+    _qi: usize,
+    _add: usize,
+    _rel: usize,
+    _i0: usize,
+    _i1: usize,
+    _i2: usize,
+    _id: usize,
+    status:
+        unsafe extern "system" fn(*mut core::ffi::c_void, *mut i32) -> windows_core::HRESULT,
+    _ec: usize,
+    _cancel: usize,
+    _close: usize,
+    _put_completed: usize,
+    _get_completed: usize,
+    get_results: unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        *mut *mut core::ffi::c_void,
+    ) -> windows_core::HRESULT,
 }
 
 /// Release a raw COM pointer returned through an out-param.
@@ -415,7 +482,6 @@ pub fn inject(
 ) -> Option<InjectState> {
     match webview {
         WebView::Standalone(wv) => {
-            crate::tap_log!("webview: inject handle={handle} source={:?}", wv.source_uri());
             let js = windows_core::HSTRING::from(injector_js(css));
             wv.exec_script(&js).ok()?;
             let js2 = js.clone();
@@ -496,6 +562,46 @@ pub fn exec_once(webview: &WebView, css: &str) {
     }
 }
 
+impl WebView {
+    /// Current document URI for logging — `""` when the standalone core
+    /// hasn't navigated yet; `None` on the classic path.
+    pub fn source_uri(&self) -> Option<String> {
+        match self {
+            WebView::Standalone(wv) => wv.source_uri(),
+            WebView::Core(_) => None,
+        }
+    }
+}
+
+/// One-shot probe: run `js`, wait for the async op, return its result
+/// string. Standalone only — the classic path reports via its handler.
+/// Diagnostic telemetry (`COREDESK_WEBVIEW_PROBE`), not on the hot path.
+pub fn exec_probe(webview: &WebView, js: &str, timeout_ms: u32) -> Option<String> {
+    match webview {
+        WebView::Standalone(wv) => {
+            wv.exec_script_result(&windows_core::HSTRING::from(js), timeout_ms)
+        }
+        WebView::Core(_) => None,
+    }
+}
+
+/// DOM telemetry script — reports viewport size, the live container
+/// rects/computed styles `2.html` actually uses, and whether our style
+/// node survived. Returned via `exec_probe`'s op result.
+pub const PROBE_JS: &str = "(()=>{try{\
+    const r=e=>{if(!e)return null;const b=e.getBoundingClientRect();\
+    const c=getComputedStyle(e);\
+    return{x:Math.round(b.x),y:Math.round(b.y),w:Math.round(b.width),\
+    h:Math.round(b.height),d:c.display,v:c.visibility,o:c.opacity,z:c.zIndex}};\
+    const q=s=>r(document.querySelector(s));\
+    return JSON.stringify({iw:innerWidth,ih:innerHeight,\
+    body:r(document.body),bpage:q('#bpage'),root:q('#root'),\
+    rc:q('#rootContainer'),scopes:q('#scopesHeader'),top:q('#topResults'),\
+    res:q('.resultsContainer'),sugg:q('.suggContainer'),\
+    kids:document.body?document.body.children.length:-1,\
+    style:!!document.getElementById('cde-css')});\
+    }catch(e){return'ERR '+e}})()";
+
 /// Un-inject — drop the nav subscription / document-created script and
 /// blank the live `<style>` node (covers the window where the AddScript
 /// id hasn't landed yet).
@@ -537,15 +643,41 @@ pub fn uninject(webview: &WebView, injected: &InjectState) {
 // ============================================================================
 
 pub fn injector_js(css: &str) -> String {
+    // The style node carries a content hash in `data-h` — a hash match is
+    // a full no-op so no DOM mutation re-triggers the observer. The
+    // observer itself is a singleton on `window.__cdesObs` (repeated
+    // ExecuteScriptAsync calls disconnect the previous one) and watches
+    // only shallow childList changes on <html>/<head> — enough to catch
+    // the SPA dropping our node without ever reacting to result-list churn.
     format!(
-        "(()=>{{const c={};const a=()=>{{let e=document.getElementById('cde-css');\
+        "(()=>{{const c={},h='{:x}';try{{\
+         let e=document.getElementById('cde-css');\
          if(!e){{e=document.createElement('style');e.id='cde-css';\
          (document.head||document.documentElement).appendChild(e);}}\
-         if(e.textContent!==c)e.textContent=c;}};\
-         try{{a();new MutationObserver(a).observe(document.documentElement,\
-         {{childList:true,subtree:true}});}}catch(_){{}}}})();",
-        js_string(css)
+         if(e.getAttribute('data-h')!==h){{e.setAttribute('data-h',h);e.textContent=c;}}\
+         if(window.__cdesObs)window.__cdesObs.disconnect();\
+         const o=window.__cdesObs=new MutationObserver(()=>{{\
+         if(document.getElementById('cde-css')){{arm();return;}}\
+         const s=document.createElement('style');s.id='cde-css';\
+         s.setAttribute('data-h',h);s.textContent=c;\
+         (document.head||document.documentElement).appendChild(s);arm();}});\
+         const arm=()=>{{o.observe(document.documentElement,{{childList:true}});\
+         if(document.head)o.observe(document.head,{{childList:true}});}};\
+         arm();}}catch(_){{}}}})();",
+        js_string(css),
+        fnv1a(css)
     )
+}
+
+/// FNV-1a — a short staleness key so the injector never compares (or
+/// rewrites) the ~166 KB CSS payload on a mutation hot path.
+fn fnv1a(s: &str) -> u64 {
+    let mut h = 0xcbf29ce484222325u64;
+    for b in s.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
 }
 
 /// JSON-encode `s` into a JS string literal.
