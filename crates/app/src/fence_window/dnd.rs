@@ -1165,14 +1165,10 @@ impl FenceViewState {
             m31: 0.0,
             m32: 0.0,
         };
-        let keys: Vec<String> = {
-            let icons = self.icons.borrow();
-            cells
-                .iter()
-                .map(|(i, _)| &self.items[*i])
-                .map(|it| icons.draw_key(&it.icon_key, it.icon_px))
-                .collect()
-        };
+        let keys: Vec<String> = cells
+            .iter()
+            .map(|(i, _)| self.items[*i].icon_draw_key.clone())
+            .collect();
         let drawn = match &layout {
             ItemLayout::Grid(grid) => {
                 let items: Vec<ItemCell<'_>> = cells

@@ -1005,6 +1005,34 @@ mod tests {
         assert_eq!(arrows.suffix(), "#a");
     }
 
+    /// A variant change must give every icon a new draw key and bump the epoch: an item that
+    /// keeps its previous bitmap painted while the re-request runs uploads it under its own
+    /// key, so if the two keys ever collided the stale upload would permanently shadow the
+    /// incoming bake (the frameless-chameleon regression).
+    #[test]
+    fn variant_change_rotates_draw_key_and_epoch() {
+        let mut cache = IconCache::new(HWND::default());
+        let key = IconKey::ByExt("exe".into());
+        let plain = cache.draw_key(&key, 64);
+        let e0 = cache.epoch();
+        let ch = IconVariant {
+            chameleon: true,
+            chameleon_intensity: 55,
+            ..IconVariant::default()
+        };
+        assert!(cache.set_variant(ch));
+        let faded = cache.draw_key(&key, 64);
+        assert_ne!(plain, faded);
+        assert_eq!(cache.epoch(), e0 + 1);
+        // The same normalized variant again changes nothing: no epoch bump, no new key —
+        // an unchanged slider value must not invalidate every icon.
+        assert!(!cache.set_variant(ch));
+        assert_eq!(faded, cache.draw_key(&key, 64));
+        assert_eq!(cache.epoch(), e0 + 1);
+        assert!(cache.set_variant(IconVariant::default()));
+        assert_eq!(plain, cache.draw_key(&key, 64));
+    }
+
     /// Only per-file keys get the arrow: an extension key is shared by every file of the type,
     /// and a symbolic link among them must not put its arrow on the others.
     #[test]

@@ -776,9 +776,11 @@ impl FenceViewState {
                 let icon_only = item.icon_only || (rows && item.is_folder);
                 match icons.get(&item.icon_key, &item.path, icon_px, self.dpi, icon_only) {
                     Lookup::Ready(Some(img)) => {
+                        let draw_key = icons.draw_key(&item.icon_key, icon_px);
                         item.icon = Some(img);
                         item.icon_px = icon_px;
                         item.icon_epoch = epoch;
+                        item.icon_draw_key = draw_key;
                         if item.icon_waited {
                             // Delivered by the worker: cross-fade over the loading tile (167 ms
                             // linear); a synchronous cache hit shows at once.
@@ -992,13 +994,10 @@ impl FenceViewState {
                 (y + c.h >= 0.0 && y <= view_h).then_some((i, x, y, alpha))
             })
             .collect();
-        let keys: Vec<String> = {
-            let icons = self.icons.borrow();
-            placed
-                .iter()
-                .map(|&(i, ..)| icons.draw_key(&self.items[i].icon_key, self.items[i].icon_px))
-                .collect()
-        };
+        let keys: Vec<String> = placed
+            .iter()
+            .map(|&(i, ..)| self.items[i].icon_draw_key.clone())
+            .collect();
         // Removed items fade out beneath everything else (painted first).
         let mut cells: Vec<ItemCell<'_>> = self
             .leaving
@@ -1259,13 +1258,10 @@ impl FenceViewState {
                     .then_some((i, y, alpha))
             })
             .collect();
-        let keys: Vec<String> = {
-            let icons = self.icons.borrow();
-            placed
-                .iter()
-                .map(|&(i, ..)| icons.draw_key(&self.items[i].icon_key, self.items[i].icon_px))
-                .collect()
-        };
+        let keys: Vec<String> = placed
+            .iter()
+            .map(|&(i, ..)| self.items[i].icon_draw_key.clone())
+            .collect();
         // Removed rows fade out beneath everything else (painted first).
         let mut rows: Vec<RowCell<'_>> = self
             .leaving

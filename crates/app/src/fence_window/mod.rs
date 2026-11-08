@@ -285,6 +285,11 @@ pub struct ItemView {
     /// icon stays painted (scaled/stale) while a re-request runs — no blank flash on a
     /// tint/chameleon change.
     icon_epoch: u64,
+    /// GPU-upload key `icon` is stored under (`IconCache::draw_key` at delivery): carries the
+    /// variant suffix and px the *bitmap* was baked at, so a stale icon never collides with
+    /// the re-request's key — recomputing with the current variant would upload the old
+    /// pixels under the new key and permanently shadow the incoming bake.
+    icon_draw_key: String,
     icon_failed: bool,
     /// The icon lookup came back pending at least once: when it finally lands the bitmap
     /// cross-fades in over the loading tile (a synchronous cache hit shows at once).
@@ -361,6 +366,7 @@ impl ItemView {
             icon: None,
             icon_px: 0,
             icon_epoch: 0,
+            icon_draw_key: String::new(),
             icon_failed: false,
             icon_waited: false,
             icon_fade: None,

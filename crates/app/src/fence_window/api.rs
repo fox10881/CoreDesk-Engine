@@ -1632,8 +1632,10 @@ impl FenceWindow {
             let px = crate::layout::icon_px(v.layout, v.icon_size, v.dpi);
             for item in &v.items {
                 out.insert(icons.draw_key(&item.icon_key, px));
-                if item.icon.is_some() && item.icon_px != px {
-                    out.insert(icons.draw_key(&item.icon_key, item.icon_px));
+                // The painted bitmap's own upload key — stamped at delivery, so a stale
+                // icon from a previous size or variant isn't evicted out from under it.
+                if item.icon.is_some() {
+                    out.insert(item.icon_draw_key.clone());
                 }
             }
         }
@@ -2064,6 +2066,7 @@ impl FenceWindow {
             }
             for item in &mut v.items {
                 item.icon = None;
+                item.icon_draw_key.clear();
                 item.icon_failed = false;
                 item.icon_waited = false;
                 item.icon_fade = None;
