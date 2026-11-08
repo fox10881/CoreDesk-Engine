@@ -21,6 +21,9 @@ const STORE_METHOD: u16 = 0;
 
 /// Maximum `.cde` archive size accepted on import (512 MB, accommodating high-bitrate MP4 loops).
 const MAX_CDE_ARCHIVE_BYTES: u64 = 512 * 1024 * 1024;
+/// Maximum number of entries allowed in a `.cde` archive — prevents central-directory
+/// amplification / overlapping-offset zip-bomb payloads.
+const MAX_CDE_ENTRIES: usize = 256;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CdeArchiveEntry {
@@ -45,7 +48,10 @@ pub struct ExtractedCdeTheme {
 
 /// Standard IEEE 802.3 CRC-32 used by ZIP headers.
 pub fn crc32(bytes: &[u8]) -> u32 {
-    let mut crc = 0xFFFF_FFFFu32;
+    !crc32_update(0xFFFF_FFFF, bytes)
+}
+
+fn crc32_update(mut crc: u32, bytes: &[u8]) -> u32 {
     for &b in bytes {
         crc ^= b as u32;
         for _ in 0..8 {
@@ -53,7 +59,7 @@ pub fn crc32(bytes: &[u8]) -> u32 {
             crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
         }
     }
-    !crc
+    crc
 }
 
 /// Packs `entries` `(filename, data)` into a standard uncompressed (`STORE`, method 0) ZIP archive.
@@ -182,10 +188,14 @@ pub fn unpack_uncompressed_zip(archive: &[u8]) -> Result<Vec<CdeArchiveEntry>, S
     let eocd =
         eocd_pos.ok_or_else(|| "invalid .cde archive (missing central directory)".to_string())?;
     let entry_count = read_u16(archive, eocd + 10).ok_or("corrupt EOCD")? as usize;
+    if entry_count > MAX_CDE_ENTRIES {
+        return Err("too many entries in .cde archive".into());
+    }
     let cd_offset = read_u32(archive, eocd + 16).ok_or("corrupt EOCD")? as usize;
 
     let mut entries = Vec::with_capacity(entry_count.min(32));
     let mut cursor = cd_offset;
+    let mut total_unpacked: u64 = 0;
     for _ in 0..entry_count {
         if read_u32(archive, cursor) != Some(CENTRAL_DIR_HEADER_SIG) {
             return Err("corrupt central directory header in .cde archive".into());
@@ -207,6 +217,10 @@ pub fn unpack_uncompressed_zip(archive: &[u8]) -> Result<Vec<CdeArchiveEntry>, S
 
         if comp_size != uncomp_size {
             return Err("mismatched size in uncompressed .cde entry".into());
+        }
+        total_unpacked = total_unpacked.saturating_add(uncomp_size as u64);
+        if total_unpacked > MAX_CDE_ARCHIVE_BYTES {
+            return Err("cumulative unpacked size exceeds maximum supported size".into());
         }
         let name_slice = archive
             .get(cursor + 46..cursor + 46 + name_len)
@@ -424,73 +438,211 @@ pub fn read_cde_preview(path: &Path) -> Option<Vec<u8>> {
 }
 
 /// Extracts a `.cde` archive into a fresh temporary directory and returns the extracted paths.
+/// Streams entries directly from the archive `File` to disk in 64 KB chunks so large 4K video
+/// themes never buffer the full archive in memory, while still enforcing `MAX_CDE_ENTRIES`,
+/// cumulative size limits, and per-entry CRC-32 verification.
 pub fn extract_cde_to_temp(cde_path: &Path) -> Result<ExtractedCdeTheme, String> {
-    let meta = fs::metadata(cde_path).map_err(|e| e.to_string())?;
-    if meta.len() > MAX_CDE_ARCHIVE_BYTES {
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    let mut f = fs::File::open(cde_path).map_err(|e| e.to_string())?;
+    let file_len = f.metadata().map_err(|e| e.to_string())?.len();
+    if file_len < 22 {
+        return Err("invalid .cde archive (too short)".into());
+    }
+    if file_len > MAX_CDE_ARCHIVE_BYTES {
         return Err("theme file exceeds maximum supported size".into());
     }
-    let bytes = fs::read(cde_path).map_err(|e| e.to_string())?;
-    let entries = unpack_uncompressed_zip(&bytes)?;
+
+    let tail_len = file_len.min(65_557 + 22) as usize;
+    f.seek(SeekFrom::End(-(tail_len as i64)))
+        .map_err(|e| e.to_string())?;
+    let mut tail = vec![0u8; tail_len];
+    f.read_exact(&mut tail).map_err(|e| e.to_string())?;
+    let mut eocd_pos = None;
+    for pos in (0..=tail.len() - 22).rev() {
+        if read_u32(&tail, pos) == Some(END_OF_CENTRAL_DIR_SIG) {
+            eocd_pos = Some(pos);
+            break;
+        }
+    }
+    let eocd =
+        eocd_pos.ok_or_else(|| "invalid .cde archive (missing central directory)".to_string())?;
+    let entry_count = read_u16(&tail, eocd + 10).ok_or("corrupt EOCD")? as usize;
+    if entry_count > MAX_CDE_ENTRIES {
+        return Err("too many entries in .cde archive".into());
+    }
+    let mut cursor = read_u32(&tail, eocd + 16).ok_or("corrupt EOCD")? as u64;
+    drop(tail);
+
+    struct CdEntry {
+        clean_name: String,
+        local_offset: u64,
+        uncomp_size: u64,
+        expected_crc: u32,
+    }
+
+    let mut cd_entries = Vec::with_capacity(entry_count.min(32));
+    let mut total_unpacked: u64 = 0;
+    let mut hdr = [0u8; 46];
+    for _ in 0..entry_count {
+        f.seek(SeekFrom::Start(cursor))
+            .map_err(|_| "corrupt central directory offset in .cde archive".to_string())?;
+        f.read_exact(&mut hdr)
+            .map_err(|_| "corrupt central directory header in .cde archive".to_string())?;
+        if read_u32(&hdr, 0) != Some(CENTRAL_DIR_HEADER_SIG) {
+            return Err("corrupt central directory header in .cde archive".into());
+        }
+        let method = read_u16(&hdr, 10).ok_or("corrupt CDH")?;
+        if method != STORE_METHOD {
+            return Err(
+                "unsupported compression method in .cde archive (expected uncompressed STORE)"
+                    .into(),
+            );
+        }
+        let expected_crc = read_u32(&hdr, 16).ok_or("corrupt CDH")?;
+        let comp_size = read_u32(&hdr, 20).ok_or("corrupt CDH")? as u64;
+        let uncomp_size = read_u32(&hdr, 24).ok_or("corrupt CDH")? as u64;
+        let name_len = read_u16(&hdr, 28).ok_or("corrupt CDH")? as u64;
+        let extra_len = read_u16(&hdr, 30).ok_or("corrupt CDH")? as u64;
+        let comment_len = read_u16(&hdr, 32).ok_or("corrupt CDH")? as u64;
+        let local_offset = read_u32(&hdr, 42).ok_or("corrupt CDH")? as u64;
+
+        if comp_size != uncomp_size {
+            return Err("mismatched size in uncompressed .cde entry".into());
+        }
+        total_unpacked = total_unpacked.saturating_add(uncomp_size);
+        if total_unpacked > MAX_CDE_ARCHIVE_BYTES {
+            return Err("cumulative unpacked size exceeds maximum supported size".into());
+        }
+        let mut name_buf = vec![0u8; name_len as usize];
+        f.read_exact(&mut name_buf)
+            .map_err(|_| "truncated entry name".to_string())?;
+        let raw_name = std::str::from_utf8(&name_buf).map_err(|_| "non-UTF8 entry name")?;
+        cursor = cursor
+            .checked_add(46 + name_len + extra_len + comment_len)
+            .ok_or("overflow in CDH")?;
+
+        if let Some(clean_name) = sanitize_entry_name(raw_name) {
+            cd_entries.push(CdEntry {
+                clean_name,
+                local_offset,
+                uncomp_size,
+                expected_crc,
+            });
+        }
+    }
 
     let temp_dir = std::env::temp_dir().join(format!("coredesk-theme-{}", Uuid::new_v4()));
     fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
 
-    let mut config_path = None;
-    let mut background_path = None;
-    let mut preview_path = None;
-    let mut meta = None;
-    let mut style_files = Vec::new();
+    let result: Result<ExtractedCdeTheme, String> = (|| {
+        let mut config_path = None;
+        let mut background_path = None;
+        let mut preview_path = None;
+        let mut meta = None;
+        let mut style_files = Vec::new();
+        let mut chunk = vec![0u8; 64 * 1024];
 
-    for entry in entries {
-        let lower = entry.name.to_ascii_lowercase();
-        // theme.json is parsed from memory — nothing on disk needs it.
-        if lower == "theme.json" {
-            meta = serde_json::from_slice(&entry.data).ok();
-            continue;
-        }
-        // Bundled style payloads land nested under `styles/`: write them
-        // only when every path component is a plain name (no `..`, no
-        // separators) so a crafted archive can't escape the temp dir.
-        if lower.starts_with("styles/") {
-            let rel = Path::new(&entry.name);
-            let safe = rel
-                .components()
-                .all(|c| matches!(c, std::path::Component::Normal(_)));
-            if safe {
-                let dest = temp_dir.join(rel);
-                if let Some(parent) = dest.parent() {
+        for entry in cd_entries {
+            f.seek(SeekFrom::Start(entry.local_offset))
+                .map_err(|_| "corrupt local file offset in .cde archive".to_string())?;
+            let mut lfh = [0u8; 30];
+            f.read_exact(&mut lfh)
+                .map_err(|_| "corrupt local file header in .cde archive".to_string())?;
+            if read_u32(&lfh, 0) != Some(LOCAL_FILE_HEADER_SIG) {
+                return Err("corrupt local file header in .cde archive".into());
+            }
+            let lfh_name_len = read_u16(&lfh, 26).ok_or("corrupt LFH")? as u64;
+            let lfh_extra_len = read_u16(&lfh, 28).ok_or("corrupt LFH")? as u64;
+            let data_start = entry
+                .local_offset
+                .checked_add(30 + lfh_name_len + lfh_extra_len)
+                .ok_or("overflow in LFH")?;
+            let data_end = data_start
+                .checked_add(entry.uncomp_size)
+                .ok_or("overflow in entry data")?;
+            if data_end > file_len {
+                return Err("truncated entry payload in .cde archive".into());
+            }
+            f.seek(SeekFrom::Start(data_start))
+                .map_err(|e| e.to_string())?;
+
+            let lower = entry.clean_name.to_ascii_lowercase();
+            if lower == "theme.json" {
+                if entry.uncomp_size <= 4 * 1024 * 1024 {
+                    let mut buf = vec![0u8; entry.uncomp_size as usize];
+                    f.read_exact(&mut buf).map_err(|e| e.to_string())?;
+                    if crc32(&buf) != entry.expected_crc {
+                        return Err(format!("CRC mismatch in .cde entry {}", entry.clean_name));
+                    }
+                    meta = serde_json::from_slice(&buf).ok();
+                }
+                continue;
+            }
+
+            let dest = if lower.starts_with("styles/") {
+                let rel = Path::new(&entry.clean_name);
+                let safe = rel
+                    .components()
+                    .all(|c| matches!(c, std::path::Component::Normal(_)));
+                if !safe {
+                    continue;
+                }
+                let d = temp_dir.join(rel);
+                if let Some(parent) = d.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
-                if fs::write(&dest, &entry.data).is_ok() {
-                    style_files.push((entry.name.clone(), dest));
-                }
+                d
+            } else {
+                temp_dir.join(&entry.clean_name)
+            };
+
+            let mut out = fs::File::create(&dest).map_err(|e| e.to_string())?;
+            let mut remaining = entry.uncomp_size as usize;
+            let mut crc_state = 0xFFFF_FFFFu32;
+            while remaining > 0 {
+                let to_read = remaining.min(chunk.len());
+                f.read_exact(&mut chunk[..to_read])
+                    .map_err(|e| e.to_string())?;
+                crc_state = crc32_update(crc_state, &chunk[..to_read]);
+                out.write_all(&chunk[..to_read])
+                    .map_err(|e| e.to_string())?;
+                remaining -= to_read;
             }
-            continue;
-        }
-        let dest = temp_dir.join(&entry.name);
-        fs::write(&dest, &entry.data).map_err(|e| e.to_string())?;
-        if lower == "config.json" {
-            config_path = Some(dest);
-        } else if lower == "preview.jpg" || lower == "preview.jpeg" {
-            preview_path = Some(dest);
-        } else if background_path.is_none() && is_background_media_name(&entry.name) {
-            background_path = Some(dest);
-        }
-    }
+            drop(out);
+            if !crc_state != entry.expected_crc {
+                return Err(format!("CRC mismatch in .cde entry {}", entry.clean_name));
+            }
 
-    let Some(config_path) = config_path else {
+            if lower.starts_with("styles/") {
+                style_files.push((entry.clean_name, dest));
+            } else if lower == "config.json" {
+                config_path = Some(dest);
+            } else if lower == "preview.jpg" || lower == "preview.jpeg" {
+                preview_path = Some(dest);
+            } else if background_path.is_none() && is_background_media_name(&entry.clean_name) {
+                background_path = Some(dest);
+            }
+        }
+
+        let Some(config_path) = config_path else {
+            return Err("missing config.json in .cde theme archive".into());
+        };
+
+        Ok(ExtractedCdeTheme {
+            temp_dir: temp_dir.clone(),
+            config_path,
+            background_path,
+            preview_path,
+            meta,
+            style_files,
+        })
+    })();
+
+    if result.is_err() {
         let _ = fs::remove_dir_all(&temp_dir);
-        return Err("missing config.json in .cde theme archive".into());
-    };
-
-    Ok(ExtractedCdeTheme {
-        temp_dir,
-        config_path,
-        background_path,
-        preview_path,
-        meta,
-        style_files,
-    })
+    }
+    result
 }
 
 /// Renders a `width x height` (e.g. 640x360) BGRA thumbnail of the desktop layout for `preview.jpg`.
@@ -873,6 +1025,13 @@ mod tests {
         assert_eq!(unpacked[1].data, fake_media);
         assert_eq!(unpacked[2].name, "preview.jpg");
         assert_eq!(unpacked[2].data, fake_preview);
+
+        // Exceeding MAX_CDE_ENTRIES must be rejected.
+        let many: Vec<(&str, &[u8])> = (0..=MAX_CDE_ENTRIES)
+            .map(|_| ("config.json", cfg_json.as_bytes()))
+            .collect();
+        let over_entries = pack_uncompressed_zip(&many);
+        assert!(unpack_uncompressed_zip(&over_entries).is_err());
     }
 
     /// A theme exported while a stale `video_wallpaper_path` lingers must not carry it:

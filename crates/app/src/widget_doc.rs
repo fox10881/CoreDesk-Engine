@@ -18,19 +18,36 @@
 
 use crate::clock_host::I18N_JS;
 
+const WIDGET_CSP_META: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src 'none'; connect-src 'none'; frame-src 'none';\">";
+
+fn inject_csp(doc: String) -> String {
+    let lower = doc.to_ascii_lowercase();
+    if let Some(idx) = lower.find("<head>") {
+        let insert_at = idx + "<head>".len();
+        let mut out = String::with_capacity(doc.len() + WIDGET_CSP_META.len() + 1);
+        out.push_str(&doc[..insert_at]);
+        out.push_str(WIDGET_CSP_META);
+        out.push_str(&doc[insert_at..]);
+        out
+    } else {
+        format!("{WIDGET_CSP_META}{doc}")
+    }
+}
+
 /// Builds the document a widget host navigates to for design `id` in
-/// `category`: the resolved `.html` file with locale markers injected.
+/// `category`: the resolved `.html` file with a strict CSP and locale
+/// markers injected.
 /// `None` when no file resolves (factory missing + no user override) or it
 /// fails the size/UTF-8 checks — callers treat that like an unknown id.
 pub(crate) fn build_widget_document(category: &str, id: &str) -> Option<String> {
     let file = coredesk_core::styles_fs::load_widget_document(category, id)?;
     if !file.contains("<!-- COREDESK_LOCALE -->") && !file.contains("i18n.js") {
-        return Some(file);
+        return Some(inject_csp(file));
     }
     let payload = coredesk_core::i18n::ui_payload()
         .to_string()
         .replace('<', "\\u003c");
-    Some(
+    Some(inject_csp(
         file.replace(
             "<!-- COREDESK_LOCALE -->",
             &format!("<script>window.COREDESK_LOCALE={payload};</script>"),
@@ -39,7 +56,7 @@ pub(crate) fn build_widget_document(category: &str, id: &str) -> Option<String> 
             "<script src=\"i18n.js\"></script>",
             &format!("<script>{I18N_JS}</script>"),
         ),
-    )
+    ))
 }
 
 /// The widget message allowlist: only `{"type": <allowed>}` reaches the

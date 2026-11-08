@@ -126,46 +126,44 @@ impl IStandaloneWebView2 {
         }
     }
 
-    /// `ExecuteScriptAsync` that polls the op's `IAsyncInfo::Status` and
-    /// returns the script's JSON result — the only result channel on the
-    /// standalone element (WebMessage is disabled on this control).
-    fn exec_script_result(&self, js: &windows_core::HSTRING, timeout_ms: u32) -> Option<String> {
+    /// `ExecuteScriptAsync` with a non-blocking `AsyncOperationCompletedHandler`
+    /// that logs the script's JSON result when the operation completes on the
+    /// UI apartment — never sleeps or blocks the XAML UI thread.
+    fn exec_script_probe(&self, js: &windows_core::HSTRING) {
         unsafe {
-            let mut op = core::ptr::null_mut();
-            (windows_core::Interface::vtable(self).ExecuteScriptAsync)(
+            let mut op_raw = core::ptr::null_mut();
+            if (windows_core::Interface::vtable(self).ExecuteScriptAsync)(
                 windows_core::Interface::as_raw(self),
                 core::mem::transmute_copy(js),
-                &mut op,
+                &mut op_raw,
             )
-            .ok()
-            .ok()?;
-            if op.is_null() {
-                return None;
+            .is_err()
+                || op_raw.is_null()
+            {
+                return;
             }
-            let deadline =
-                std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64);
-            let vt = &**(op as *const *const IAsyncOpVtbl);
-            let mut status = 0i32;
-            while status == 0 && std::time::Instant::now() < deadline {
-                let _ = (vt.status)(op, &mut status);
-                if status == 0 {
-                    std::thread::sleep(std::time::Duration::from_millis(40));
+            let op: windows_future::IAsyncOperation<windows_core::HSTRING> =
+                match windows_core::imp::Type::from_abi(op_raw) {
+                    Ok(op) => op,
+                    Err(_) => {
+                        release_raw(op_raw);
+                        return;
+                    }
+                };
+            let _ = op.SetCompleted(&windows_future::AsyncOperationCompletedHandler::<
+                windows_core::HSTRING,
+            >::new(move |op_ref, status| {
+                if status == windows_future::AsyncStatus::Completed
+                    && let Some(done) = op_ref.as_ref()
+                    && let Ok(res) = done.GetResults()
+                {
+                    let text = res.to_string_lossy();
+                    if !text.is_empty() {
+                        crate::tap_log!("webview: probe {text}");
+                    }
                 }
-            }
-            let out = if status == 1 {
-                let mut res = core::ptr::null_mut();
-                let _ = (vt.get_results)(op, &mut res);
-                if res.is_null() {
-                    None
-                } else {
-                    let hs: windows_core::HSTRING = core::mem::transmute(res);
-                    Some(hs.to_string_lossy())
-                }
-            } else {
-                None
-            };
-            release_raw(op);
-            out
+                Ok(())
+            }));
         }
     }
 
@@ -193,29 +191,6 @@ impl IStandaloneWebView2 {
             );
         }
     }
-}
-
-/// `IAsyncOperation<HSTRING>` vtable subset — inherited `IAsyncInfo`
-/// members come before the operation's own `put/get_Completed`/`GetResults`.
-#[repr(C)]
-struct IAsyncOpVtbl {
-    _qi: usize,
-    _add: usize,
-    _rel: usize,
-    _i0: usize,
-    _i1: usize,
-    _i2: usize,
-    _id: usize,
-    status: unsafe extern "system" fn(*mut core::ffi::c_void, *mut i32) -> windows_core::HRESULT,
-    _ec: usize,
-    _cancel: usize,
-    _close: usize,
-    _put_completed: usize,
-    _get_completed: usize,
-    get_results: unsafe extern "system" fn(
-        *mut core::ffi::c_void,
-        *mut *mut core::ffi::c_void,
-    ) -> windows_core::HRESULT,
 }
 
 /// Release a raw COM pointer returned through an out-param.
@@ -566,15 +541,15 @@ impl WebView {
     }
 }
 
-/// One-shot probe: run `js`, wait for the async op, return its result
-/// string. Standalone only — the classic path reports via its handler.
+/// One-shot non-blocking probe: run `js` and log its result via the async
+/// completion handler once the operation completes on the UI apartment.
 /// Diagnostic telemetry (`COREDESK_WEBVIEW_PROBE`), not on the hot path.
-pub fn exec_probe(webview: &WebView, js: &str, timeout_ms: u32) -> Option<String> {
+pub fn exec_probe(webview: &WebView, js: &str) {
     match webview {
         WebView::Standalone(wv) => {
-            wv.exec_script_result(&windows_core::HSTRING::from(js), timeout_ms)
+            wv.exec_script_probe(&windows_core::HSTRING::from(js));
         }
-        WebView::Core(_) => None,
+        WebView::Core(_) => {}
     }
 }
 

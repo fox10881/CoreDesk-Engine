@@ -385,19 +385,27 @@ fn rewrite_relative_uris_in_text(text: &str, dir: &Path) -> String {
     out
 }
 
-/// A URI reference with no scheme — a bare filename or relative path the
-/// style intends to resolve beside its own file.
+/// A URI reference with no scheme and no traversal components — a bare
+/// filename or clean relative subpath the style intends to resolve beside
+/// its own file. Rejects `..`, `.`, drive prefixes, and rooted paths so a
+/// style cannot reference or bundle files outside its own directory.
 fn is_relative_uri(value: &str) -> bool {
-    if value.is_empty() || value.starts_with('#') {
+    if value.is_empty() || value.starts_with('#') || value.starts_with(['\\', '/']) {
         return false;
     }
-    match value.find(':') {
-        Some(colon) => !value[..colon]
+    if let Some(colon) = value.find(':')
+        && value[..colon]
             .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.')),
-        // `\\server\share` is already absolute; `foo.png` is relative.
-        None => !value.starts_with(['\\', '/']),
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+    {
+        return false;
     }
+    let p = Path::new(value);
+    !value
+        .split(['/', '\\'])
+        .any(|seg| seg.is_empty() || seg == "." || seg == "..")
+        && p.components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)))
 }
 
 /// `dir` + a relative name → `file:///C:/…/Start%20Menu%20style/bg.jpg`.
@@ -479,8 +487,11 @@ pub fn referenced_assets(style_path: &Path) -> Vec<PathBuf> {
     };
     let mut out = Vec::new();
     for value in uris {
+        if !is_relative_uri(&value) {
+            continue;
+        }
         let path = dir.join(&value);
-        if path.is_file() && !out.contains(&path) {
+        if path.starts_with(dir) && path.is_file() && !out.contains(&path) {
             out.push(path);
         }
     }
@@ -837,17 +848,24 @@ mod tests {
         fs::write(dir.join("bg.jpg"), b"jpeg-bytes").unwrap();
         fs::write(dir.join("icon.png"), b"png").unwrap();
         let style = dir.join("Mod.json");
+        let outside = base.join("secret.png");
+        fs::write(&outside, b"secret").unwrap();
         fs::write(
             &style,
             r#"{"styleConstants":[
                 "W=<ImageBrush ImageSource=\"bg.jpg\"/>",
                 "I=<ImageBrush ImageSource=\"icon.png\"/>",
                 "M=<ImageBrush ImageSource=\"missing.png\"/>",
+                "T1=<ImageBrush ImageSource=\"../secret.png\"/>",
+                "T2=<ImageBrush ImageSource=\"..\\secret.png\"/>",
                 "A=<ImageBrush ImageSource=\"data:image/png;base64,AAAA\"/>",
                 "B=<ImageBrush ImageSource=\"file:///D:/abs.png\"/>"
             ]}"#,
         )
         .unwrap();
+        assert!(!is_relative_uri("../secret.png"));
+        assert!(!is_relative_uri("..\\secret.png"));
+        assert!(!is_relative_uri("./bg.jpg"));
         let mut names: Vec<_> = referenced_assets(&style)
             .iter()
             .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))

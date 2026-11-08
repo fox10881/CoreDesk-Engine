@@ -1325,11 +1325,11 @@ fn find_winning(
     consumer_node: Option<&Rc<TreeNode>>,
     scope: usize,
 ) -> Option<(CapVal, u64)> {
-    let candidates = capture_candidates(name, scope);
+    let mut candidates = capture_candidates(name, scope);
     match candidates.len() {
         0 => None,
         1 => {
-            let (owner, _, val) = candidates.into_iter().next().unwrap();
+            let (owner, _, val) = candidates.pop()?;
             Some((val, owner))
         }
         _ => {
@@ -3570,13 +3570,16 @@ fn apply_resvars(entries: &[(String, String)]) -> Option<xb::ResourceDictionary>
         if target.HasKey(&k).unwrap_or(false) {
             continue;
         }
-        let _ = target.Insert(
-            &k,
-            &resolved.unwrap_or_else(|| {
+        let Some(val) = resolved
+            .or_else(|| {
                 crate::fx_bindings::PropertyValue::CreateString(&windows_core::HSTRING::from(""))
-                    .unwrap_or_else(|_| crate::fx_bindings::PropertyValue::CreateEmpty().unwrap())
-            }),
-        );
+                    .ok()
+            })
+            .or_else(|| crate::fx_bindings::PropertyValue::CreateEmpty().ok())
+        else {
+            continue;
+        };
+        let _ = target.Insert(&k, &val);
     }
     if let Ok(merged) = resources.MergedDictionaries() {
         let _ = merged.Append(&theme_dict);
@@ -3600,8 +3603,12 @@ type RtlQueryFn =
 
 static LAYOUT_DETOUR: Mutex<Option<retour::RawDetour>> = Mutex::new(None);
 static LAYOUT_TRAMP: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
-/// 0 = Default (no override), 1 = ForceNew, 2 = NewSideBySide.
+/// `0` = Default (no override), `1` = ForceNew, `2` = NewSideBySide.
 static DETOUR_LAYOUT: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+/// `true` when this SMEH process pre-armed the layout detour at startup from a
+/// recent `cde_smeh_exit.tick` stamp — suppresses a second `ExitProcess(0)`
+/// bounce for the same layout override.
+static PREARMED_FROM_STAMP: AtomicBool = AtomicBool::new(false);
 /// `g_windowsDefaultIsNewLayout` — probed BEFORE the detour ever arms.
 static DEFAULT_IS_NEW: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
@@ -3690,8 +3697,8 @@ fn arm_layout_detour(layout: Layout) {
         Ordering::Release,
     );
     let mut guard = LAYOUT_DETOUR.lock().unwrap_or_else(|p| p.into_inner());
-    if guard.is_some() {
-        let _ = unsafe { guard.as_ref().unwrap().enable() };
+    if let Some(existing) = guard.as_ref() {
+        let _ = unsafe { existing.enable() };
         return;
     }
     let ntdll = unsafe { win32::GetModuleHandleW(windows_core::w!("ntdll.dll")) };
@@ -3732,16 +3739,58 @@ fn disarm_layout_detour() {
     }
 }
 
-/// `%TEMP%\cde_smeh_exit.tick` — the mod's 10 s exit throttle.
-fn throttled_exit() {
+/// Pre-arms the `RtlQueryFeatureConfiguration` detour at resident startup in
+/// `StartMenuExperienceHost.exe` when `%TEMP%\cde_smeh_exit.tick` indicates the
+/// previous SMEH instance just exited to apply a forced layout override.
+/// Hooking at startup ensures SMEH queries the overridden feature flags during
+/// initial menu construction and prevents an infinite 10 s exit loop.
+pub fn prearm_smeh_layout_from_stamp() {
+    if !crate::is_smeh() {
+        return;
+    }
+    let path = std::env::temp_dir().join("cde_smeh_exit.tick");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let mut parts = text.split_whitespace();
+    let Some(last_tick) = parts.next().and_then(|s| s.parse::<u64>().ok()) else {
+        return;
+    };
+    let layout_code = parts.next().and_then(|s| s.parse::<u8>().ok()).unwrap_or(0);
+    let now = unsafe { win32::GetTickCount64() };
+    if now.saturating_sub(last_tick) <= 60_000 {
+        let layout = match layout_code {
+            1 => Layout::ForceNew,
+            2 => Layout::NewSideBySide,
+            _ => return,
+        };
+        let _ = windows_default_is_new_layout();
+        arm_layout_detour(layout);
+        PREARMED_FROM_STAMP.store(true, Ordering::Release);
+        crate::tap_log!("smeh: pre-armed layout detour ({layout:?}) from recent exit stamp");
+    }
+}
+
+/// `%TEMP%\cde_smeh_exit.tick` — the mod's 10 s exit throttle, extended with
+/// the target layout code so the respawned SMEH pre-arms the detour at boot
+/// and never bounces a second time for the same override.
+fn throttled_exit(layout: Layout) {
+    if PREARMED_FROM_STAMP.load(Ordering::Acquire) {
+        return;
+    }
+    let code: u8 = match layout {
+        Layout::ForceNew => 1,
+        Layout::NewSideBySide => 2,
+        Layout::Default => 0,
+    };
     let path = std::env::temp_dir().join("cde_smeh_exit.tick");
     let last: u64 = std::fs::read_to_string(&path)
         .ok()
-        .and_then(|s| s.trim().parse().ok())
+        .and_then(|s| s.split_whitespace().next()?.parse().ok())
         .unwrap_or(0);
     let now = unsafe { win32::GetTickCount64() };
     if now.saturating_sub(last) > 10_000 {
-        let _ = std::fs::write(&path, now.to_string());
+        let _ = std::fs::write(&path, format!("{now} {code}"));
         crate::tap_log!("layout override -> ExitProcess");
         unsafe { win32::ExitProcess(0) }
     }
@@ -3906,8 +3955,8 @@ fn cleanup_element(handle: u64, es: &ElemState) {
                     true
                 }
             });
-            if scope.is_some() {
-                removed.insert((cap.var.clone(), scope.unwrap()));
+            if let Some(scope) = scope {
+                removed.insert((cap.var.clone(), scope));
             }
             if list.is_empty() {
                 eng.variables.remove(&cap.var);
@@ -4158,11 +4207,8 @@ fn webview_maybe_inject_ui(diagnostics: &IXamlDiagnostics, handle: u64, css: &st
                     let inner = UiBound(diag);
                     post_ui(&d, Prio::Normal, move || {
                         let UiBound(diag) = &inner;
-                        if let Some(wv) = crate::webview::resolve(diag, handle)
-                            && let Some(res) =
-                                crate::webview::exec_probe(&wv, crate::webview::PROBE_JS, 2500)
-                        {
-                            crate::tap_log!("webview: probe {res}");
+                        if let Some(wv) = crate::webview::resolve(diag, handle) {
+                            crate::webview::exec_probe(&wv, crate::webview::PROBE_JS);
                         }
                         Ok(())
                     });
@@ -4255,7 +4301,7 @@ pub fn apply_wire(text: &str) {
             // The menu is rebuilt with the override — exit so SMEH reconstructs
             // it under the forced feature flags (relaunches automatically; the
             // host re-injects and re-sends the theme).
-            throttled_exit();
+            throttled_exit(theme.layout);
         }
         let mut eng = state();
         let is_redesigned = forced || win_default_new;
@@ -4302,6 +4348,7 @@ pub fn reset() {
             Ok(())
         });
     }
+    reported_types().clear();
     // Reverting to Windows Default may need the layout back too.
     disarm_layout_detour();
 }
@@ -4333,6 +4380,7 @@ pub fn session_reset() {
     };
     drop(old_elements);
     known().clear();
+    reported_types().clear();
 }
 
 /// dispatcher; without one the pending theme sits until the first element.
@@ -4703,6 +4751,7 @@ pub fn shutdown() {
     drop(old_elements);
     known().clear();
     immersive().clear();
+    reported_types().clear();
     TL_RULES.with(|t| *t.borrow_mut() = (0, Rc::new(Vec::new())));
     TREE_NODES.with(|p| p.borrow_mut().clear());
     PROP_QUEUE.with(|q| q.borrow_mut().clear());

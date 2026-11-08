@@ -582,10 +582,13 @@ impl App {
         if !self.ensure_web_env() {
             return;
         }
+        let Some(web_env) = self.web_env.as_ref() else {
+            return;
+        };
         let liquid_glass = self.ctx.theme.borrow().liquid_glass;
         match SettingsHost::open(
             &self.settings_class,
-            self.web_env.as_ref().unwrap(),
+            web_env,
             self.theme_mode,
             liquid_glass,
             self.queue.clone(),
@@ -723,10 +726,13 @@ impl App {
         if !self.ensure_web_env() {
             return;
         }
+        let Some(web_env) = self.web_env.as_ref() else {
+            return;
+        };
         let bounds = self.state.config.settings.clock_bounds;
         match crate::clock_host::ClockHost::open(
             &self.clock_class,
-            self.web_env.as_ref().unwrap(),
+            web_env,
             bounds,
             self.queue.clone(),
             s,
@@ -795,6 +801,9 @@ impl App {
         if !self.ensure_web_env() {
             return;
         }
+        let Some(web_env) = self.web_env.as_ref() else {
+            return;
+        };
         let bounds = self
             .state
             .config
@@ -804,7 +813,7 @@ impl App {
             .and_then(|p| p.bounds);
         match crate::visualizer_host::VisualizerHost::open(
             &self.visualizer_class,
-            self.web_env.as_ref().unwrap(),
+            web_env,
             bounds,
             self.queue.clone(),
             shared,
@@ -1031,9 +1040,12 @@ impl App {
         if !self.ensure_web_env() {
             return;
         }
+        let Some(web_env) = self.web_env.as_ref() else {
+            return;
+        };
         match crate::fe_glass_host::FeGlassHost::open(
             &self.fe_glass_class,
-            self.web_env.as_ref().unwrap(),
+            web_env,
             self.theme_mode,
             self.queue.clone(),
         ) {
@@ -4203,6 +4215,25 @@ impl App {
                 let dest = root.join(cat).join(leaf);
                 if let Some(parent) = dest.parent() {
                     let _ = std::fs::create_dir_all(parent);
+                }
+                if dest.is_file() {
+                    let same = match (std::fs::read(&dest), std::fs::read(src)) {
+                        (Ok(existing), Ok(incoming)) => existing == incoming,
+                        _ => false,
+                    };
+                    if same {
+                        continue;
+                    }
+                    // Preserve a differing user-authored file in `.user-backups/<cat>/<leaf>`
+                    // (outside `CATEGORY_DIRS` so dropdowns never enumerate it as a duplicate)
+                    // before installing the theme's bundled copy.
+                    let backup = root.join(".user-backups").join(cat).join(leaf);
+                    if !backup.exists() {
+                        if let Some(bp) = backup.parent() {
+                            let _ = std::fs::create_dir_all(bp);
+                        }
+                        let _ = std::fs::copy(&dest, &backup);
+                    }
                 }
                 match std::fs::copy(src, &dest) {
                     Ok(_) => {

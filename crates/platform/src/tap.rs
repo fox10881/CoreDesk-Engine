@@ -210,7 +210,8 @@ pub(crate) fn tap_injectable_path() -> Option<PathBuf> {
             .join("residents");
         std::fs::create_dir_all(&dir).ok()?;
         let out = dir.join(&name);
-        if !out.is_file() {
+        let matches_real = std::fs::read(&out).ok().as_deref() == Some(bytes.as_slice());
+        if !matches_real {
             // Garbage-collect superseded copies — pinned ones (loaded in a
             // live host) fail removal harmlessly and get a retry next run.
             if let Ok(rd) = std::fs::read_dir(&dir) {
@@ -224,32 +225,36 @@ pub(crate) fn tap_injectable_path() -> Option<PathBuf> {
                     }
                 }
             }
-            std::fs::copy(&real, &out).ok()?;
+            std::fs::write(&out, &bytes).ok()?;
         }
         Some(out)
     })
     .clone()
 }
 
-/// The same unique-per-build resident copy but under `%ProgramData%` with
-/// an `ALL APPLICATION PACKAGES` read+execute ACE — AppContainer hosts
-/// (`ShellExperienceHost`, `ShellHost`) can't read `%LOCALAPPDATA%` paths,
-/// so the NC pipeline injects this copy instead. Same filename → the
-/// resident derives the identical command-window class.
+/// The same unique-per-build resident copy under `%LOCALAPPDATA%\CoreDeskEngine\residents`
+/// with an `ALL APPLICATION PACKAGES` read+execute ACE on the file and its
+/// parent directories — AppContainer hosts (`ShellExperienceHost`, `ShellHost`,
+/// `SearchHost`) can then map the DLL without staging into world-writable
+/// `%ProgramData%`. Byte-level verification against `tap_dll_path()` ensures an
+/// existing file is never trusted without matching the current build image.
 pub(crate) fn tap_injectable_path_appcontainer() -> Option<PathBuf> {
     static PATH: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     PATH.get_or_init(|| {
         let local = tap_injectable_path()?;
-        let dir = PathBuf::from(std::env::var_os("ProgramData")?)
-            .join("CoreDeskEngine")
-            .join("residents");
-        std::fs::create_dir_all(&dir).ok()?;
-        let out = dir.join(local.file_name()?);
-        if !out.is_file() {
-            std::fs::copy(&local, &out).ok()?;
+        let real = tap_dll_path()?;
+        let expected = std::fs::read(&real).ok()?;
+        if std::fs::read(&local).ok().as_deref() != Some(expected.as_slice()) {
+            std::fs::write(&local, &expected).ok()?;
         }
-        grant_app_packages_access(&out);
-        Some(out)
+        if let Some(residents_dir) = local.parent() {
+            if let Some(app_dir) = residents_dir.parent() {
+                grant_app_packages_access(app_dir);
+            }
+            grant_app_packages_access(residents_dir);
+        }
+        grant_app_packages_access(&local);
+        Some(local)
     })
     .clone()
 }

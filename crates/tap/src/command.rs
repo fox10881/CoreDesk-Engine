@@ -178,6 +178,7 @@ fn build_prop_name() -> &'static [u16] {
 }
 
 pub fn run() {
+    crate::styler::wux::prearm_smeh_layout_from_stamp();
     // Spawn the FIFO worker first — `LoadLibraryW`/`FreeLibrary` and COM
     // diagnostics calls must never run inside `handle_message` (see `Job`).
     start_worker();
@@ -707,13 +708,11 @@ fn unload(hwnd: HWND) {
         let _ = crate::win32::RemovePropW(hwnd, pcwstr(build_prop_name()));
     }
     crate::tap_log!("unload: inert — timer killed, CmdHwnd unstamped");
-    crate::styler::wux::shutdown();
-    crate::styler::mux::shutdown();
-    crate::ebm::shutdown();
-    // Snapshot the service/watcher under the lock, then release it — the
-    // unadvise call marshals to the UI thread and must not race callbacks
-    // that take `shared`. Runs on a worker: a dead island pump parks the
-    // unadvise forever, and the command pump must stay responsive.
+    // Unadvise the visual-tree watchers BEFORE shutting down the stylers so
+    // late `OnVisualTreeChange` callbacks do not repopulate `known()` or
+    // `reported_types()` after `styler::*::shutdown()` clears them. Snapshot
+    // the service/watcher under the lock, then release it — the unadvise call
+    // marshals to the UI thread and must not race callbacks that take `shared`.
     let both = {
         let mut shared = shared::lock();
         [
@@ -741,6 +740,9 @@ fn unload(hwnd: HWND) {
             }
         }
     });
+    crate::styler::wux::shutdown();
+    crate::styler::mux::shutdown();
+    crate::ebm::shutdown();
     let mut shared = shared::lock();
     if !shared.host_wait.is_null() {
         unsafe {

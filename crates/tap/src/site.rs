@@ -67,12 +67,77 @@ pub fn install() {
 /// `ixde` failures are sticky: injecting into a just-started Explorer lands
 /// before the taskbar's DXamlCore registers with the diagnostics service,
 /// and the first `0x80070490` poisons **every** later attempt for the
-/// process's life (observed: 80+ consecutive failures; every success landed
-/// on attempt 1). So the first attempt waits for the host to be past boot —
-/// the command window's `WM_TIMER` retries `ensure_watching`, which calls
-/// `install` again once the age gate opens.
+/// process's life. Probe dynamically for the XAML host window
+/// (`Windows.UI.Composition.DesktopWindowContentBridge` under `Shell_TrayWnd`
+/// in Explorer, or `Windows.UI.Core.CoreWindow` in Start Menu / Notification
+/// Center hosts) plus a short 4 s settle floor, falling back to the 30 s
+/// age gate if the bridge window class ever changes on a future OS build.
 fn host_warm_enough() -> bool {
+    if host_xaml_bridge_ready() && host_warm_enough_ms(4_000) {
+        return true;
+    }
     host_warm_enough_ms(30_000)
+}
+
+/// Checks whether the current process already owns a live XAML host surface
+/// (`DesktopWindowContentBridge` child under `Shell_TrayWnd` in Explorer, or
+/// a `Windows.UI.Core.CoreWindow` in SMEH / Notification Center hosts).
+fn host_xaml_bridge_ready() -> bool {
+    unsafe {
+        let wux = win32::GetModuleHandleW(windows_core::w!("Windows.UI.Xaml.dll"));
+        if wux.is_null() {
+            return false;
+        }
+        let self_pid = win32::GetCurrentProcessId();
+        if crate::is_smeh() || crate::is_nch() || crate::is_searchhost() {
+            let mut after = HWND(core::ptr::null_mut());
+            loop {
+                let h = win32::FindWindowExW(
+                    HWND(core::ptr::null_mut()),
+                    after,
+                    windows_core::w!("Windows.UI.Core.CoreWindow"),
+                    windows_core::PCWSTR::null(),
+                );
+                if h.0.is_null() {
+                    break;
+                }
+                let mut pid = 0u32;
+                let _ = win32::GetWindowThreadProcessId(h, &mut pid);
+                if pid == self_pid {
+                    return true;
+                }
+                after = h;
+            }
+            return false;
+        }
+        let mut after = HWND(core::ptr::null_mut());
+        loop {
+            let tray = win32::FindWindowExW(
+                HWND(core::ptr::null_mut()),
+                after,
+                windows_core::w!("Shell_TrayWnd"),
+                windows_core::PCWSTR::null(),
+            );
+            if tray.0.is_null() {
+                break;
+            }
+            let mut pid = 0u32;
+            let _ = win32::GetWindowThreadProcessId(tray, &mut pid);
+            if pid == self_pid {
+                let bridge = win32::FindWindowExW(
+                    tray,
+                    HWND(core::ptr::null_mut()),
+                    windows_core::w!("Windows.UI.Composition.DesktopWindowContentBridge"),
+                    windows_core::PCWSTR::null(),
+                );
+                if !bridge.0.is_null() {
+                    return true;
+                }
+            }
+            after = tray;
+        }
+        false
+    }
 }
 
 /// `warmup_ms` — the WUX session needs 30s (the taskbar's DXamlCore
@@ -742,6 +807,10 @@ fn on_visual_tree_change(
     element: &VisualElement,
     mutationtype: VisualMutationType,
 ) {
+    if crate::command::is_unloaded() {
+        unsafe { free_element_strings(element) };
+        return;
+    }
     // DIAG: element-feed telemetry while bringing up the taskbar styler —
     // counts callbacks and logs the first element types seen per resident.
     {

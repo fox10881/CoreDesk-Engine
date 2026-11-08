@@ -50,13 +50,7 @@ impl PipeListener {
     /// process already owns the name (the caller should then run without IPC).
     pub fn bind(name: &str) -> Result<Self> {
         let wide = to_wide(name);
-        let security = match owner_only_security_descriptor() {
-            Ok(sd) => Some(sd),
-            Err(error) => {
-                tracing::warn!(%error, "ipc: could not build the pipe DACL; using the default one");
-                None
-            }
-        };
+        let security = Some(owner_only_security_descriptor()?);
         let first = create_instance(&wide, true, security.as_ref())?;
         Ok(Self {
             name: wide,
