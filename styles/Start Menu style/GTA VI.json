@@ -115,7 +115,7 @@
         "Background:=$Background",
         "BorderBrush:=$BorderBrush",
         "BorderThickness=$BorderThickness",
-        "CornerRadius=$CornerRadius"
+        "CornerRadius=48"
       ]
     },
     {
@@ -380,7 +380,8 @@
       "target": "StartMenu.SearchBoxToggleButton#SearchBoxToggleButton",
       "styles": [
         "Height=50",
-        "Width=350"
+        "Width=350",
+        "Margin=0,64,0,0"
       ]
     },
     {
@@ -502,7 +503,8 @@
       "styles": [
         "Width=470",
         "Height=740",
-        "Background:=$phWallCombined"
+        "VerticalAlignment=Bottom",
+        "Margin=0,0,0,12"
       ]
     },
     {
@@ -675,6 +677,12 @@
       "target": "Grid#SearchBoxOnTaskbarGleamContainer > Grid#SearchBoxOnTaskbarGleamImageContainer",
       "styles": [
         "Visibility=1"
+      ]
+    },
+    {
+      "target": "Cortana.UI.Views.TaskbarSearchPage > Grid#RootGrid > Cortana.UI.Views.RichSearchBoxControl#SearchBoxControl",
+      "styles": [
+        "Margin=0,56,0,0"
       ]
     }
   ],
