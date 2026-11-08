@@ -1243,13 +1243,18 @@ impl App {
         let variant = icon_variant_for(&self.state.config.settings.icons);
         if self.ctx.icons.borrow_mut().set_variant(variant) {
             self.ctx.bitmaps.borrow_mut().clear_keyed();
-            let k = icon_chameleon_k(&self.state.config.settings.icons);
             for w in self.fences.values().chain(self.desktop_windows.values()) {
-                // The card frame isn't an icon bitmap — it takes the same fade
-                // as a paint parameter instead of a pixel pass.
-                w.set_chameleon(k);
                 w.drop_icons();
             }
+        }
+        // Outside the variant-changed gate: `set_variant` compares the normalized variant,
+        // so a cache primed with the same variant (startup) or a window spawned after the
+        // last change both return false — gating the push on it left `FenceView.chameleon`
+        // stale, painting an opaque card over faded icons. The setter no-ops on equality,
+        // so the sweep costs nothing when nothing moved.
+        let k = icon_chameleon_k(&self.state.config.settings.icons);
+        for w in self.fences.values().chain(self.desktop_windows.values()) {
+            w.set_chameleon(k);
         }
     }
 }

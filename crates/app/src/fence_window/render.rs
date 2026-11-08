@@ -770,13 +770,15 @@ impl FenceViewState {
         let mut started = false;
         let mut pending = false;
         let mut icons = self.icons.borrow_mut();
+        let epoch = icons.epoch();
         for (i, item) in self.items.iter_mut().enumerate() {
-            if item.wants_icon(icon_px) && near(i) {
+            if item.wants_icon(icon_px, epoch) && near(i) {
                 let icon_only = item.icon_only || (rows && item.is_folder);
                 match icons.get(&item.icon_key, &item.path, icon_px, self.dpi, icon_only) {
                     Lookup::Ready(Some(img)) => {
                         item.icon = Some(img);
                         item.icon_px = icon_px;
+                        item.icon_epoch = epoch;
                         if item.icon_waited {
                             // Delivered by the worker: cross-fade over the loading tile (167 ms
                             // linear); a synchronous cache hit shows at once.

@@ -180,6 +180,10 @@ pub struct IconCache {
     /// instead of holding up the icons that are wanted now.
     live: Arc<Mutex<HashSet<u64>>>,
     variant: IconVariant,
+    /// Bumped every time `set_variant` actually changes the processing, so an item can tell
+    /// its still-painted icon was baked under an older variant and re-request it — without
+    /// blanking the cell first. `ItemView::icon_epoch` stamps it at each delivery.
+    variant_epoch: u64,
     stats: IconStats,
     next_id: u64,
 }
@@ -281,6 +285,7 @@ impl IconCache {
             rx,
             live,
             variant: IconVariant::default(),
+            variant_epoch: 0,
             stats: IconStats::default(),
             next_id: 0,
         }
@@ -294,11 +299,18 @@ impl IconCache {
             return false;
         }
         self.variant = variant;
+        self.variant_epoch += 1;
         self.map.clear();
         self.pending.clear();
         self.live_lock().clear();
         self.retry.clear();
         true
+    }
+
+    /// The current baking generation; an item icon delivered before the last
+    /// `set_variant` carries a lower epoch and is due for a re-request.
+    pub fn epoch(&self) -> u64 {
+        self.variant_epoch
     }
 
     fn live_lock(&self) -> std::sync::MutexGuard<'_, HashSet<u64>> {

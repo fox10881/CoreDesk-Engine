@@ -3599,12 +3599,15 @@ impl FenceChrome {
         // cell's alpha. Translucent = a subtle theme-tinted slot inside a crisp
         // white hairline; 纯色 = a uniform opaque tile in the chosen colour, sized
         // by the icon and reserved label rows, leaving added cell spacing transparent.
-        let cham_a = 1.0 - content.chameleon;
+        // Clamped: a stray k > 1 would turn `cham_a` negative and hand D2D a
+        // negative opacity — the reported "solid box / vanished icon" glitch.
+        let cham_k = content.chameleon.clamp(0.0, 1.0);
+        let cham_a = 1.0 - cham_k;
         match content.icon_frame_style {
             IconFrameStyle::Off => {}
             IconFrameStyle::Translucent => {
                 state.frame_fill.set_color(with_alpha(
-                    chameleon_rgb(theme.text_primary, content.chameleon),
+                    chameleon_rgb(theme.text_primary, cham_k),
                     0.07 * alpha * cham_a,
                 ));
                 state.frame_stroke.set_color(with_alpha(
@@ -3622,7 +3625,7 @@ impl FenceChrome {
                     content
                         .icon_frame_color
                         .unwrap_or(ColorF::new(1.0, 1.0, 1.0, 1.0)),
-                    content.chameleon,
+                    cham_k,
                 );
                 state.frame_shadow.set_color(with_alpha(
                     ColorF::new(0.0, 0.0, 0.0, 1.0),

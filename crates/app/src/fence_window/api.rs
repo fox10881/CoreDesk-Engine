@@ -1154,8 +1154,10 @@ impl FenceWindow {
     }
 
     /// Chameleon (FenceView.chameleon): paint-only — the card frame fades with
-    /// the icon bitmaps, no grid or label refit.
+    /// the icon bitmaps, no grid or label refit. `k` is clamped into 0..=1: a
+    /// stray un-normalised value would otherwise produce a negative frame alpha.
     pub fn set_chameleon(&self, k: f32) {
+        let k = k.clamp(0.0, 1.0);
         self.with_view(|v| {
             if v.chameleon == k {
                 return;
@@ -1969,11 +1971,14 @@ impl FenceWindow {
         });
     }
 
-    /// Drops every cached icon (global icon processing changed); they reload lazily.
+    /// The global icon processing changed (tint / chameleon / arrows): the icons every item
+    /// still shows were baked under the old variant — their `icon_epoch` is behind the
+    /// cache's, so `wants_icon` re-requests them on the next draw while the stale bitmap
+    /// stays up. The new one swaps in place when it lands — a slider drag never flashes
+    /// empty cells (the epoch bump in `set_variant` is what makes the re-request fire).
     pub fn drop_icons(&self) {
         self.with_view(|v| {
             for item in &mut v.items {
-                item.icon = None;
                 item.icon_failed = false;
                 item.icon_waited = false;
                 item.icon_fade = None;

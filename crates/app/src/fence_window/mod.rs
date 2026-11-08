@@ -281,6 +281,10 @@ pub struct ItemView {
     /// bitmap stays up, scaled into the new box, until the new size arrives; its GPU upload
     /// is keyed by this size, never by the size being shown.
     icon_px: u32,
+    /// `IconCache::variant_epoch` this bitmap was baked under; behind the current epoch the
+    /// icon stays painted (scaled/stale) while a re-request runs — no blank flash on a
+    /// tint/chameleon change.
+    icon_epoch: u64,
     icon_failed: bool,
     /// The icon lookup came back pending at least once: when it finally lands the bitmap
     /// cross-fades in over the loading tile (a synchronous cache hit shows at once).
@@ -310,9 +314,10 @@ impl ItemView {
         }
     }
 
-    /// The icon for `px` is still to come: none yet, or only one of another size.
-    fn wants_icon(&self, px: u32) -> bool {
-        (self.icon.is_none() || self.icon_px != px) && !self.icon_failed
+    /// The icon for `px` is still to come: none yet, only one of another size, or one baked
+    /// under an older icon variant (`epoch` ≠ the cache's current).
+    fn wants_icon(&self, px: u32, epoch: u64) -> bool {
+        (self.icon.is_none() || self.icon_px != px || self.icon_epoch != epoch) && !self.icon_failed
     }
 
     /// Details "大小" text; namespace items have none.
@@ -355,6 +360,7 @@ impl ItemView {
             size_label: None,
             icon: None,
             icon_px: 0,
+            icon_epoch: 0,
             icon_failed: false,
             icon_waited: false,
             icon_fade: None,
