@@ -1073,6 +1073,7 @@ impl FenceViewState {
             icon_text_color: self.icon_text_color,
             icon_frame_style: self.icon_frame_style,
             icon_frame_color: self.icon_frame_color,
+            chameleon: self.chameleon,
             icon_top: grid.metrics.icon_top,
             label_gap: grid.metrics.label_gap,
             scrollbar,

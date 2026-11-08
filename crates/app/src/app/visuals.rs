@@ -729,6 +729,16 @@ pub(super) fn icon_variant_for(s: &coredesk_core::IconSettings) -> IconVariant {
     }
 }
 
+/// The icon post-processing's fade factor for paint layers that aren't icons
+/// (the card frame): 0 = untouched, 1 = invisible — `Image::fade(k, 1-k)`.
+pub(super) fn icon_chameleon_k(s: &coredesk_core::IconSettings) -> f32 {
+    if s.chameleon {
+        s.chameleon_intensity.min(100) as f32 / 100.0
+    } else {
+        0.0
+    }
+}
+
 pub(super) fn fence_style_for(f: &coredesk_core::Fence) -> FenceStyle {
     let a = f.appearance.as_ref();
     let rgb = |c: [u8; 3]| coredesk_render::ColorF::from_rgba8(c[0], c[1], c[2], 0xFF);
@@ -1233,7 +1243,11 @@ impl App {
         let variant = icon_variant_for(&self.state.config.settings.icons);
         if self.ctx.icons.borrow_mut().set_variant(variant) {
             self.ctx.bitmaps.borrow_mut().clear_keyed();
+            let k = icon_chameleon_k(&self.state.config.settings.icons);
             for w in self.fences.values().chain(self.desktop_windows.values()) {
+                // The card frame isn't an icon bitmap — it takes the same fade
+                // as a paint parameter instead of a pixel pass.
+                w.set_chameleon(k);
                 w.drop_icons();
             }
         }

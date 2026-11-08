@@ -1175,6 +1175,21 @@ fn solid_card_stroke(fill: ColorF) -> ColorF {
     }
 }
 
+/// The Chameleon desaturation `Image::fade` applies to icon pixels, on a brush
+/// colour: pull each channel towards Rec.709 luminance by `k`. The (1−k) alpha
+/// half of the fade is applied at the `with_alpha` call sites, since a brush
+/// colour's channels are not premultiplied the way the icon bitmap's are.
+fn chameleon_rgb(c: ColorF, k: f32) -> ColorF {
+    let k = k.clamp(0.0, 1.0);
+    let lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    ColorF {
+        r: c.r + (lum - c.r) * k,
+        g: c.g + (lum - c.g) * k,
+        b: c.b + (lum - c.b) * k,
+        a: c.a,
+    }
+}
+
 fn solid_card_bounds(icon_w: f32, icon_h: f32, label_h: f32, cell: Rect) -> Rect {
     let width = (icon_w + 2.0 * SOLID_FRAME_PAD_X).min(cell.width().max(0.0));
     let height = (SOLID_FRAME_TOP_PAD + icon_h + label_h + SOLID_FRAME_BOTTOM_PAD)
@@ -1348,6 +1363,10 @@ pub struct ContentDraw<'a> {
     pub icon_frame_style: IconFrameStyle,
     /// 外框颜色 (FenceView.icon_frame_color): the SolidColor fill; None = white.
     pub icon_frame_color: Option<ColorF>,
+    /// Chameleon (FenceView.chameleon): 0..1 — `Image::fade` desaturates and
+    /// fades the icon bitmaps by it; the card under them follows the same
+    /// curve so the whole tile recedes into the backdrop together.
+    pub chameleon: f32,
     /// Cell top pad above the icon and gap between icon and label (GridMetrics).
     pub icon_top: f32,
     pub label_gap: f32,
@@ -3580,15 +3599,18 @@ impl FenceChrome {
         // cell's alpha. Translucent = a subtle theme-tinted slot inside a crisp
         // white hairline; 纯色 = a uniform opaque tile in the chosen colour, sized
         // by the icon and reserved label rows, leaving added cell spacing transparent.
+        let cham_a = 1.0 - content.chameleon;
         match content.icon_frame_style {
             IconFrameStyle::Off => {}
             IconFrameStyle::Translucent => {
-                state
-                    .frame_fill
-                    .set_color(with_alpha(theme.text_primary, 0.07 * alpha));
-                state
-                    .frame_stroke
-                    .set_color(with_alpha(ColorF::new(1.0, 1.0, 1.0, 1.0), 0.75 * alpha));
+                state.frame_fill.set_color(with_alpha(
+                    chameleon_rgb(theme.text_primary, content.chameleon),
+                    0.07 * alpha * cham_a,
+                ));
+                state.frame_stroke.set_color(with_alpha(
+                    ColorF::new(1.0, 1.0, 1.0, 1.0),
+                    0.75 * alpha * cham_a,
+                ));
                 session.fill_rounded_rect(&RoundedRect::uniform(rect, 6.0), &state.frame_fill);
                 session.draw_rounded_rect(&px.ring(rect, 6.0), &state.frame_stroke, px.hair());
             }
@@ -3596,16 +3618,20 @@ impl FenceChrome {
                 let card =
                     solid_card_rect(content, Rect::from_xywh(cell.x, cell.y, cell.w, cell.h));
                 let shadow = card.offset(0.0, 1.5);
-                let fill = content
-                    .icon_frame_color
-                    .unwrap_or(ColorF::new(1.0, 1.0, 1.0, 1.0));
-                state
-                    .frame_shadow
-                    .set_color(with_alpha(ColorF::new(0.0, 0.0, 0.0, 1.0), 0.16 * alpha));
-                state.frame_fill.set_color(with_alpha(fill, alpha));
+                let fill = chameleon_rgb(
+                    content
+                        .icon_frame_color
+                        .unwrap_or(ColorF::new(1.0, 1.0, 1.0, 1.0)),
+                    content.chameleon,
+                );
+                state.frame_shadow.set_color(with_alpha(
+                    ColorF::new(0.0, 0.0, 0.0, 1.0),
+                    0.16 * alpha * cham_a,
+                ));
+                state.frame_fill.set_color(with_alpha(fill, alpha * cham_a));
                 state
                     .frame_stroke
-                    .set_color(with_alpha(solid_card_stroke(fill), alpha));
+                    .set_color(with_alpha(solid_card_stroke(fill), alpha * cham_a));
                 session.fill_rounded_rect(
                     &RoundedRect::uniform(shadow, SOLID_FRAME_RADIUS),
                     &state.frame_shadow,

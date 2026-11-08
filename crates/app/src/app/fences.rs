@@ -264,6 +264,10 @@ impl App {
                 shown.view.label_font_weight.map(|w| w.dwrite()),
             );
             w.set_icon_frame_style(shown.view.icon_frame_style());
+            // Global (not per-fence): the card frame fades with the icons.
+            w.set_chameleon(super::visuals::icon_chameleon_k(
+                &self.state.config.settings.icons,
+            ));
             w.set_icon_colors(
                 fence_options::view_color(shown.view.icon_text_color.as_ref()),
                 fence_options::view_color(shown.view.icon_frame_color.as_ref()),

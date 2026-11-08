@@ -179,6 +179,7 @@ impl FenceWindow {
             icon_frame_style: IconFrameStyle::Off,
             icon_text_color: None,
             icon_frame_color: None,
+            chameleon: 0.0,
             items,
             tabs: Vec::new(),
             active: fence_id,
@@ -1148,6 +1149,18 @@ impl FenceWindow {
             }
             v.icon_text_color = text;
             v.icon_frame_color = frame;
+            let _ = v.redraw();
+        });
+    }
+
+    /// Chameleon (FenceView.chameleon): paint-only — the card frame fades with
+    /// the icon bitmaps, no grid or label refit.
+    pub fn set_chameleon(&self, k: f32) {
+        self.with_view(|v| {
+            if v.chameleon == k {
+                return;
+            }
+            v.chameleon = k;
             let _ = v.redraw();
         });
     }

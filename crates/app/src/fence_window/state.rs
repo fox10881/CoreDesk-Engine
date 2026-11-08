@@ -29,6 +29,10 @@ pub struct FenceViewState {
     /// 图标文字颜色 / 外框颜色: explicit per-fence inks; None follows the theme/white.
     pub(super) icon_text_color: Option<ColorF>,
     pub(super) icon_frame_color: Option<ColorF>,
+    /// Chameleon (settings.icons): 0..1 — the icon pixels desaturate and fade
+    /// by it; the card frame follows the same curve so the tile recedes with
+    /// its icon instead of floating opaque over the wallpaper.
+    pub(super) chameleon: f32,
     pub(super) content_dirty: bool,
     pub(super) content_ink: Option<ColorF>,
     pub(super) content_draws: u64,
