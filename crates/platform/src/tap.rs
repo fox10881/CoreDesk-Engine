@@ -335,13 +335,36 @@ fn expected_resident_class(base: &str) -> String {
 
 /// Discovery acceptance: live window, right process, new-enough protocol,
 /// and our build's class — a same-protocol older-hash resident is still
-/// foreign (it carries the bug being upgraded away).
+/// foreign (it carries the bug being upgraded away). `version == 0` is
+/// accepted too: a same-class window whose `Build` stamp is gone is THIS
+/// build's resident left inert by a prior app's shutdown — adoptable
+/// because the next hello revives it (see `command::revive`).
 fn resident_usable(cmd: HWND, pid: u32, min_version: usize) -> bool {
+    let version = resident_version(cmd);
     !cmd.0.is_null()
         && unsafe { IsWindow(cmd) }.0 != 0
         && resident_owner(cmd) == pid
-        && resident_version(cmd) >= min_version
+        && (version >= min_version || version == 0)
         && resident_class_name(cmd) == expected_resident_class("CoreDeskTAP")
+}
+
+/// Pokes a dormant same-build resident with a hello so `command::revive`
+/// wakes it before the caller's real payload. A resident is dormant when
+/// its window lives but its `Build` stamp is gone — `unload()` leaves it
+/// that way on app shutdown, and the next launch's first wire must be
+/// preceded by this poke or the resident drops it. Class-checked: foreign
+/// swept residents (different class) get nothing and stay inert forever.
+pub(crate) fn revive_if_dormant(hwnd: HWND, base: &str) {
+    if hwnd.0.is_null()
+        || unsafe { IsWindow(hwnd) }.0 == 0
+        || resident_version(hwnd) != 0
+        || resident_class_name(hwnd) != expected_resident_class(base)
+    {
+        return;
+    }
+    const HELLO: usize = u32::from_be_bytes(*b"NCHI") as usize;
+    let pid = std::process::id();
+    let _ = send_copydata(hwnd, HELLO, &pid.to_ne_bytes());
 }
 
 /// All resident command windows of the `base` class family owned by `pid`,
@@ -485,7 +508,7 @@ static STALE_RESIDENT_PID: AtomicU32 = AtomicU32::new(0);
 /// The build stamp a resident command window advertises — `0` when the
 /// property is missing (a resident older than this handshake, or a dying
 /// window mid-teardown).
-fn resident_version(hwnd: HWND) -> usize {
+pub(crate) fn resident_version(hwnd: HWND) -> usize {
     let name = wide("CoreDeskEngine.TAP.Build");
     unsafe { GetPropW(hwnd, PCWSTR(name.as_ptr())).0 as usize }
 }
@@ -494,7 +517,7 @@ fn resident_version(hwnd: HWND) -> usize {
 /// restarting explorer leaves its resident window alive briefly during
 /// teardown, and `FindWindowW` is global, so windows from other processes
 /// must neither satisfy the handshake nor poison the stale-pid latch.
-fn resident_owner(hwnd: HWND) -> u32 {
+pub(crate) fn resident_owner(hwnd: HWND) -> u32 {
     let mut pid = 0;
     unsafe {
         let _ = GetWindowThreadProcessId(hwnd, Some(&mut pid));

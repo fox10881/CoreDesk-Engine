@@ -588,7 +588,16 @@ fn deliver_host(pid: u32) -> bool {
     let (hwnd, wire, generation, hello_done) = {
         let nc = lock();
         match nc.hosts.get(&pid) {
-            Some(h) => (h.cmd_hwnd, nc.wire.clone(), nc.wire_gen, h.hello_sent),
+            // `hello_sent` alone isn't enough: a same-class window with no
+            // `Build` stamp is this build's resident left inert by a prior
+            // app's shutdown — it needs the revive hello even on a repeat
+            // delivery to the same hwnd.
+            Some(h) => (
+                h.cmd_hwnd,
+                nc.wire.clone(),
+                nc.wire_gen,
+                h.hello_sent && crate::tap::resident_version(h.cmd_hwnd) != 0,
+            ),
             None => return false,
         }
     };
@@ -760,6 +769,9 @@ pub fn ensure() {
                         || unsafe { IsWindow(h.cmd_hwnd) }.0 == 0
                         || h.delivered_gen != generation
                         || (themed && !h.hello_sent)
+                        // Dormant resident (`unload()` stripped its Build
+                        // stamp) — deliver_host re-sends the revive hello.
+                        || crate::tap::resident_version(h.cmd_hwnd) == 0
                 })
             })
             .collect()
@@ -846,6 +858,7 @@ pub fn shutdown() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bindings::{FindWindowExW, HWND_MESSAGE};
 
     /// Read-only sweep: lists every NC-family resident window per host —
     /// safe to run against a live styled system (sends nothing).
@@ -858,6 +871,119 @@ mod tests {
                 eprintln!("  resident {:?}", crate::tap::resident_class_name(h));
             }
         }
+    }
+
+    /// Read-only census: every `CoreDeskTAP*` message-only window on the
+    /// system — class, protocol stamp (0 = unloaded/inert), and owning
+    /// process name. Distinguishes a live resident from an inert leftover
+    /// that still satisfies class+owner matching but drops every wire.
+    #[test]
+    #[ignore]
+    fn census_residents() {
+        let mut after = HWND(core::ptr::null_mut());
+        loop {
+            let h = unsafe {
+                FindWindowExW(
+                    Some(HWND_MESSAGE),
+                    Some(after),
+                    PCWSTR::null(),
+                    PCWSTR::null(),
+                )
+            };
+            if h.0.is_null() {
+                break;
+            }
+            after = h;
+            let name = crate::tap::resident_class_name(h);
+            if !name.starts_with("CoreDeskTAP") {
+                continue;
+            }
+            let owner = crate::tap::resident_owner(h);
+            let ver = crate::tap::resident_version(h);
+            let pname = process_name_of(owner);
+            eprintln!(
+                "hwnd={:?} ver={ver} pid={owner} proc={pname} class={name}",
+                h.0
+            );
+        }
+    }
+
+    /// Dormancy probe: sends the unload message to the first live NC
+    /// resident (what `shutdown()` does) so it goes inert — protocol stamp
+    /// gone, window alive. The RUNNING app's `ensure` tick should then
+    /// adopt the window and revive it via hello; a follow-up
+    /// `census_residents` shows the stamp back. Mutates live state.
+    #[test]
+    #[ignore]
+    fn dormant_probe() {
+        for pid in find_nc_pids() {
+            for h in crate::tap::resident_windows_matching(pid, NC_CLASS_BASE) {
+                let ver = crate::tap::resident_version(h);
+                eprintln!("before: hwnd={:?} ver={ver} pid={pid}", h.0);
+                if ver == 0 {
+                    continue; // already inert — leave it
+                }
+                let msg = unsafe {
+                    RegisterWindowMessageW(PCWSTR(wide("CoreDeskEngine.TAP.Unload").as_ptr()))
+                };
+                let mut result = 0usize;
+                let sent = unsafe {
+                    SendMessageTimeoutW(
+                        h,
+                        msg,
+                        WPARAM(0),
+                        LPARAM(0),
+                        SMTO_ABORTIFHUNG | SMTO_BLOCK | SMTO_ERRORONEXIT,
+                        3_000,
+                        Some(&mut result),
+                    )
+                };
+                eprintln!(
+                    "sent unload: sent={:?} ver_after={}",
+                    sent,
+                    crate::tap::resident_version(h)
+                );
+            }
+        }
+    }
+
+    /// Exe name for `pid` via the same Toolhelp snapshot `find_nc_pids`
+    /// uses — `?` when the process is gone or access was denied.
+    fn process_name_of(pid: u32) -> String {
+        let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+        if snap.is_null() {
+            return "?".into();
+        }
+        let mut pe = ProcessEntry {
+            size: core::mem::size_of::<ProcessEntry>() as u32,
+            usage: 0,
+            pid: 0,
+            heap: 0,
+            module: 0,
+            threads: 0,
+            parent_pid: 0,
+            base_pri: 0,
+            flags: 0,
+            exe_file: [0; 260],
+        };
+        let mut cur = unsafe { Process32FirstW(snap, (&mut pe as *mut ProcessEntry).cast()) };
+        let mut name = String::from("?");
+        while cur.0 != 0 {
+            if pe.pid == pid {
+                let len = pe
+                    .exe_file
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(pe.exe_file.len());
+                name = from_wide(&pe.exe_file[..len]);
+                break;
+            }
+            cur = unsafe { Process32NextW(snap, (&mut pe as *mut ProcessEntry).cast()) };
+        }
+        unsafe {
+            let _ = CloseHandle(snap);
+        }
+        name
     }
 
     /// Diagnoses the live injection path against the running shell hosts —

@@ -418,9 +418,25 @@ fn handle_message(_hwnd: HWND, msg: u32, _wparam: WPARAM, lparam: LPARAM) {
         return;
     }
     // An unloaded resident is inert: its timer is killed, and any wire or
-    // hello still landing here must not re-arm styling or the death watch.
+    // hello still landing here must not re-arm styling or the death watch —
+    // EXCEPT a hello. Hellos only ever arrive on this build's expected
+    // class (the app sends them solely to windows it adopted), so one
+    // landing on an inert window means the app restarted while this host
+    // survived: `revive` undoes `unload()`, then the hello re-arms the
+    // death watch through the normal branch below.
     if is_unloaded() {
-        return;
+        let revive_hello = msg == WM_COPYDATA && {
+            let cds = lparam as *const CopyDataStruct;
+            !cds.is_null()
+                && matches!(
+                    unsafe { (*cds).dw_data },
+                    CDS_HELLO | CDS_TB_HELLO | CDS_NC_HELLO
+                )
+        };
+        if !revive_hello {
+            return;
+        }
+        revive(_hwnd);
     }
     if msg == WM_TIMER {
         // COM diagnostics + image-list work ride the worker — a marshaled
@@ -819,4 +835,24 @@ fn unload(hwnd: HWND) {
         }
         shared.host_process = core::ptr::null_mut();
     }
+}
+
+/// The reverse of `unload()` for a resident being re-claimed by a new app
+/// instance: the command window, pump, and worker never went away, so
+/// revival only re-stamps discovery props, re-arms the watcher cadence,
+/// and re-enables message handling — the teardown already left the engines
+/// on a clean slate, so the wire that follows the hello applies fresh.
+fn revive(hwnd: HWND) {
+    crate::tap_log!("resident revived by hello hwnd={:?}", hwnd.0);
+    unsafe {
+        let _ = SetPropW(
+            hwnd,
+            pcwstr(build_prop_name()),
+            TAP_PROTOCOL_VERSION as *mut core::ffi::c_void,
+        );
+        SetTimer(hwnd, RETRY_TIMER_ID, RETRY_TIMER_MS, core::ptr::null());
+    }
+    stamp_host_props(hwnd);
+    UNLOADED.store(false, Ordering::Release);
+    enqueue(Job::EnsureWatching);
 }

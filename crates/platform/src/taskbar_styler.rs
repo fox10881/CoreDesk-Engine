@@ -133,7 +133,10 @@ fn taskbar_is_vertical() -> bool {
 /// delivered to (hwnd differs) gets the hello re-armed first — the wire
 /// itself is (re)sent by the caller's decision.
 fn deliver(hwnd: crate::bindings::HWND, tb: &mut Tb) -> bool {
-    if tb.cmd_hwnd != hwnd.0 as usize {
+    // A same-class window with no `Build` stamp is this build's resident
+    // left inert by a prior app's shutdown — the revive hello must precede
+    // the wire even when the hwnd matches a previously-delivered one.
+    if tb.cmd_hwnd != hwnd.0 as usize || crate::tap::resident_version(hwnd) == 0 {
         tb.hello_sent = false;
     }
     if !tb.hello_sent {
@@ -241,8 +244,9 @@ pub fn ensure() {
         tb.cmd_hwnd = 0; // force re-delivery of the armed theme
     }
     // Resident identity decides re-delivery — a same-tick reinjection may
-    // have already consumed the `fresh` flag.
-    if tb.cmd_hwnd != hwnd.0 as usize {
+    // have already consumed the `fresh` flag. A `Build`-less window is a
+    // dormant same-build resident — re-deliver so its revive hello fires.
+    if tb.cmd_hwnd != hwnd.0 as usize || crate::tap::resident_version(hwnd) == 0 {
         let _ = deliver(hwnd, tb);
     }
 }

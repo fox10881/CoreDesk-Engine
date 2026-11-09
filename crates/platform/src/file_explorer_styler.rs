@@ -426,6 +426,7 @@ fn task_switcher_foreground() -> bool {
 /// config change re-read `config.ini` in already-loaded pids; it is a
 /// no-op where EBM was never loaded.
 fn deliver_ebm(cmd: crate::bindings::HWND, dll_path_utf16: &[u8]) {
+    crate::tap::revive_if_dormant(cmd, "CoreDeskTAP");
     let _ = crate::tap::send_copydata(cmd, CDS_EBM_UNLOAD, &[]);
     let _ = crate::tap::send_copydata(cmd, CDS_EBM_LOAD, dll_path_utf16);
 }

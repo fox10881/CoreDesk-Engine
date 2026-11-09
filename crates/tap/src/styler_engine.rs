@@ -1789,6 +1789,7 @@ impl Clone for StyleVal {
     }
 }
 
+#[derive(Clone)]
 struct ResolvedStyle {
     dp: DependencyProperty,
     name: String,
@@ -1801,12 +1802,19 @@ struct ResolvedStyle {
 /// All COM members are only touched on the XAML UI thread.
 unsafe impl Send for ResolvedRuleSet {}
 
+#[derive(Clone)]
 struct ResolvedRuleSet {
     matcher: Matcher,
     preds: Vec<(DependencyProperty, IInspectable)>,
     parents: Vec<(Matcher, Vec<(DependencyProperty, IInspectable)>)>,
     rules: Vec<ResolvedStyle>,
     captures: Vec<(DependencyProperty, String, String)>, // (dp, prop_name, var)
+    /// `style_from_setters` failed — the target type's module wasn't
+    /// loaded yet (shell hosts lazy-load e.g. `Windows.UI.ActionCenter.dll`
+    /// only when the panel first opens). A live element report of that
+    /// type proves it resolvable, so the ruleset retries there instead of
+    /// staying inert for the rest of the session.
+    failed: bool,
 }
 
 /// `Setter::Property()` returns the setter's own `DependencyProperty`
@@ -1929,16 +1937,20 @@ fn resolve_ruleset(rs: &WireRuleSet) -> ResolvedRuleSet {
             .collect(),
         rules: Vec::new(),
         captures: Vec::new(),
+        failed: false,
     };
     let Ok(style) = style_from_setters(&rs.matcher.type_name, NS_FE, &xaml) else {
         crate::tap_log!("resolve failed for {:?}", rs.matcher.type_name);
+        resolved.failed = true;
         return resolved;
     };
     let Ok(setters) = style.Setters() else {
+        resolved.failed = true;
         return resolved;
     };
     let Ok(setters) = Interface::cast::<windows_collections::IVector<xb::SetterBase>>(&setters)
     else {
+        resolved.failed = true;
         return resolved;
     };
     let mut idx = 0u32;
@@ -4483,6 +4495,44 @@ fn apply_theme_ui() {
     }
 }
 
+/// Re-resolves `failed` rulesets whose target is `type_name` — a live
+/// element report proves the type's assembly is now loaded, so
+/// `XamlReader.Load` succeeds where the apply-time attempt could not.
+/// Runs on the element's dispatcher thread (same affinity the original
+/// resolution needed), and leaves the marker set when the load still
+/// fails so a genuinely unknown type doesn't retry on every element.
+fn retry_failed_rules(type_name: &str) {
+    let Some(wire) = state().wire_rules.clone() else {
+        return;
+    };
+    // Resolve outside the TL borrow: `XamlReader.Load` must never run while
+    // a `borrow_mut` is held — any re-entrant `rules_for_thread` (a nested
+    // visual-tree callback) would panic the dispatcher outright.
+    let targets: Vec<usize> = TL_RULES.with(|tl| {
+        tl.borrow()
+            .1
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| r.failed && r.matcher.type_name == type_name)
+            .map(|(i, _)| i)
+            .collect()
+    });
+    for i in targets {
+        let Some(rs) = wire.get(i) else { break };
+        let fresh = resolve_ruleset(rs);
+        crate::tap_log!(
+            "styler: lazy resolve {type_name:?} {}",
+            if fresh.failed { "still failing" } else { "recovered" }
+        );
+        TL_RULES.with(|tl| {
+            let mut tl = tl.borrow_mut();
+            if let Some(slot) = Rc::make_mut(&mut tl.1).get_mut(i) {
+                *slot = fresh;
+            }
+        });
+    }
+}
+
 /// Tests an element against every ruleset (reverse file order → later rules
 /// win); applies on match. `fallback_type` = the reported `element.Type`.
 fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _parent: u64) -> bool {
@@ -4490,7 +4540,18 @@ fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _paren
     if let Some(old) = prev {
         cleanup_element(handle, &old);
     }
-    let eng_rules = rules_for_thread();
+    let mut eng_rules = rules_for_thread();
+    // A ruleset that failed `XamlReader.Load` at apply time (its shell
+    // assembly wasn't loaded yet — `ActionCenter.*`, `QuickActions.*`)
+    // retires permanently without this: when an element of that type
+    // finally reports, the load now succeeds and its rules come alive.
+    if eng_rules
+        .iter()
+        .any(|r| r.failed && r.matcher.type_name == fallback_type)
+    {
+        retry_failed_rules(fallback_type);
+        eng_rules = rules_for_thread();
+    }
     let matched: Vec<(usize, Vec<Option<FrameworkElement>>)> = {
         (0..eng_rules.len())
             .rev()

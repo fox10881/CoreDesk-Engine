@@ -344,8 +344,10 @@ fn deliver_locked(host: &mut Host, wire: &str) -> bool {
         return send_copydata(host.cmd_hwnd, CDS_RESET, &[]);
     }
     // Arm the DLL's host death-watch once per host lifetime — styles revert
-    // to stock if coredesk dies.
-    if !host.hello_sent {
+    // to stock if coredesk dies. A `Build`-less same-class window is this
+    // build's resident left inert by a prior shutdown — the revive hello
+    // must re-send even on a repeat delivery to the same hwnd.
+    if !host.hello_sent || crate::tap::resident_version(host.cmd_hwnd) == 0 {
         let pid = std::process::id();
         if send_copydata(host.cmd_hwnd, CDS_HELLO, &pid.to_ne_bytes()) {
             host.hello_sent = true;
@@ -424,7 +426,11 @@ pub fn ensure() {
             continue;
         }
         let stale = host.pid == 0 || unsafe { IsWindow(host.cmd_hwnd) }.0 == 0;
-        let stale = stale || {
+        let stale = stale
+            // Dormant resident (`unload()` stripped its `Build` stamp) —
+            // deliver_locked re-sends the revive hello, so treat as stale.
+            || crate::tap::resident_version(host.cmd_hwnd) == 0
+            || {
             // `IsWindow` on a dead-process window fails — also guard the pid.
             let alive = unsafe { OpenProcess(PROCESS_QUERY_INFORMATION, BOOL(0), host.pid) };
             if !alive.0.is_null() {

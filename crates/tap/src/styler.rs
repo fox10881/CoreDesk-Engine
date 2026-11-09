@@ -15,8 +15,13 @@ pub mod wux {
     type XDispatcher = xb::CoreDispatcher;
 
     /// The wux diagnostics service delivers `OnVisualTreeChange` on the
-    /// element's own UI thread — direct styling is correct.
-    const MARSHAL_ON_ELEMENT: bool = false;
+    /// element's own UI thread — but styling is deferred through the engine
+    /// dispatcher, and hosts like ShellExperienceHost run several wux
+    /// islands on DIFFERENT dispatcher threads (toast flyout, focus
+    /// session, notification panel). Elements reporting on a sibling
+    /// island must ride their own `DependencyObject::Dispatcher` —
+    /// otherwise `SetValue` lands cross-thread and fails RPC_E_WRONG_THREAD.
+    const MARSHAL_ON_ELEMENT: bool = true;
 
     /// `IReference<Windows.UI.Text.FontWeight>` signature + runtime name for
     /// the boxed-FontWeight workaround (`Setter.Value` hands back bare ints).
