@@ -847,6 +847,19 @@ pub fn shutdown() {
 mod tests {
     use super::*;
 
+    /// Read-only sweep: lists every NC-family resident window per host —
+    /// safe to run against a live styled system (sends nothing).
+    #[test]
+    #[ignore]
+    fn list_nc() {
+        for pid in find_nc_pids() {
+            eprintln!("host {pid}:");
+            for h in crate::tap::resident_windows_matching(pid, NC_CLASS_BASE) {
+                eprintln!("  resident {:?}", crate::tap::resident_class_name(h));
+            }
+        }
+    }
+
     /// Diagnoses the live injection path against the running shell hosts —
     /// prints the pids found; does not apply a theme (run `apply` through
     /// the settings CLI for that).
@@ -860,6 +873,18 @@ mod tests {
                 "cmd_window[{pid}] -> {:?}",
                 find_cmd_window(pid).map(|h| h.0)
             );
+            // NOTE: each hello arms the resident's host death-watch on THIS
+            // test process — when the test exits every probed resident
+            // resets its styling state, so run this only for diagnosis and
+            // expect a host/app restart afterwards.
+            for h in crate::tap::resident_windows_matching(pid, NC_CLASS_BASE) {
+                let own = std::process::id();
+                eprintln!(
+                    "  resident {:?} hello={}",
+                    crate::tap::resident_class_name(h),
+                    send_copydata(h, CDS_HELLO, &own.to_ne_bytes())
+                );
+            }
         }
     }
 }

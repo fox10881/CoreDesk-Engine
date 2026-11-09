@@ -69,6 +69,16 @@ pub(crate) fn is_unloaded() -> bool {
     UNLOADED.load(Ordering::Acquire)
 }
 
+/// `true` while the command pump thread lives — `ensure_boot`'s liveness
+/// gate: a resident whose `command::run` died before its window existed
+/// (bootstrap starved mid-attach, or an early return below) must re-run on
+/// the next host-alive signal, while a live one must never double-pump.
+static PUMP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn pump_running() -> bool {
+    PUMP.load(Ordering::Acquire)
+}
+
 /// Heavy wire work runs on ONE worker thread so the command pump never
 /// stalls: `LoadLibraryW`/`FreeLibrary` serialize on the loader lock,
 /// `ensure_watching` calls into COM (`InitializeXamlDiagnosticsEx`), and
@@ -178,6 +188,24 @@ fn build_prop_name() -> &'static [u16] {
 }
 
 pub fn run() {
+    if is_unloaded() || PUMP.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let _pump = PumpGuard;
+    run_inner();
+}
+
+/// Clears `PUMP` on every `run_inner` exit — early returns included — so
+/// the next `ensure_boot` nudge retries a pump that died before the
+/// command window existed.
+struct PumpGuard;
+impl Drop for PumpGuard {
+    fn drop(&mut self) {
+        PUMP.store(false, Ordering::Release);
+    }
+}
+
+fn run_inner() {
     crate::styler::wux::prearm_smeh_layout_from_stamp();
     // Spawn the FIFO worker first — `LoadLibraryW`/`FreeLibrary` and COM
     // diagnostics calls must never run inside `handle_message` (see `Job`).
@@ -203,9 +231,11 @@ pub fn run() {
             lpszClassName: pcwstr(class_name),
             hIconSm: core::ptr::null_mut(),
         };
-        if RegisterClassExW(&class) == 0 {
-            return;
-        }
+        // A starved earlier attempt may have left the class registered —
+        // it's OUR class (build-unique name, same wndproc and module), so
+        // `CreateWindowExW` still succeeds. Any real registration failure
+        // fails there instead, and `PUMP` clears for the next retry.
+        let _ = RegisterClassExW(&class);
         let hwnd = CreateWindowExW(
             0,
             pcwstr(class_name),
@@ -624,10 +654,30 @@ fn redraw_process_windows() {
     }
 }
 
+/// `WaitForSingleObject(_, 0)` result for a process that is still running
+/// — distinguishes a live death-watch from one whose callback is merely
+/// queued (a wait fires once and may run late).
+const WAIT_STILL_ALIVE: u32 = 0x102; // WAIT_TIMEOUT
+
 fn watch_host_process(pid: u32) {
     let mut shared = shared::lock();
     if !shared.host_wait.is_null() {
-        return; // already watching
+        // A hello from a NEW coredesk while the previous wait is still
+        // outstanding: if the watched process already exited, that wait is
+        // spent and must not block re-arming on the live owner — otherwise
+        // the stale `host_died` callback fires after the new wire lands
+        // and wipes it while the new app believes delivery succeeded.
+        if unsafe { WaitForSingleObject(shared.host_process, 0) } == WAIT_STILL_ALIVE {
+            return; // still watching a live host
+        }
+        unsafe {
+            let _ = UnregisterWaitEx(shared.host_wait, core::ptr::null_mut());
+            if !shared.host_process.is_null() {
+                let _ = CloseHandle(shared.host_process);
+            }
+        }
+        shared.host_wait = core::ptr::null_mut();
+        shared.host_process = core::ptr::null_mut();
     }
     let process = unsafe {
         OpenProcess(
@@ -669,16 +719,29 @@ fn watch_host_process(pid: u32) {
 /// hello re-arm the death watch.
 unsafe extern "system" fn host_died(_context: *mut core::ffi::c_void, _fired: windows_core::BOOL) {
     let _ = std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
+        // Stale callback guard, atomic with `watch_host_process`'s re-arm
+        // (same lock): a wait whose callback was queued while a NEW live
+        // coredesk already armed its own watch must not reset — the new
+        // app's pending/applied wires would die with the old owner's
+        // callback. Check AND clear under one lock so the verdict and the
+        // teardown can't interleave with a re-arm.
+        {
+            let mut shared = shared::lock();
+            if !shared.host_process.is_null()
+                && unsafe { WaitForSingleObject(shared.host_process, 0) } == WAIT_STILL_ALIVE
+            {
+                return;
+            }
+            shared.host_wait = core::ptr::null_mut();
+            if !shared.host_process.is_null() {
+                unsafe {
+                    let _ = CloseHandle(shared.host_process);
+                }
+                shared.host_process = core::ptr::null_mut();
+            }
+        }
         crate::styler::wux::reset();
         crate::styler::mux::reset();
-        let mut shared = shared::lock();
-        shared.host_wait = core::ptr::null_mut();
-        if !shared.host_process.is_null() {
-            unsafe {
-                let _ = CloseHandle(shared.host_process);
-            }
-            shared.host_process = core::ptr::null_mut();
-        }
     }));
 }
 

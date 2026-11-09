@@ -314,7 +314,7 @@ fn cmd_prop(hwnd: HWND) -> HWND {
 /// build (`CoreDeskTAP_v<ver>_<filehash>`), which is a stricter identity
 /// than the `CoreDeskEngine.TAP.Build` protocol stamp alone: two builds can
 /// share a protocol version while differing in code.
-fn resident_class_name(hwnd: HWND) -> String {
+pub(crate) fn resident_class_name(hwnd: HWND) -> String {
     let mut cls = [0u16; 96];
     let n = unsafe { GetClassNameW(hwnd, PWSTR(cls.as_mut_ptr()), cls.len() as i32) };
     String::from_utf16_lossy(&cls[..n.max(0) as usize])

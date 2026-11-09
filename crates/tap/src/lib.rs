@@ -102,9 +102,35 @@ macro_rules! tap_log {
 }
 pub(crate) use tap_log;
 
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
 static DLL_INSTANCE: AtomicPtr<core::ffi::c_void> = AtomicPtr::new(core::ptr::null_mut());
+
+/// A bootstrap spawn is in flight — dedups concurrent `ensure_boot`
+/// nudges landing while the spawned thread is still queueing
+/// `command::run`/`site::install`.
+static BOOTING: AtomicBool = AtomicBool::new(false);
+
+/// Bootstrap retry bounded by host liveness. The exported hook procs run
+/// inside the target only while it pumps messages, which is exactly when a
+/// resident whose `bootstrap` starved mid-attach (PLM suspension racing
+/// `DllMain`'s thread spawn, or a `command::run` that returned early) can
+/// finish booting — a mapped-but-windowless resident otherwise stays a
+/// zombie forever since `LoadLibrary` dedups every later inject. `DllMain`
+/// funnels through it too so first-attach and revive share the dedup; an
+/// inert (unloaded) resident never re-boots.
+fn ensure_boot() {
+    if crate::command::is_unloaded()
+        || crate::command::pump_running()
+        || BOOTING.swap(true, Ordering::AcqRel)
+    {
+        return;
+    }
+    std::thread::spawn(|| {
+        let _ = std::panic::catch_unwind(core::panic::AssertUnwindSafe(bootstrap));
+        BOOTING.store(false, Ordering::Release);
+    });
+}
 
 pub(crate) fn dll_instance() -> win32::HMODULE {
     DLL_INSTANCE.load(Ordering::Relaxed)
@@ -143,7 +169,7 @@ pub unsafe extern "system" fn DllMain(
                 );
             }
             tap_log!("DllMain attach hmod={hinstance:?} smeh={}", is_smeh());
-            std::thread::spawn(bootstrap);
+            ensure_boot();
         }
     } else if reason == 0
         && (is_explorer_process()
@@ -160,7 +186,9 @@ pub unsafe extern "system" fn DllMain(
 }
 
 /// The exported hook procedure — presence in this DLL is all the injection
-/// needs; it never does work itself.
+/// needs. It fires only while the hooked thread retrieves messages, which
+/// doubles as the liveness signal that retries a bootstrap starved
+/// mid-attach: two atomic loads per message when already booted.
 ///
 /// # Safety
 /// Called by Windows from the hooked thread with valid arguments.
@@ -170,14 +198,16 @@ pub unsafe extern "system" fn CallWndProc(
     wparam: win32::WPARAM,
     lparam: win32::LPARAM,
 ) -> win32::LRESULT {
+    ensure_boot();
     unsafe { win32::CallNextHookEx(core::ptr::null_mut(), code, wparam, lparam) }
 }
 
 /// The exported win-event procedure — the `WINEVENT_INCONTEXT` injection
 /// vector for suspended AppContainer hosts: the OS maps this DLL into the
 /// target when it fires its first accessibility event (i.e. exactly when a
-/// frozen host wakes to render). The proc itself is a no-op; `DllMain` did
-/// the bootstrap at map time.
+/// frozen host wakes to render). Every later event is another liveness
+/// signal — the same revive nudge `CallWndProc` gives message-pumping
+/// hosts — so a bootstrap that starved mid-attach retries here.
 ///
 /// # Safety
 /// Called by Windows inside the hooked process with valid arguments.
@@ -191,6 +221,7 @@ pub unsafe extern "system" fn WinEventProc(
     _tid: u32,
     _time: u32,
 ) {
+    ensure_boot();
 }
 
 fn process_name_is(target: &str) -> bool {
