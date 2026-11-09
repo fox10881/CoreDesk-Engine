@@ -1815,7 +1815,16 @@ struct ResolvedRuleSet {
     /// type proves it resolvable, so the ruleset retries there instead of
     /// staying inert for the rest of the session.
     failed: bool,
+    /// `retry_failed_rules` count — capped at `RETRY_LIMIT` so a type that
+    /// still fails `XamlReader.Load` with its element live doesn't re-run
+    /// the load on every matching element report.
+    attempts: u8,
 }
+
+/// How many times a failed ruleset may re-resolve per session — covers
+/// assemblies that load a few beats after their first element reports,
+/// while a genuinely unresolvable type gives up cheaply.
+const RETRY_LIMIT: u8 = 4;
 
 /// `Setter::Property()` returns the setter's own `DependencyProperty`
 /// projection; the element APIs take this bindings' — same IID, one QI away.
@@ -1938,6 +1947,7 @@ fn resolve_ruleset(rs: &WireRuleSet) -> ResolvedRuleSet {
         rules: Vec::new(),
         captures: Vec::new(),
         failed: false,
+        attempts: 0,
     };
     let Ok(style) = style_from_setters(&rs.matcher.type_name, NS_FE, &xaml) else {
         crate::tap_log!("resolve failed for {:?}", rs.matcher.type_name);
@@ -4020,6 +4030,11 @@ fn restore_element(es: &ElemState) {
         Ok(d) => d,
         Err(_) => return,
     };
+    // `cleanup_element`'s rule applies here too: a detached/dying element
+    // is a zombie — writes on it stow inside XAML (`0xc000027b`) and kill
+    // the host. Callbacks still unregister; values restore only while the
+    // element is still parented.
+    let live_in_tree = VisualTreeHelper::GetParent(&dobj).is_ok();
     for cap in &es.captures {
         if let (Some(dp), token) = (&cap.dp, cap.token)
             && token != 0
@@ -4033,6 +4048,9 @@ fn restore_element(es: &ElemState) {
         };
         if slot.token != 0 {
             let _ = dobj.UnregisterPropertyChangedCallback(dp, slot.token);
+        }
+        if !live_in_tree {
+            continue;
         }
         MODIFYING.store(true, Ordering::Relaxed);
         match &slot.original {
@@ -4060,13 +4078,12 @@ fn restore_all() {
     for es in elements {
         if MARSHAL_ON_ELEMENT {
             // Elements may live on different island dispatchers — restore
-            // each on its own UI thread.
-            if let Some(d) = es
-                .upgrade_el()
-                .as_ref()
-                .and_then(elem_dispatcher)
-                .or_else(|| state().dispatcher.clone())
-            {
+            // each on its own UI thread. Only a LIVE element names its
+            // island: `restore_element` early-returns on dead refs, so
+            // posting the engine dispatcher instead would just ship
+            // apartment-affine `original`/`last_applied` values to a
+            // foreign island's queue to be dropped there.
+            if let Some(d) = es.upgrade_el().as_ref().and_then(elem_dispatcher) {
                 let payload = UiBound(es);
                 post_ui(&d, Prio::Normal, move || {
                     // Borrow `payload` first — `payload.0` alone would be a
@@ -4508,18 +4525,21 @@ fn retry_failed_rules(type_name: &str) {
     // Resolve outside the TL borrow: `XamlReader.Load` must never run while
     // a `borrow_mut` is held — any re-entrant `rules_for_thread` (a nested
     // visual-tree callback) would panic the dispatcher outright.
-    let targets: Vec<usize> = TL_RULES.with(|tl| {
+    let targets: Vec<(usize, u8)> = TL_RULES.with(|tl| {
         tl.borrow()
             .1
             .iter()
             .enumerate()
-            .filter(|(_, r)| r.failed && r.matcher.type_name == type_name)
-            .map(|(i, _)| i)
+            .filter(|(_, r)| {
+                r.failed && r.attempts < RETRY_LIMIT && r.matcher.type_name == type_name
+            })
+            .map(|(i, r)| (i, r.attempts))
             .collect()
     });
-    for i in targets {
+    for (i, prev) in targets {
         let Some(rs) = wire.get(i) else { break };
-        let fresh = resolve_ruleset(rs);
+        let mut fresh = resolve_ruleset(rs);
+        fresh.attempts = prev + 1;
         crate::tap_log!(
             "styler: lazy resolve {type_name:?} {}",
             if fresh.failed { "still failing" } else { "recovered" }
@@ -4547,7 +4567,7 @@ fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _paren
     // finally reports, the load now succeeds and its rules come alive.
     if eng_rules
         .iter()
-        .any(|r| r.failed && r.matcher.type_name == fallback_type)
+        .any(|r| r.failed && r.attempts < RETRY_LIMIT && r.matcher.type_name == fallback_type)
     {
         retry_failed_rules(fallback_type);
         eng_rules = rules_for_thread();
@@ -4580,6 +4600,12 @@ pub fn on_element(
     parent: u64,
     reported_type: &str,
 ) {
+    // Teardown gate — while `unload` runs, elements are dying under the
+    // watcher; queuing style work into a tearing-down tree is the
+    // stowed-fault path that kills the host.
+    if crate::command::is_unloaded() {
+        return;
+    }
     if is_immersive(element.Handle.0, parent, reported_type) {
         // Excluded subtree — release the reported handles without any
         // matcher, dispatcher or write work. Immersive churn also stays
@@ -4732,10 +4758,11 @@ pub fn on_element_removed(handle: u64) {
     };
     if let Some(es) = es {
         let d = if MARSHAL_ON_ELEMENT {
-            es.upgrade_el()
-                .as_ref()
-                .and_then(elem_dispatcher)
-                .or_else(|| state().dispatcher.clone())
+            // Same rule as `restore_all`: only a live element names its
+            // island. A dead ref falls through to inline cleanup on this
+            // Remove-callback thread — for wux the element's own island
+            // thread, the best remaining apartment for its originals.
+            es.upgrade_el().as_ref().and_then(elem_dispatcher)
         } else {
             state().dispatcher.clone()
         };

@@ -62,6 +62,17 @@ pub mod wux {
             Prio::Normal => xb::CoreDispatcherPriority::Normal,
             Prio::High => xb::CoreDispatcherPriority::High,
         };
+        // A work item must never hand an error or a panic back to XAML's
+        // dispatch loop: a failed `DispatchedHandler` is stowed as
+        // `0xc000027b` and kills the host process outright.
+        let f = move || {
+            match std::panic::catch_unwind(core::panic::AssertUnwindSafe(&f)) {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => crate::tap_log!("styler: dispatched item failed: {e:?}"),
+                Err(_) => crate::tap_log!("styler: dispatched item panicked"),
+            }
+            Ok(())
+        };
         let _ = d.RunAsync(prio, &xb::DispatchedHandler::new(f));
     }
 
@@ -142,6 +153,17 @@ pub mod mux {
             Prio::Low => xb::DispatcherQueuePriority::Low,
             Prio::Normal => xb::DispatcherQueuePriority::Normal,
             Prio::High => xb::DispatcherQueuePriority::High,
+        };
+        // Same airlock as the wux engine: a failed or panicking handler
+        // must never reach XAML's dispatch loop (stowed `0xc000027b`
+        // kills the host).
+        let f = move || {
+            match std::panic::catch_unwind(core::panic::AssertUnwindSafe(&f)) {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => crate::tap_log!("styler: dispatched item failed: {e:?}"),
+                Err(_) => crate::tap_log!("styler: dispatched item panicked"),
+            }
+            Ok(())
         };
         let _ = d.TryEnqueueWithPriority(prio, &xb::DispatcherQueueHandler::new(f));
     }
