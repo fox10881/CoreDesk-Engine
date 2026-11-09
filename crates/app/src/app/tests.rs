@@ -40,6 +40,39 @@ fn peek_search_matches_names_and_hidden_extensions() {
     assert!(search_matches("Shell item", None, "shell"));
 }
 
+/// The transcode target is the largest monitor proportionally fit inside the
+/// res-cap box — decode cost follows the encoded frame, never the raw display.
+#[test]
+fn capped_transcode_target_clamps_to_res_cap() {
+    use super::settings::capped_transcode_target;
+    let uhd = [(3840, 2160)];
+    // A 4K desktop under the 1080p cap encodes a 1080p file.
+    assert_eq!(capped_transcode_target(&uhd, "1080p"), (1920, 1080));
+    assert_eq!(capped_transcode_target(&uhd, "2k"), (2560, 1440));
+    // Native / unknown caps keep the display-sized target.
+    assert_eq!(capped_transcode_target(&uhd, "4k"), (3840, 2160));
+    assert_eq!(capped_transcode_target(&uhd, "native"), (3840, 2160));
+    assert_eq!(capped_transcode_target(&uhd, "bogus"), (3840, 2160));
+    // A small monitor never upscales, whatever the cap.
+    assert_eq!(
+        capped_transcode_target(&[(1366, 768)], "1080p"),
+        (1366, 768)
+    );
+    assert_eq!(capped_transcode_target(&[(2560, 1440)], "4k"), (2560, 1440));
+    // Ultrawide keeps its aspect inside the box (fit, not componentwise min).
+    assert_eq!(
+        capped_transcode_target(&[(3440, 1440)], "1080p"),
+        (1920, 804)
+    );
+    // The largest-by-area monitor drives the target.
+    assert_eq!(
+        capped_transcode_target(&[(1920, 1080), (3840, 2160), (1280, 720)], "1080p"),
+        (1920, 1080)
+    );
+    // No monitors → the historical default, still capped.
+    assert_eq!(capped_transcode_target(&[], "1080p"), (1920, 1080));
+}
+
 mod ipc {
     use super::super::fence_options::{FenceProp, TitleBarChoice, parse_fence_prop};
     use super::super::ipc::{

@@ -384,6 +384,10 @@ pub struct App {
     /// A video-wallpaper transcode running on a worker — the player stays off
     /// until `video_wallpaper_path` flips to the optimized file.
     video_transcode: Option<settings::VideoTranscode>,
+    /// Sources this session already ran through the lazy res-cap optimization
+    /// pass — compliant results and failures alike, so a `video_wallpaper_path`
+    /// that stays configured never respawns a probe on every sync poll.
+    video_transcode_seen: std::collections::HashSet<std::path::PathBuf>,
     /// Toast owed to a user pick whose apply goes through the transcode-then-
     /// swap pipeline — consumed when the player finally installs.
     pending_video_toast: bool,
@@ -1452,6 +1456,7 @@ impl App {
             wmf_player: None,
             video_swap: None,
             video_transcode: None,
+            video_transcode_seen: std::collections::HashSet::new(),
             pending_video_toast: false,
             static_under_video: None,
             video_start_failures: 0,

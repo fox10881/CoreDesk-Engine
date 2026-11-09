@@ -402,6 +402,9 @@ pub(super) struct VideoTranscode {
     /// The original pick — `video_wallpaper_path` holds it until the optimized
     /// file lands.
     src: PathBuf,
+    /// `(w, h)` the worker encodes to — a cap-change re-transcode spawns only
+    /// when this differs from the in-flight run's.
+    target: (u32, u32),
     toast: bool,
     rx: std::sync::mpsc::Receiver<std::result::Result<Option<PathBuf>, String>>,
 }
@@ -423,6 +426,23 @@ fn spawn_video_transcode(
             ));
         });
     rx
+}
+
+/// Largest monitor's physical pixels proportionally clamped inside the
+/// res-cap box — `clamped_buffer_size` semantics applied to the transcode
+/// target, so an encoded file's decode cost follows `wallpaper_res_cap`,
+/// not the raw display. Never upscales a small monitor. Pure so tests can
+/// pin the math without a running app.
+pub(super) fn capped_transcode_target(monitors: &[(u32, u32)], res_cap: &str) -> (u32, u32) {
+    let (mw, mh) = monitors
+        .iter()
+        .copied()
+        .max_by_key(|(w, h)| w * h)
+        .unwrap_or((1920, 1080));
+    coredesk_platform::wmf_wallpaper::WallpaperRenderConfig::from_res_cap(
+        false, false, res_cap, 0, 0, false,
+    )
+    .clamped_buffer_size(mw, mh)
 }
 
 /// Stops a player off the UI thread (stop+join ≈70 ms), serialized with swap
@@ -2216,6 +2236,7 @@ impl App {
             || new.eco_mode != old.eco_mode
             || new.secondary_offset_x != old.secondary_offset_x
             || new.secondary_offset_y != old.secondary_offset_y;
+        let res_cap_changed = new.wallpaper_res_cap != old.wallpaper_res_cap;
         let eco_changed = new.eco_mode != old.eco_mode;
         // 「调整大小时按整行整列对齐」 switched on keeps every rectangle: the rows fill any
         // height with whole icons (redrawn above), and rounding would undo fences lined up.
@@ -2252,6 +2273,11 @@ impl App {
             // cover/contain restart rides the sync right below.
             self.retune_background_fit();
         }
+        if res_cap_changed {
+            // The decode-side saving `fit_changed`'s buffer clamp cannot give:
+            // re-encode the configured file to the new cap box.
+            self.retranscode_video_for_cap();
+        }
         self.sync_video_wallpaper();
         self.push_settings_state();
     }
@@ -2266,6 +2292,101 @@ impl App {
             s.secondary_offset_y,
             s.eco_mode,
         )
+    }
+
+    /// The frame size imports and cap-change re-optimizes encode to. Eco Mode
+    /// stays out: it is a live buffer-level clamp, and keying the file cache
+    /// to a tray toggle would rewrite the asset on every flip.
+    fn video_transcode_target(&self) -> (u32, u32) {
+        capped_transcode_target(
+            &self
+                .state
+                .work_areas
+                .iter()
+                .map(|a| a.screen_px())
+                .map(|[w, h]| (w.max(0) as u32, h.max(0) as u32))
+                .collect::<Vec<_>>(),
+            &self.state.config.settings.wallpaper_res_cap,
+        )
+    }
+
+    /// A configured video that predates the res-cap (restored config, bundled
+    /// theme, pick from before the setting existed) gets one optimization pass
+    /// per path per session: compliant files cost a worker probe only, heavier
+    /// ones land as a smaller `video-*` cache file the config flips to on
+    /// `poll_video_transcode`. Returns `true` when a check spawned — the
+    /// player waits for the next poll, the running one keeps the old file.
+    fn maybe_lazy_video_transcode(&mut self, path: &Path) -> bool {
+        if !path.is_file() || self.video_transcode.is_some() {
+            return false;
+        }
+        let Some(dir) = self
+            .state
+            .config_path()
+            .parent()
+            .map(|p| p.join("imported_wallpapers"))
+        else {
+            return false;
+        };
+        if !self.video_transcode_seen.insert(path.to_path_buf()) {
+            return false;
+        }
+        let target = self.video_transcode_target();
+        let epoch = VIDEO_SWAP_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+        self.video_transcode = Some(VideoTranscode {
+            epoch,
+            src: path.to_path_buf(),
+            target,
+            toast: false,
+            rx: spawn_video_transcode(path.to_path_buf(), dir, target),
+        });
+        true
+    }
+
+    /// `wallpaper_res_cap` moved: re-optimize the configured video for the new
+    /// box. Down-caps rewrite the cache file (the sink keeps only the newest
+    /// `video-*` sibling); up-caps probe-skip and keep the current asset —
+    /// transcoding can shrink, never regrow. Silent and async: the running
+    /// player holds the old file until `poll_video_transcode` flips the path.
+    fn retranscode_video_for_cap(&mut self) {
+        let Some(src) = self
+            .state
+            .config
+            .settings
+            .video_wallpaper_path
+            .clone()
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from)
+        else {
+            return;
+        };
+        if !src.is_file() {
+            return;
+        }
+        let Some(dir) = self
+            .state
+            .config_path()
+            .parent()
+            .map(|p| p.join("imported_wallpapers"))
+        else {
+            return;
+        };
+        let target = self.video_transcode_target();
+        if self
+            .video_transcode
+            .as_ref()
+            .is_some_and(|t| t.src == src && t.target == target)
+        {
+            return;
+        }
+        let epoch = VIDEO_SWAP_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+        self.video_transcode = Some(VideoTranscode {
+            epoch,
+            src: src.clone(),
+            target,
+            toast: false,
+            rx: spawn_video_transcode(src, dir, target),
+        });
     }
 
     /// Starts or stops the WMF desktop video wallpaper player to match
@@ -2296,6 +2417,11 @@ impl App {
             return;
         };
         let path = PathBuf::from(&path_str);
+        // A file configured before the cap existed gets one optimization
+        // pass; the player install waits for the next poll when it spawns.
+        if self.maybe_lazy_video_transcode(&path) {
+            return;
+        }
         let config = self.wallpaper_render_config();
         if self
             .video_swap
@@ -2493,6 +2619,11 @@ impl App {
         // A swap for this exact target is already in flight — keep it; a swap
         // for a different target gets superseded by the spawn below.
         let path = PathBuf::from(&path_str);
+        // Boot/restore path for the same lazy cap optimization `sync` runs —
+        // the poll cadence defers the player until the probe lands.
+        if self.maybe_lazy_video_transcode(&path) {
+            return;
+        }
         let config = self.wallpaper_render_config();
         if self
             .video_swap
@@ -2830,21 +2961,16 @@ impl App {
             });
             return;
         };
-        // The largest connected display's physical pixels — transcoding to
-        // any bigger frame would only inflate the bundle.
-        let (tw, th) = self
-            .state
-            .work_areas
-            .iter()
-            .map(|a| a.screen_px())
-            .map(|[w, h]| (w.max(0) as u32, h.max(0) as u32))
-            .max_by_key(|(w, h)| w * h)
-            .unwrap_or((1920, 1080));
+        // The largest connected display's physical pixels clamped inside the
+        // res-cap box — decode cost follows the file's frame size, so matching
+        // the cap is where the real decode/processing savings come from.
+        let target = self.video_transcode_target();
         self.video_transcode = Some(VideoTranscode {
             epoch,
             src: path.to_path_buf(),
+            target,
             toast: true,
-            rx: spawn_video_transcode(path.to_path_buf(), dir, (tw, th)),
+            rx: spawn_video_transcode(path.to_path_buf(), dir, target),
         });
     }
 
