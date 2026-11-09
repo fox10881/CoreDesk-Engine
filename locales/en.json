@@ -760,9 +760,9 @@
   "副屏垂直偏移 (Offset Y)": "Secondary Monitor Vertical Offset (Offset Y)",
   "垂直移动跨屏壁纸，修正显示器之间的高度差": "Shift spanned wallpapers vertically to fix height misalignment across monitors",
   "节能模式 (Eco Mode)": "Eco Mode (Lightweight Performance)",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅降低内部渲染分辨率并将帧率限制为 30 FPS": "Keeps video wallpapers, live weather/particle effects, and the audio visualizer running while downscaling internal buffers and capping at 30 FPS",
   "低配置设备？启用节能模式可节省约 413 MB 内存和 49% 的显卡负载。": "Low-spec or battery device? Enable Eco Mode to save ~413 MB of memory and 49% of GPU load.",
   "启用节能模式": "Enable Eco Mode",
   "隐藏": "Dismiss",
-  "完成": "Done"
+  "完成": "Done",
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Keeps video wallpapers, weather/particle effects and the audio visualizer running — caps the frame rate at 30 FPS and trims effect cost without changing render resolution"
 }

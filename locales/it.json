@@ -760,9 +760,9 @@
   "副屏垂直偏移 (Offset Y)": "Scostamento verticale monitor secondario (Offset Y)",
   "垂直移动跨屏壁纸，修正显示器之间的高度差": "Sposta verticalmente lo sfondo esteso per correggere il disallineamento verticale tra monitor",
   "节能模式 (Eco Mode)": "Modalità Eco (Prestazioni leggere)",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅降低内部渲染分辨率并将帧率限制为 30 FPS": "Mantiene attivi sfondi video, effetti meteo/particelle e visualizzatore audio riducendo il buffer interno e limitando a 30 FPS",
   "低配置设备？启用节能模式可节省约 413 MB 内存和 49% 的显卡负载。": "Hardware leggero o a batteria? Attiva la Modalità Eco per risparmiare 413 MB di memoria e il 49% di carico GPU.",
   "启用节能模式": "Attiva risparmio",
   "隐藏": "Nascondi",
-  "完成": "Fatto"
+  "完成": "Fatto",
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Mantiene sfondi video, effetti meteo/particelle e visualizzatore audio attivi — limita i fotogrammi a 30 FPS e riduce il costo degli effetti senza cambiare la risoluzione di rendering"
 }

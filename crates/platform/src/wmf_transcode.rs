@@ -8,13 +8,15 @@
 //! files — the name alone is the reuse key, so re-picking the same file or
 //! re-deriving a cap variant never pays a second encode.
 //!
-//! [`ensure_video_master`] pins the lineage's fidelity ceiling: the asset in
-//! `imported_wallpapers/` at the source's NATIVE resolution that every
-//! res-cap variant transcodes from. Raising the cap therefore re-derives from
-//! the master instead of trying to regrow pixels a downscale discarded.
+//! [`ensure_video_master`] pins the lineage's fidelity ceiling: the source's
+//! ORIGINAL BYTES preserved inside `imported_wallpapers/` (verbatim copy, no
+//! re-encode) that every res-cap variant transcodes from. Raising the cap
+//! therefore re-derives from the master instead of trying to regrow pixels a
+//! downscale discarded — and when the cap already covers the master,
+//! [`optimize_for_display`] plays the master itself at maximum quality.
 //!
-//! `.cde` bundles ship the master: a 250 MB 4K loop arrives as a ~30 MB
-//! native-resolution MP4 the player also fits in the RAM byte-stream cache.
+//! `.cde` bundles ship the master: a 250 MB 4K loop arrives whole, so an
+//! importing machine can derive any cap variant from the same ceiling.
 
 use crate::wide::to_wide;
 use crate::wmf_bindings::{
@@ -138,46 +140,89 @@ fn stem_prefix(src: &Path, src_len: u64) -> String {
 
 /// Resolves the transcode/archive master for `src`: `src` itself when it
 /// already lives inside `cache_dir` (a bundled `theme-background-*`, an
-/// existing `video-*` asset — it is the best copy the app owns), else an
-/// asset INSIDE `cache_dir` at the source's native resolution — a re-encode
-/// at wallpaper bitrate, or the source's own bytes adopted under the
-/// canonical `video-*` name when the compliance probe says no encode is
-/// needed. Every res-cap variant transcodes from this file, so it is the
-/// resolution ceiling the app never throws away.
+/// existing `video-*`/`master-*` asset — it is the best copy the app owns),
+/// else a VERBATIM byte copy at `master-<srclen>-<srcmtime>.<ext>` — the
+/// original file preserved whole: full resolution, full bitrate, no
+/// re-encode. Every res-cap variant transcodes from this file, so it is the
+/// fidelity ceiling the app keeps and quality can always be derived back up.
+/// Abandoned `master-*` files from previous picks are retired here — at most
+/// one lineage is active.
 pub fn ensure_video_master(src: &Path, cache_dir: &Path) -> std::result::Result<PathBuf, String> {
     let abs_src = std::path::absolute(src).map_err(|e| format!("abs src: {e}"))?;
     let abs_dir = std::path::absolute(cache_dir).map_err(|e| format!("abs dir: {e}"))?;
-    if abs_src.starts_with(&abs_dir) {
-        return Ok(src.to_path_buf());
+    let master = if abs_src.starts_with(&abs_dir) {
+        src.to_path_buf()
+    } else {
+        let meta = std::fs::metadata(src).map_err(|e| format!("stat {}: {e}", src.display()))?;
+        let mtime = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let ext = src.extension().and_then(|e| e.to_str()).unwrap_or("mp4");
+        let dest = abs_dir.join(format!("master-{:x}-{mtime:x}.{ext}", meta.len()));
+        // Reuse-keyed: identical name means identical pick — skip the copy.
+        let stale =
+            !dest.is_file() || std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0) != meta.len();
+        if stale {
+            std::fs::create_dir_all(&abs_dir).map_err(|e| format!("cache dir: {e}"))?;
+            std::fs::copy(src, &dest).map_err(|e| format!("copy master: {e}"))?;
+            tracing::info!(
+                src = %src.display(),
+                dest = %dest.display(),
+                bytes = meta.len(),
+                "wmf transcode: original bytes preserved as video master"
+            );
+        }
+        dest
+    };
+    // Retire abandoned `master-*` files — one lineage is active at a time.
+    // Compared by file name: `read_dir` yields `abs_dir`-formed paths while
+    // `master` may be differently normalized.
+    let keep = master
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(String::from);
+    if let Ok(rd) = std::fs::read_dir(&abs_dir) {
+        for e in rd.flatten() {
+            let p = e.path();
+            let stale = p
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("master-") && Some(n) != keep.as_deref());
+            if stale {
+                let _ = std::fs::remove_file(&p);
+            }
+        }
     }
-    // Probe once up front: the encode target is the source's own frame size —
-    // the master keeps the full resolution regardless of the current res-cap.
-    let probe = probe_video(src).map_err(|e| format!("probe {}: {e}", src.display()))?;
-    if let Some(encoded) = transcode_for_display(src, cache_dir, probe.width, probe.height)? {
-        return Ok(encoded);
-    }
-    // Already lean at native size — no re-encode, but the master must still
-    // live inside the cache so an external pick's later deletion (or a theme
-    // export) cannot strand the lineage. Adopt the bytes under the same
-    // `video-*` name an encode would have written: the reuse key stays exact.
-    std::fs::create_dir_all(cache_dir).map_err(|e| format!("cache dir: {e}"))?;
-    let dest = std::path::absolute(cache_dir)
-        .map_err(|e| format!("cache dir: {e}"))?
-        .join(optimized_name(
-            src,
-            probe.file_len,
-            probe.width,
-            probe.height,
-        ));
-    if !dest.is_file() {
-        std::fs::copy(src, &dest).map_err(|e| format!("adopt master: {e}"))?;
-        tracing::info!(
-            src = %src.display(),
-            dest = %dest.display(),
-            "wmf transcode: adopted lean source as video master"
-        );
-    }
-    Ok(dest)
+    Ok(master)
+}
+
+/// The full pick-time optimize: resolve the lineage master, then derive the
+/// cap-targeted variant FROM it. `(master, None)` means the master itself
+/// fits the cap box — the original bytes then play at maximum quality.
+///
+/// Runs COM/WMF on the calling thread; callers must not hold the UI thread.
+pub fn optimize_for_display(
+    src: &Path,
+    cache_dir: &Path,
+    target_w: u32,
+    target_h: u32,
+) -> std::result::Result<(PathBuf, Option<PathBuf>), String> {
+    // COM+MF must be up before `probe_video` — `transcode_for_display` does
+    // its own init, but the master probe below runs first.
+    let _com = ComThreadGuard::init().map_err(|e| format!("COM init: {e}"))?;
+    let _mf = MfSessionGuard::init().map_err(|e| format!("MFStartup: {e}"))?;
+    let master = ensure_video_master(src, cache_dir)?;
+    let probe = probe_video(&master).map_err(|e| format!("probe {}: {e}", master.display()))?;
+    let variant = match cover_size(probe.width, probe.height, target_w, target_h) {
+        // The master already fits inside the cap box — playing it directly
+        // keeps the source's own encode at maximum quality; no variant.
+        None => None,
+        Some(_) => transcode_for_display(&master, cache_dir, target_w, target_h)?,
+    };
+    Ok((master, variant))
 }
 
 /// The reader's negotiated output type: the *native* type cloned (so every

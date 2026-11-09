@@ -757,7 +757,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       <div class="sliderctl"><input type="range" id="advOffsetX" min="-500" max="500" step="1"><span class="sliderval" id="advOffsetXVal">0 px</span></div></div>
     <div class="card"><div class="l"><span class="ic">&#xE759;</span><div><div class="t">副屏垂直偏移 (Offset Y)</div><div class="s">垂直移动跨屏壁纸，修正显示器之间的高度差</div></div></div>
       <div class="sliderctl"><input type="range" id="advOffsetY" min="-500" max="500" step="1"><span class="sliderval" id="advOffsetYVal">0 px</span></div></div>
-    <div class="card"><div class="l"><span class="ic">&#xEC4A;</span><div><div class="t">节能模式 (Eco Mode)</div><div class="s">保持视频壁纸、天气粒子特效与音频可视化运行，仅降低内部渲染分辨率并将帧率限制为 30 FPS</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="ecoMode" aria-label="节能模式 (Eco Mode)"></div></div>
+    <div class="card"><div class="l"><span class="ic">&#xEC4A;</span><div><div class="t">节能模式 (Eco Mode)</div><div class="s">保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="ecoMode" aria-label="节能模式 (Eco Mode)"></div></div>
     <div class="modal-actions" style="margin-top:12px">
       <button class="accent" type="button" id="advDisplayClose">完成</button>
     </div>

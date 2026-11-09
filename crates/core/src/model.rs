@@ -325,8 +325,9 @@ pub struct Settings {
     #[serde(default)]
     pub secondary_offset_y: i32,
     /// Eco Mode: keeps video wallpapers, live weather/particle effects (`le_rain`
-    /// etc.), and the audio visualizer running, while downscaling their internal
-    /// render buffers and capping frame rates at 30 FPS to cut GPU/VRAM load.
+    /// etc.), and the audio visualizer running, while capping their frame rates
+    /// at ~30 FPS and trimming effect cost to cut GPU/VRAM load. It never
+    /// changes wallpaper resolution — `wallpaper_res_cap` owns that control.
     #[serde(default)]
     pub eco_mode: bool,
     /// Whether the user permanently dismissed the smart hardware Eco Mode

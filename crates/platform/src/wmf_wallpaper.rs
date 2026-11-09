@@ -1040,15 +1040,13 @@ impl WallpaperRenderConfig {
         secondary_offset_y: i32,
         eco_mode: bool,
     ) -> Self {
+        // Resolution is the res-cap's exclusive job — Eco Mode only throttles
+        // the frame rate to ~30 FPS and never touches `max_width`/`max_height`
+        // (the master/variant file choice follows `wallpaper_res_cap` alone).
         let (max_width, max_height) = match res_cap {
             "1080p" => (1920, 1080),
             "2k" => (2560, 1440),
             _ => (3840, 2160),
-        };
-        let (max_width, max_height) = if eco_mode {
-            (max_width.min(1920), max_height.min(1080))
-        } else {
-            (max_width, max_height)
         };
         Self {
             letterbox,

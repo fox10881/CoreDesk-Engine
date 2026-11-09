@@ -428,14 +428,9 @@ fn spawn_video_transcode(
     let _ = std::thread::Builder::new()
         .name("coredesk-video-transcode".into())
         .spawn(move || {
-            let result = coredesk_platform::wmf_transcode::ensure_video_master(&src, &cache_dir)
-                .and_then(|master| {
-                    coredesk_platform::wmf_transcode::transcode_for_display(
-                        &master, &cache_dir, target.0, target.1,
-                    )
-                    .map(|variant| (master, variant))
-                });
-            let _ = tx.send(result);
+            let _ = tx.send(coredesk_platform::wmf_transcode::optimize_for_display(
+                &src, &cache_dir, target.0, target.1,
+            ));
         });
     rx
 }
@@ -2307,8 +2302,8 @@ impl App {
     }
 
     /// The frame size imports and cap-change re-optimizes encode to. Eco Mode
-    /// stays out: it is a live buffer-level clamp, and keying the file cache
-    /// to a tray toggle would rewrite the asset on every flip.
+    /// stays out: it is a live 30-FPS/effect-cost throttle, and keying the
+    /// file cache to a tray toggle would rewrite the asset on every flip.
     fn video_transcode_target(&self) -> (u32, u32) {
         capped_transcode_target(
             &self
