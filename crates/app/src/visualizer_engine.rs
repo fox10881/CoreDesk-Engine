@@ -330,33 +330,43 @@ fn control_loop(
         let mut bands = [0.0f32; BANDS];
         let mut level_peak = (0.0f32, 0.0f32);
         analyze(&pcm, rate.max(8_000), &mut bands, &mut level_peak);
-        if !audible && level_peak.0 > 0.05 {
-            audible = true;
-            silent_since = None;
-            tracing::debug!(level = level_peak.0, "visualizer: audio detected");
-        } else if audible && level_peak.0 < 0.01 {
-            let since = silent_since.get_or_insert_with(Instant::now);
-            if since.elapsed() > Duration::from_secs(4) {
-                audible = false;
-                silent_since = None;
-                tracing::debug!("visualizer: audio silent");
+        let is_silent_tick = level_peak.0 <= 0.001 && level_peak.1 <= 0.003;
+        let mut slumber = false;
+        if !is_silent_tick {
+            if !audible {
+                audible = true;
+                tracing::debug!(level = level_peak.0, "visualizer: audio detected");
             }
-        } else if level_peak.0 >= 0.01 {
             silent_since = None;
+        } else {
+            let since = silent_since.get_or_insert_with(Instant::now);
+            // Smart Audio Slumber: 3 consecutive seconds of zero RMS/peak audio
+            // pauses the visualizer's requestAnimationFrame loop until audio resumes.
+            if since.elapsed() >= Duration::from_secs(3) {
+                slumber = true;
+                if audible {
+                    audible = false;
+                    tracing::debug!("visualizer: audio silent for 3s — entering slumber");
+                }
+            }
         }
-        for i in 0..BANDS {
-            let k = if bands[i] > smoothed[i] {
-                ATTACK
-            } else {
-                RELEASE
-            };
-            smoothed[i] += (bands[i] - smoothed[i]) * k;
+        if slumber {
+            smoothed = [0.0f32; BANDS];
+        } else {
+            for i in 0..BANDS {
+                let k = if bands[i] > smoothed[i] {
+                    ATTACK
+                } else {
+                    RELEASE
+                };
+                smoothed[i] += (bands[i] - smoothed[i]) * k;
+            }
         }
         if let Ok(mut g) = spectrum.write() {
             g.bands = smoothed;
-            g.level = level_peak.0;
-            g.peak = level_peak.1;
-            g.paused = false;
+            g.level = if slumber { 0.0 } else { level_peak.0 };
+            g.peak = if slumber { 0.0 } else { level_peak.1 };
+            g.paused = slumber;
         }
         std::thread::sleep(Duration::from_millis(TICK_MS));
     }

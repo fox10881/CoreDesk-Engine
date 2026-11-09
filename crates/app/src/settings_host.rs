@@ -55,10 +55,18 @@ impl WebEnvironment {
         // Debug builds: `COREDESK_WEBVIEW_ARGS=--remote-debugging-port=9352` lets a test drive
         // the page (the options always pass browser arguments, so WebView2's own
         // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is not honoured).
+        // Consolidate widget renderers into a single shared renderer process
+        // (`--process-per-site --disable-site-isolation-trials --renderer-process-limit=1`)
+        // and disable unnecessary Chromium background services (Network Service
+        // background tasks, Crashpad/Breakpad, component updater, domain reliability).
+        const BASE_BROWSER_ARGS: &str = "--process-per-site --disable-site-isolation-trials --renderer-process-limit=1 --disable-background-networking --disable-breakpad --disable-crash-reporter --no-pings --disable-component-update --disable-domain-reliability --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,CalculateNativeWinOcclusion";
         let browser_args = if cfg!(debug_assertions) {
-            coredesk_core::brand::var("COREDESK_WEBVIEW_ARGS").unwrap_or_default()
+            match coredesk_core::brand::var("COREDESK_WEBVIEW_ARGS") {
+                Ok(extra) if !extra.trim().is_empty() => format!("{BASE_BROWSER_ARGS} {extra}"),
+                _ => BASE_BROWSER_ARGS.to_string(),
+            }
         } else {
-            String::new()
+            BASE_BROWSER_ARGS.to_string()
         };
         tracing::debug!("settings: creating WebView2 environment");
         let env = CompEnvironment::create(&user_data, &browser_args)?;

@@ -25,7 +25,7 @@ use coredesk_platform::window::{
 };
 use coredesk_platform::{HWND, desktop, dwm, monitors, msg, wmf_wallpaper};
 use coredesk_render::{ColorF, Panel, RenderStack};
-use windows_composition::{ContainerVisual, DesktopWindowTarget};
+use windows_composition::{ContainerVisual, DesktopWindowTarget, Vector3};
 use windows_core::Result;
 
 use crate::commands::{Command, CommandQueue};
@@ -79,6 +79,9 @@ struct HostCore {
     /// into `lp.tint` for `le_*` effects unless the modder pinned
     /// `primary_color` in `Live_Effects_config.json`.
     accent: Option<ColorF>,
+    /// Eco Mode: downscales the internal Direct2D drawing surface by 50 % and
+    /// upscales the composition visual 2× while capping the frame timer at 30 FPS.
+    eco_mode: bool,
 }
 
 impl EffectsHost {
@@ -109,7 +112,16 @@ impl EffectsHost {
                 dpi: 96,
                 spectrum: None,
                 accent: None,
+                eco_mode: false,
             })),
+        }
+    }
+
+    pub fn set_eco_mode(&self, eco_mode: bool) {
+        let mut c = self.core.borrow_mut();
+        if c.eco_mode != eco_mode {
+            c.eco_mode = eco_mode;
+            c.resize_to_window();
         }
     }
 
@@ -290,7 +302,8 @@ impl EffectsHost {
         target.set_root(&root);
 
         let dpi = window::dpi_of(hwnd);
-        panel_resize(&mut panel, w_px, h_px)?;
+        let eco_mode = self.core.borrow().eco_mode;
+        panel_resize(&mut panel, w_px, h_px, eco_mode)?;
         let scale = dpi.max(96) as f32 / 96.0;
         let mut engine = Engine::new(
             effect,
@@ -360,8 +373,22 @@ impl EffectsHost {
     }
 }
 
-fn panel_resize(panel: &mut Panel, w_px: i32, h_px: i32) -> Result<()> {
-    panel.resize(w_px.max(1), h_px.max(1))?;
+fn panel_resize(panel: &mut Panel, w_px: i32, h_px: i32, eco_mode: bool) -> Result<()> {
+    let w = w_px.max(1);
+    let h = h_px.max(1);
+    if eco_mode {
+        let bw = (w / 2).max(1);
+        let bh = (h / 2).max(1);
+        panel.resize(bw, bh)?;
+        panel.visual.set_scale(Vector3::new(
+            w as f32 / bw as f32,
+            h as f32 / bh as f32,
+            1.0,
+        ));
+    } else {
+        panel.resize(w, h)?;
+        panel.visual.set_scale(Vector3::new(1.0, 1.0, 1.0));
+    }
     Ok(())
 }
 
@@ -391,7 +418,11 @@ impl HostCore {
         }
         engine.tick(dt.max(0.0));
 
-        let dpi = self.dpi;
+        let dpi = if self.eco_mode {
+            (self.dpi / 2).max(48)
+        } else {
+            self.dpi
+        };
         let cache = &mut self.cache;
         let ok = panel.draw(dpi, |s, _w, _h| engine.draw(s, cache));
         match ok {
@@ -485,8 +516,9 @@ impl HostCore {
     }
 
     fn resize(&mut self, w_px: i32, h_px: i32) {
+        let eco = self.eco_mode;
         if let Some(panel) = self.panel.as_mut() {
-            let _ = panel.resize(w_px.max(1), h_px.max(1));
+            let _ = panel_resize(panel, w_px, h_px, eco);
             let scale = self.dpi.max(96) as f32 / 96.0;
             if let Some(e) = self.engine.as_mut() {
                 e.set_size(w_px as f32 / scale, h_px as f32 / scale);

@@ -1343,11 +1343,15 @@ impl CompWebview {
         Ok(())
     }
 
-    /// `WM_DESTROY`: close the WebView first, then detach the root visual and
-    /// commit — reversing the attach order keeps DComp from holding a dead
-    /// WebView visual.
+    /// `WM_DESTROY`: navigate to `about:blank` to release the page's DOM/JS
+    /// heap immediately, close the WebView controller, then detach the root
+    /// visual and commit — reversing the attach order keeps DComp from holding
+    /// a dead WebView visual.
     pub fn close(self) {
         unsafe {
+            let _ = self
+                .webview
+                .NavigateToString(&HSTRING::from("<html></html>"));
             let _ = self.ctl3.Close();
             let _ = self
                 .target

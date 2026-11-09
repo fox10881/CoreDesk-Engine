@@ -299,6 +299,33 @@ pub struct Settings {
     /// `Config::sanitize_external`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub widget_params: BTreeMap<String, WidgetParams>,
+    /// Multi-monitor wallpaper topology mode: `"duplicate"` (default, each
+    /// monitor displays the wallpaper independently) or `"span"` (one continuous
+    /// wallpaper stretched across the virtual desktop with per-monitor bezel offsets).
+    #[serde(default = "wallpaper_display_mode_default")]
+    pub wallpaper_display_mode: String,
+    /// Internal render resolution cap for the wallpaper swap chain / texture
+    /// buffer before hardware upscaling to the physical monitor: `"4k"` (default,
+    /// 3840×2160), `"2k"` (2560×1440), or `"1080p"` (1920×1080).
+    #[serde(default = "wallpaper_res_cap_default")]
+    pub wallpaper_res_cap: String,
+    /// Horizontal pixel offset (-500..=500) applied to the secondary monitor
+    /// in `"span"` wallpaper mode to compensate for physical bezel alignment.
+    #[serde(default)]
+    pub secondary_offset_x: i32,
+    /// Vertical pixel offset (-500..=500) applied to the secondary monitor
+    /// in `"span"` wallpaper mode to compensate for physical bezel alignment.
+    #[serde(default)]
+    pub secondary_offset_y: i32,
+    /// Eco Mode: keeps video wallpapers, live weather/particle effects (`le_rain`
+    /// etc.), and the audio visualizer running, while downscaling their internal
+    /// render buffers and capping frame rates at 30 FPS to cut GPU/VRAM load.
+    #[serde(default)]
+    pub eco_mode: bool,
+    /// Whether the user permanently dismissed the smart hardware Eco Mode
+    /// recommendation banner.
+    #[serde(default)]
+    pub eco_banner_dismissed: bool,
 }
 
 /// Structural ceiling for the effects engine's live-particle pool — the
@@ -945,8 +972,22 @@ impl Default for Settings {
             desktop_effect_intensity: 50,
             effect_params: BTreeMap::new(),
             widget_params: BTreeMap::new(),
+            wallpaper_display_mode: wallpaper_display_mode_default(),
+            wallpaper_res_cap: wallpaper_res_cap_default(),
+            secondary_offset_x: 0,
+            secondary_offset_y: 0,
+            eco_mode: false,
+            eco_banner_dismissed: false,
         }
     }
+}
+
+fn wallpaper_display_mode_default() -> String {
+    "duplicate".to_string()
+}
+
+fn wallpaper_res_cap_default() -> String {
+    "4k".to_string()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2656,6 +2697,14 @@ impl Config {
         if !EBM_EFFECTS.contains(&s.fe_effect.as_str()) {
             s.fe_effect.clear();
         }
+        if !matches!(s.wallpaper_display_mode.as_str(), "duplicate" | "span") {
+            s.wallpaper_display_mode = wallpaper_display_mode_default();
+        }
+        if !matches!(s.wallpaper_res_cap.as_str(), "4k" | "2k" | "1080p") {
+            s.wallpaper_res_cap = wallpaper_res_cap_default();
+        }
+        s.secondary_offset_x = s.secondary_offset_x.clamp(-500, 500);
+        s.secondary_offset_y = s.secondary_offset_y.clamp(-500, 500);
         if !looks_like_rgba(&s.fe_light_rgba) {
             s.fe_light_rgba = fe_light_rgba_default();
         }

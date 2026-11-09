@@ -292,6 +292,13 @@ impl VisualizerHost {
         }
     }
 
+    /// A fresh page announced itself (`vizReady`): re-arm the paused edge so
+    /// the next feed tick posts the current snapshot — a page that loads while
+    /// the engine is slumbering must still see its one `paused:true` frame.
+    pub fn note_document_ready(&self) {
+        self.state.borrow().posted_paused.set(false);
+    }
+
     /// Design swap moves the widget to that design's remembered rect — each
     /// `v1`…`v5` keeps its own spot (stored in `widget_params[id].bounds`).
     pub fn set_bounds(&self, rect: [i32; 4]) {

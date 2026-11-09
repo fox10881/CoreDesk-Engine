@@ -960,7 +960,13 @@ pub fn split_config_json(text: &str) -> SplitConfigJson {
 /// Settings keys that are global user preferences, never theme content: a
 /// `.cde` export drops them entirely so a shared theme neither carries the
 /// author's machine-wide choices nor applies them on import.
-pub const THEME_GLOBAL_SETTINGS: &[&str] = &["language", "explorerRefreshOnTheme"];
+pub const THEME_GLOBAL_SETTINGS: &[&str] = &[
+    "language",
+    "explorerRefreshOnTheme",
+    "ecoMode",
+    "ecoBannerDismissed",
+    "wallpaperResCap",
+];
 
 /// Returns `text` (a serialized config document) with every
 /// [`THEME_GLOBAL_SETTINGS`] key removed from `settings`. Unparseable input

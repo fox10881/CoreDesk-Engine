@@ -46,6 +46,8 @@ use windows_core::{Error, GUID, IUnknown, Interface, PCWSTR, Result};
 
 const WM_PRINT: u32 = 0x0317;
 const WM_PRINTCLIENT: u32 = 0x0318;
+const SM_XVIRTUALSCREEN: i32 = 76;
+const SM_YVIRTUALSCREEN: i32 = 77;
 const SM_CXVIRTUALSCREEN: i32 = 78;
 const SM_CYVIRTUALSCREEN: i32 = 79;
 const RPC_E_CHANGED_MODE: i32 = 0x8001_0106u32 as i32;
@@ -901,11 +903,19 @@ unsafe fn attach_to_desktop_worker(
             let fx = FindWindowExW(Some(host), None, PCWSTR(fx_class.as_ptr()), PCWSTR::null());
             if !fx.0.is_null() { fx } else { HWND_TOP }
         };
+        // Cover the full virtual screen — including monitors parked at negative
+        // coordinates (left of / above the primary). The child's position is the
+        // virtual origin relative to the host's own window origin, which is (0,0)
+        // when the WorkerW already spans the whole desktop.
+        let mut host_rect = RECT::default();
+        let _ = GetWindowRect(crate::bindings::HWND(host.0), &mut host_rect);
+        let pos_x = GetSystemMetrics(SM_XVIRTUALSCREEN) - host_rect.left;
+        let pos_y = GetSystemMetrics(SM_YVIRTUALSCREEN) - host_rect.top;
         let swp_ok = SetWindowPos(
             video_hwnd,
             Some(insert_after),
-            0,
-            0,
+            pos_x,
+            pos_y,
             vw,
             vh,
             (SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED) as u32,
@@ -945,13 +955,184 @@ struct SharedSurface {
     /// backdrop covering the whole window, and the centered rect the video draws into.
     margin: Vec<u8>,
     dst: Option<(i32, i32, i32, i32)>,
+    /// Duplicate mode: one blit per monitor rect (window coordinates) — each
+    /// display shows the whole frame. Empty ⇒ the span/single-monitor blit.
+    tiles: Vec<(i32, i32, i32, i32)>,
+    /// Span mode: the bezel-offset translate applied to the destination rect.
+    offset: (i32, i32),
+}
+
+/// Window-coordinate monitor rects for the GDI path's Duplicate mode, plus the
+/// span-mode bezel offset applied to the destination rect. `tiles` stays empty
+/// for span or a single-monitor topology — the paint path then blits the frame
+/// window-wide.
+fn surface_tiles_and_offset(
+    hwnd: HWND,
+    config: WallpaperRenderConfig,
+) -> (Vec<(i32, i32, i32, i32)>, (i32, i32)) {
+    if config.span_mode {
+        return (
+            Vec::new(),
+            (config.secondary_offset_x, config.secondary_offset_y),
+        );
+    }
+    let mons = crate::monitors::enumerate();
+    if mons.len() < 2 {
+        return (Vec::new(), (0, 0));
+    }
+    let mut wr = RECT::default();
+    let (wx0, wy0) = unsafe {
+        if GetWindowRect(crate::bindings::HWND(hwnd.0), &mut wr).as_bool() {
+            (wr.left, wr.top)
+        } else {
+            (0, 0)
+        }
+    };
+    (
+        mons.iter()
+            .map(|m| {
+                (
+                    m.bounds.left - wx0,
+                    m.bounds.top - wy0,
+                    m.bounds.right - wx0,
+                    m.bounds.bottom - wy0,
+                )
+            })
+            .collect(),
+        (0, 0),
+    )
+}
+
+/// Rendering configuration for [`WmfWallpaperPlayer`]: controls aspect fit,
+/// multi-monitor span/duplicate topology, internal swap-chain resolution cap,
+/// secondary-monitor bezel alignment offsets, and Eco Mode 30 FPS throttling.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WallpaperRenderConfig {
+    pub letterbox: bool,
+    pub span_mode: bool,
+    pub max_width: u32,
+    pub max_height: u32,
+    pub secondary_offset_x: i32,
+    pub secondary_offset_y: i32,
+    pub eco_mode: bool,
+}
+
+impl Default for WallpaperRenderConfig {
+    fn default() -> Self {
+        Self {
+            letterbox: false,
+            span_mode: false,
+            max_width: 3840,
+            max_height: 2160,
+            secondary_offset_x: 0,
+            secondary_offset_y: 0,
+            eco_mode: false,
+        }
+    }
+}
+
+impl WallpaperRenderConfig {
+    pub fn from_res_cap(
+        letterbox: bool,
+        span_mode: bool,
+        res_cap: &str,
+        secondary_offset_x: i32,
+        secondary_offset_y: i32,
+        eco_mode: bool,
+    ) -> Self {
+        let (max_width, max_height) = match res_cap {
+            "1080p" => (1920, 1080),
+            "2k" => (2560, 1440),
+            _ => (3840, 2160),
+        };
+        let (max_width, max_height) = if eco_mode {
+            (max_width.min(1920), max_height.min(1080))
+        } else {
+            (max_width, max_height)
+        };
+        Self {
+            letterbox,
+            span_mode,
+            max_width,
+            max_height,
+            secondary_offset_x,
+            secondary_offset_y,
+            eco_mode,
+        }
+    }
+
+    /// Proportional fit of `(win_w, win_h)` inside the `(max_width, max_height)`
+    /// cap — the internal buffer / static-composite size that the GPU or the OS
+    /// then upscales to the physical output. Never upscales.
+    pub fn clamped_buffer_size(&self, win_w: u32, win_h: u32) -> (u32, u32) {
+        let (cap_w, cap_h) = (self.max_width.max(640), self.max_height.max(360));
+        if win_w <= cap_w && win_h <= cap_h {
+            return (win_w.max(2), win_h.max(2));
+        }
+        let scale = (cap_w as f32 / win_w.max(1) as f32)
+            .min(cap_h as f32 / win_h.max(1) as f32)
+            .clamp(0.1, 1.0);
+        let bw = (((win_w as f32 * scale).round() as u32) & !1).max(2);
+        let bh = (((win_h as f32 * scale).round() as u32) & !1).max(2);
+        (bw, bh)
+    }
+}
+
+/// Queries Win32 power status and the default DXGI adapter to detect battery-powered
+/// laptops or integrated / low-VRAM GPUs (e.g. Intel Iris Xe, UHD, or < 2 GiB VRAM)
+/// where Eco Mode is recommended on startup.
+pub fn detect_eco_recommended() -> bool {
+    #[repr(C)]
+    #[derive(Default)]
+    struct SystemPowerStatus {
+        ac_line_status: u8,
+        battery_flag: u8,
+        battery_life_percent: u8,
+        system_status_flag: u8,
+        battery_life_time: u32,
+        battery_full_life_time: u32,
+    }
+    unsafe {
+        windows_core::link!("kernel32.dll" "system" fn GetSystemPowerStatus(lpstatus: *mut SystemPowerStatus) -> windows_core::BOOL);
+        let mut sps = SystemPowerStatus::default();
+        if GetSystemPowerStatus(&mut sps).as_bool() {
+            // Battery present (flag 128 = no system battery, 255 = unknown) or running on battery (ac == 0).
+            if sps.ac_line_status == 0 || (sps.battery_flag != 128 && sps.battery_flag != 255) {
+                return true;
+            }
+        }
+    }
+    let _com = ComThreadGuard::init().ok();
+    if let Some((device, _, _)) = create_d3d_device()
+        && let Ok(dxgi_dev) = device.cast::<IDXGIDevice>()
+        && let Ok(adapter) = unsafe { dxgi_dev.GetAdapter() }
+    {
+        let mut desc = crate::wmf_bindings::DXGI_ADAPTER_DESC::default();
+        if unsafe { adapter.GetDesc(&mut desc) }.is_ok() {
+            let len = desc
+                .Description
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(desc.Description.len());
+            let name = String::from_utf16_lossy(&desc.Description[..len]).to_ascii_lowercase();
+            // Intel vendor (0x8086), Iris Xe / UHD / integrated Radeon, or < 2 GiB dedicated VRAM.
+            if desc.VendorId == 0x8086
+                || name.contains("iris")
+                || name.contains("uhd")
+                || desc.DedicatedVideoMemory < 2 * 1024 * 1024 * 1024
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Active WMF desktop video wallpaper player. Dropping or calling `stop` cleanly shuts down the
 /// playback thread, destroys the `WorkerW` child window, and repaints the desktop background.
 pub struct WmfWallpaperPlayer {
     path: PathBuf,
-    letterbox: bool,
+    config: WallpaperRenderConfig,
     stop: Arc<AtomicBool>,
     wake: Arc<(Mutex<()>, Condvar)>,
     latest_frame: Arc<Mutex<Option<VideoFrame>>>,
@@ -965,8 +1146,29 @@ impl WmfWallpaperPlayer {
     /// `letterbox` (`containBackground`) draws strict-Contain — the whole frame
     /// centered over a blurred backdrop instead of cover-cropped.
     pub fn start(path: impl Into<PathBuf>, letterbox: bool) -> std::result::Result<Self, String> {
+        Self::start_with_config(
+            path,
+            WallpaperRenderConfig {
+                letterbox,
+                ..Default::default()
+            },
+        )
+    }
+
+    pub fn start_with_config(
+        path: impl Into<PathBuf>,
+        config: WallpaperRenderConfig,
+    ) -> std::result::Result<Self, String> {
         let path = path.into();
-        tracing::info!(path = %path.display(), letterbox, "wmf: starting WmfWallpaperPlayer");
+        tracing::info!(
+            path = %path.display(),
+            letterbox = config.letterbox,
+            span_mode = config.span_mode,
+            max_w = config.max_width,
+            max_h = config.max_height,
+            eco = config.eco_mode,
+            "wmf: starting WmfWallpaperPlayer"
+        );
         let stop = Arc::new(AtomicBool::new(false));
         let wake = Arc::new((Mutex::new(()), Condvar::new()));
         let latest_frame = Arc::new(Mutex::new(None));
@@ -983,7 +1185,7 @@ impl WmfWallpaperPlayer {
             .spawn(move || {
                 run_player_thread(
                     video_path,
-                    letterbox,
+                    config,
                     stop_thread,
                     wake_thread,
                     latest_thread,
@@ -1003,7 +1205,7 @@ impl WmfWallpaperPlayer {
                 tracing::info!(path = %path.display(), "wmf: WmfWallpaperPlayer started and rendering");
                 Ok(Self {
                     path,
-                    letterbox,
+                    config,
                     stop,
                     wake,
                     latest_frame,
@@ -1031,7 +1233,11 @@ impl WmfWallpaperPlayer {
     /// Whether this player renders strict-Contain (letterbox) or cover-cropped —
     /// `sync_video_wallpaper` restarts rather than reuses when the mode changed.
     pub fn letterbox(&self) -> bool {
-        self.letterbox
+        self.config.letterbox
+    }
+
+    pub fn config(&self) -> WallpaperRenderConfig {
+        self.config
     }
 
     /// Whether the playback thread is still running. The desktop video window can die
@@ -1157,6 +1363,10 @@ unsafe fn paint_surface_dc(hwnd: HWND, dc: HDC) {
         };
         let wmf_dc = crate::wmf_bindings::HDC(dc.0);
         let _ = SetStretchBltMode(wmf_dc, HALFTONE);
+        // Duplicate mode: one blit per monitor tile (each display shows the whole
+        // frame, fit to its own rect); span keeps one window-wide blit shifted by
+        // the bezel offsets.
+        let (ox, oy) = surface.offset;
         if let Some((dl, dt, dr, db)) = surface.dst {
             // Letterbox: blurred backdrop covers the whole window; the video frame
             // draws uncropped into its centered contain rect.
@@ -1189,10 +1399,32 @@ unsafe fn paint_surface_dc(hwnd: HWND, dc: HDC) {
                     SRCCOPY,
                 );
             }
+            if surface.tiles.len() > 1 {
+                for &(tl, tt, tr, tb) in &surface.tiles {
+                    let (cl, ct, cr, cb) =
+                        contain_rect(surface.width, surface.height, tr - tl, tb - tt);
+                    let _ = StretchDIBits(
+                        wmf_dc,
+                        tl + cl,
+                        tt + ct,
+                        cr - cl,
+                        cb - ct,
+                        0,
+                        0,
+                        surface.width,
+                        surface.height,
+                        Some(surface.bgra.as_ptr().cast()),
+                        &bmi,
+                        DIB_RGB_COLORS as u32,
+                        SRCCOPY,
+                    );
+                }
+                return;
+            }
             let _ = StretchDIBits(
                 wmf_dc,
-                dl,
-                dt,
+                dl + ox,
+                dt + oy,
                 dr - dl,
                 db - dt,
                 0,
@@ -1206,12 +1438,33 @@ unsafe fn paint_surface_dc(hwnd: HWND, dc: HDC) {
             );
             return;
         }
+        if surface.tiles.len() > 1 {
+            for &(tl, tt, tr, tb) in &surface.tiles {
+                let (sx, sy, sw, sh) = cover_crop(surface.width, surface.height, tr - tl, tb - tt);
+                let _ = StretchDIBits(
+                    wmf_dc,
+                    tl,
+                    tt,
+                    tr - tl,
+                    tb - tt,
+                    sx,
+                    sy,
+                    sw,
+                    sh,
+                    Some(surface.bgra.as_ptr().cast()),
+                    &bmi,
+                    DIB_RGB_COLORS as u32,
+                    SRCCOPY,
+                );
+            }
+            return;
+        }
         let (sx, sy, sw, sh) =
             cover_crop(surface.width, surface.height, surface.out_w, surface.out_h);
         let _ = StretchDIBits(
             wmf_dc,
-            0,
-            0,
+            ox,
+            oy,
             surface.out_w,
             surface.out_h,
             sx,
@@ -1349,7 +1602,56 @@ struct GpuPipeline {
     vid_h: usize,
     win_w: u32,
     win_h: u32,
-    letterbox: bool,
+    buf_w: u32,
+    buf_h: u32,
+    /// Duplicate mode: one destination rect per monitor in swap-chain buffer
+    /// space — each blit renders the whole video into its own monitor's slice.
+    /// Empty or single-entry ⇒ the span/single-monitor one-blit path.
+    tile_rects: Vec<crate::wmf_bindings::RECT>,
+    config: WallpaperRenderConfig,
+}
+
+/// Per-monitor destination rects in swap-chain buffer space for Duplicate mode.
+/// `hwnd`'s window rect anchors the virtual-to-buffer mapping. Returns an empty
+/// vec for a single-monitor topology or an unreadable window — callers fall
+/// back to the one-blit span path.
+fn duplicate_tiles(
+    hwnd: HWND,
+    win_w: u32,
+    win_h: u32,
+    buf_w: u32,
+    buf_h: u32,
+) -> Vec<crate::wmf_bindings::RECT> {
+    let mons = crate::monitors::enumerate();
+    if mons.len() < 2 {
+        return Vec::new();
+    }
+    let mut wr = RECT::default();
+    let (wx0, wy0) = unsafe {
+        if GetWindowRect(crate::bindings::HWND(hwnd.0), &mut wr).as_bool() {
+            (wr.left, wr.top)
+        } else {
+            (
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+            )
+        }
+    };
+    let sx = buf_w as f32 / win_w.max(1) as f32;
+    let sy = buf_h as f32 / win_h.max(1) as f32;
+    mons.iter()
+        .filter_map(|m| {
+            let r = crate::wmf_bindings::RECT {
+                left: ((m.bounds.left - wx0) as f32 * sx).round() as i32,
+                top: ((m.bounds.top - wy0) as f32 * sy).round() as i32,
+                right: ((m.bounds.right - wx0) as f32 * sx).round() as i32,
+                bottom: ((m.bounds.bottom - wy0) as f32 * sy).round() as i32,
+            };
+            // Skip monitors entirely outside the window (cannot draw there).
+            (r.right > 0 && r.bottom > 0 && r.left < buf_w as i32 && r.top < buf_h as i32)
+                .then_some(r)
+        })
+        .collect()
 }
 
 impl GpuPipeline {
@@ -1367,8 +1669,15 @@ impl GpuPipeline {
         win_h: u32,
         fps_num: u32,
         fps_den: u32,
-        letterbox: bool,
+        config: WallpaperRenderConfig,
     ) -> std::result::Result<Self, String> {
+        let letterbox = config.letterbox;
+        let (buf_w, buf_h) = config.clamped_buffer_size(win_w, win_h);
+        let tile_rects = if config.span_mode {
+            Vec::new()
+        } else {
+            duplicate_tiles(hwnd, win_w, win_h, buf_w, buf_h)
+        };
         unsafe {
             let video_dev: ID3D11VideoDevice = device
                 .cast()
@@ -1378,11 +1687,12 @@ impl GpuPipeline {
                 .map_err(|e| format!("ID3D11VideoContext: {e}"))?;
             let unk: IUnknown = device.cast().map_err(|e| e.to_string())?;
 
-            // 2-buffer flip swap chain for composition — the minimum DXGI allows for a
-            // flip model, so iGPU shared memory stays tight.
+            // 2-buffer flip swap chain for composition — sized to the capped internal
+            // buffer `(buf_w, buf_h)` and hardware-upscaled by DirectComposition to
+            // `(win_w, win_h)`, cutting VRAM and pixel-shader load on 4K/2K screens.
             let sc_desc = DXGI_SWAP_CHAIN_DESC1 {
-                Width: win_w,
-                Height: win_h,
+                Width: buf_w,
+                Height: buf_h,
                 Format: DXGI_FORMAT_B8G8R8A8_UNORM,
                 Stereo: windows_core::BOOL(0),
                 SampleDesc: DXGI_SAMPLE_DESC {
@@ -1417,6 +1727,23 @@ impl GpuPipeline {
                 .SetContent(&swapchain)
                 .ok()
                 .map_err(|e| format!("DComp SetContent: {e}"))?;
+            let (ox, oy) = if config.span_mode {
+                (
+                    config.secondary_offset_x as f32,
+                    config.secondary_offset_y as f32,
+                )
+            } else {
+                (0.0, 0.0)
+            };
+            let matrix = windows_numerics::Matrix3x2 {
+                m11: win_w as f32 / buf_w.max(1) as f32,
+                m12: 0.0,
+                m21: 0.0,
+                m22: win_h as f32 / buf_h.max(1) as f32,
+                m31: ox,
+                m32: oy,
+            };
+            let _ = visual.SetTransform2(&matrix);
             target
                 .SetRoot(&visual)
                 .ok()
@@ -1434,8 +1761,8 @@ impl GpuPipeline {
                 InputWidth: vid_w,
                 InputHeight: vid_h,
                 OutputFrameRate: fps,
-                OutputWidth: win_w,
-                OutputHeight: win_h,
+                OutputWidth: buf_w,
+                OutputHeight: buf_h,
                 Usage: D3D11_VIDEO_USAGE_OPTIMAL_SPEED,
             };
             let enumerator = video_dev
@@ -1489,7 +1816,7 @@ impl GpuPipeline {
             let (sx, sy, sw, sh) = if letterbox {
                 (0, 0, vid_w as i32, vid_h as i32)
             } else {
-                cover_crop(vid_w as i32, vid_h as i32, win_w as i32, win_h as i32)
+                cover_crop(vid_w as i32, vid_h as i32, buf_w as i32, buf_h as i32)
             };
             let src_rect = crate::wmf_bindings::RECT {
                 left: sx,
@@ -1498,9 +1825,9 @@ impl GpuPipeline {
                 bottom: sy + sh,
             };
             let (dl, dt, dr, db) = if letterbox {
-                contain_rect(vid_w as i32, vid_h as i32, win_w as i32, win_h as i32)
+                contain_rect(vid_w as i32, vid_h as i32, buf_w as i32, buf_h as i32)
             } else {
-                (0, 0, win_w as i32, win_h as i32)
+                (0, 0, buf_w as i32, buf_h as i32)
             };
             let dst_rect = crate::wmf_bindings::RECT {
                 left: dl,
@@ -1517,8 +1844,8 @@ impl GpuPipeline {
                 crate::wmf_bindings::RECT {
                     left: 0,
                     top: 0,
-                    right: win_w as i32,
-                    bottom: win_h as i32,
+                    right: buf_w as i32,
+                    bottom: buf_h as i32,
                 }
             };
             video_ctx.VideoProcessorSetStreamSourceRect(&vp, 0, true, Some(&src_rect));
@@ -1554,6 +1881,8 @@ impl GpuPipeline {
                 vid_h,
                 win_w,
                 win_h,
+                buf_w,
+                buf_h,
                 fps_num,
                 fps_den,
                 "wmf: zero-copy GPU pipeline ready (DComp + VP + 2-buffer swap chain)"
@@ -1576,7 +1905,10 @@ impl GpuPipeline {
                 vid_h: vid_h as usize,
                 win_w,
                 win_h,
-                letterbox,
+                buf_w,
+                buf_h,
+                tile_rects,
+                config,
             })
         }
     }
@@ -1603,6 +1935,23 @@ impl GpuPipeline {
                 .SetContent(&self.swapchain)
                 .ok()
                 .map_err(|e| format!("rebind SetContent: {e}"))?;
+            let (ox, oy) = if self.config.span_mode {
+                (
+                    self.config.secondary_offset_x as f32,
+                    self.config.secondary_offset_y as f32,
+                )
+            } else {
+                (0.0, 0.0)
+            };
+            let matrix = windows_numerics::Matrix3x2 {
+                m11: self.win_w as f32 / self.buf_w.max(1) as f32,
+                m12: 0.0,
+                m21: 0.0,
+                m22: self.win_h as f32 / self.buf_h.max(1) as f32,
+                m31: ox,
+                m32: oy,
+            };
+            let _ = visual.SetTransform2(&matrix);
             target
                 .SetRoot(&visual)
                 .ok()
@@ -1645,9 +1994,9 @@ impl GpuPipeline {
 
     /// Recomputes the crop/contain rects after a mid-stream media-type change.
     unsafe fn set_video_dims(&mut self, w: u32, h: u32) {
-        if self.letterbox {
+        if self.config.letterbox {
             let (dl, dt, dr, db) =
-                contain_rect(w as i32, h as i32, self.win_w as i32, self.win_h as i32);
+                contain_rect(w as i32, h as i32, self.buf_w as i32, self.buf_h as i32);
             self.dst_rect = crate::wmf_bindings::RECT {
                 left: dl,
                 top: dt,
@@ -1757,12 +2106,65 @@ impl GpuPipeline {
                 pInputSurface: ManuallyDrop::new(iv),
                 ..Default::default()
             };
-            let hr = self.video_ctx.VideoProcessorBlt(
-                &self.vp,
-                &self.out_view,
-                0,
-                core::slice::from_ref(&stream),
-            );
+            // Duplicate mode blits the same input once per monitor tile; span /
+            // single-monitor blits once into the sticky src/dst rects.
+            let blit = |src: &crate::wmf_bindings::RECT,
+                        dst: &crate::wmf_bindings::RECT|
+             -> windows_core::HRESULT {
+                self.video_ctx
+                    .VideoProcessorSetStreamSourceRect(&self.vp, 0, true, Some(src));
+                self.video_ctx
+                    .VideoProcessorSetStreamDestRect(&self.vp, 0, true, Some(dst));
+                self.video_ctx.VideoProcessorBlt(
+                    &self.vp,
+                    &self.out_view,
+                    0,
+                    core::slice::from_ref(&stream),
+                )
+            };
+            let hr = if self.tile_rects.len() > 1 {
+                let mut last = windows_core::HRESULT(0);
+                for tile in &self.tile_rects {
+                    let (tw, th) = (tile.right - tile.left, tile.bottom - tile.top);
+                    let (src, dst) = if self.config.letterbox {
+                        let (dl, dt, dr, db) =
+                            contain_rect(self.vid_w as i32, self.vid_h as i32, tw, th);
+                        (
+                            crate::wmf_bindings::RECT {
+                                left: 0,
+                                top: 0,
+                                right: self.vid_w as i32,
+                                bottom: self.vid_h as i32,
+                            },
+                            crate::wmf_bindings::RECT {
+                                left: tile.left + dl,
+                                top: tile.top + dt,
+                                right: tile.left + dr,
+                                bottom: tile.top + db,
+                            },
+                        )
+                    } else {
+                        let (sx, sy, sw, sh) =
+                            cover_crop(self.vid_w as i32, self.vid_h as i32, tw, th);
+                        (
+                            crate::wmf_bindings::RECT {
+                                left: sx,
+                                top: sy,
+                                right: sx + sw,
+                                bottom: sy + sh,
+                            },
+                            *tile,
+                        )
+                    };
+                    last = blit(&src, &dst);
+                    if last.is_err() {
+                        break;
+                    }
+                }
+                last
+            } else {
+                blit(&self.src_rect, &self.dst_rect)
+            };
             // Reclaim the input view inside the ManuallyDrop so the COM ref is released.
             let _iv_back = ManuallyDrop::into_inner(core::mem::replace(
                 &mut stream.pInputSurface,
@@ -1786,8 +2188,8 @@ impl GpuPipeline {
     /// SAFETY: UpdateSubresource/Present on the live swap chain.
     unsafe fn fill_letterbox_backdrop(&self, bgra: &[u8]) -> std::result::Result<(), String> {
         unsafe {
-            let pitch = self.win_w as usize * 4;
-            if bgra.len() != pitch * self.win_h as usize {
+            let pitch = self.buf_w as usize * 4;
+            if bgra.len() != pitch * self.buf_h as usize {
                 return Err("letterbox backdrop size mismatch".to_string());
             }
             for _ in 0..2 {
@@ -1910,7 +2312,7 @@ unsafe fn detach_video_window(hwnd: HWND, host: HWND) {
 #[allow(clippy::too_many_arguments)]
 unsafe fn run_gpu_wallpaper(
     path: &Path,
-    letterbox: bool,
+    config: WallpaperRenderConfig,
     mem: Option<&[u8]>,
     stop: &AtomicBool,
     wake: &(Mutex<()>, Condvar),
@@ -1927,7 +2329,11 @@ unsafe fn run_gpu_wallpaper(
     let opened = try_open_reader(&clean_path, OutputKind::Nv12, Some(&manager), mem)
         .map_err(|e| format!("hardware reader: {e}"))?;
     let reader = opened.reader;
-    let interval = opened.frame_interval;
+    let interval = if config.eco_mode {
+        opened.frame_interval.max(Duration::from_millis(33))
+    } else {
+        opened.frame_interval
+    };
     let vid_w = opened.width;
     let vid_h = opened.height;
 
@@ -1956,7 +2362,7 @@ unsafe fn run_gpu_wallpaper(
             hwnd,
             host,
             &class_name,
-            letterbox,
+            config,
             &device,
             &context,
             &reader,
@@ -2083,7 +2489,7 @@ unsafe fn run_gpu_attached(
     mut hwnd: HWND,
     mut host: HWND,
     class_name: &[u16],
-    letterbox: bool,
+    config: WallpaperRenderConfig,
     device: &ID3D11Device,
     context: &ID3D11DeviceContext,
     reader: &IMFSourceReader,
@@ -2103,9 +2509,10 @@ unsafe fn run_gpu_attached(
     latest_frame: &Mutex<Option<VideoFrame>>,
     startup_tx: &mpsc::SyncSender<std::result::Result<VideoFrame, String>>,
 ) -> (HWND, HWND, std::result::Result<(), String>) {
+    let letterbox = config.letterbox;
     unsafe {
         let mut gp = match GpuPipeline::new(
-            hwnd, device, context, vid_w, vid_h, win_w, win_h, fps_num, fps_den, letterbox,
+            hwnd, device, context, vid_w, vid_h, win_w, win_h, fps_num, fps_den, config,
         ) {
             Ok(gp) => gp,
             Err(e) => return (hwnd, host, Err(e)),
@@ -2122,8 +2529,8 @@ unsafe fn run_gpu_attached(
                     &thumb,
                     THUMB_W,
                     THUMB_H,
-                    win_w as usize,
-                    win_h as usize,
+                    gp.buf_w as usize,
+                    gp.buf_h as usize,
                 );
                 if let Err(e) = gp.fill_letterbox_backdrop(&backdrop) {
                     tracing::warn!(error = %e, "wmf: letterbox backdrop fill failed; margins show last frame");
@@ -2448,12 +2855,13 @@ fn read_video_bytes(path: &Path) -> Option<Vec<u8>> {
 
 fn run_player_thread(
     path: PathBuf,
-    letterbox: bool,
+    config: WallpaperRenderConfig,
     stop: Arc<AtomicBool>,
     wake: Arc<(Mutex<()>, Condvar)>,
     latest_frame: Arc<Mutex<Option<VideoFrame>>>,
     startup_tx: mpsc::SyncSender<std::result::Result<VideoFrame, String>>,
 ) {
+    let letterbox = config.letterbox;
     let _com = match ComThreadGuard::init() {
         Ok(g) => g,
         Err(e) => {
@@ -2481,7 +2889,7 @@ fn run_player_thread(
     match unsafe {
         run_gpu_wallpaper(
             &path,
-            letterbox,
+            config,
             mem.as_deref(),
             &stop,
             &wake,
@@ -2509,7 +2917,11 @@ fn run_player_thread(
     let mut vid_w = opened.width;
     let mut vid_h = opened.height;
     let mut stride = opened.stride;
-    let frame_interval = opened.frame_interval;
+    let frame_interval = if config.eco_mode {
+        opened.frame_interval.max(Duration::from_millis(33))
+    } else {
+        opened.frame_interval
+    };
     let out_kind = opened.kind;
 
     let mut raw_frame = Vec::new();
@@ -2544,6 +2956,8 @@ fn run_player_thread(
             bgra: Vec::new(),
             margin: Vec::new(),
             dst: None,
+            tiles: Vec::new(),
+            offset: (0, 0),
         }));
         let surface_ptr = &*surface as *const Mutex<SharedSurface>;
 
@@ -2575,6 +2989,9 @@ fn run_player_thread(
             surf.width = vid_w as i32;
             surf.height = vid_h as i32;
             surf.bgra.clone_from(&raw_frame);
+            let (tiles, offset) = surface_tiles_and_offset(hwnd, config);
+            surf.tiles = tiles;
+            surf.offset = offset;
             if letterbox {
                 surf.margin = crate::wallpaper::blurred_backdrop_bgra(
                     &raw_frame,
@@ -2652,6 +3069,13 @@ fn run_player_thread(
                             host = new_host;
                             win_w = w;
                             win_h = h;
+                            if let Ok(mut surf) = surface.lock() {
+                                surf.out_w = w;
+                                surf.out_h = h;
+                                let (tiles, offset) = surface_tiles_and_offset(hwnd, config);
+                                surf.tiles = tiles;
+                                surf.offset = offset;
+                            }
                             present_hwnd(hwnd);
                             tracing::info!(?hwnd, "wmf: video window re-attached (GDI)");
                         }
@@ -2998,7 +3422,7 @@ mod tests {
                 360,
                 opened.fps_num,
                 opened.fps_den,
-                false,
+                WallpaperRenderConfig::default(),
             )
             .expect("GPU pipeline");
             for i in 0..3 {
@@ -3164,7 +3588,7 @@ mod tests {
                 opened2.height,
                 opened2.fps_num,
                 opened2.fps_den,
-                false,
+                WallpaperRenderConfig::default(),
             )
             .expect("GPU pipeline");
             // Measured vsync grid + snap decision for this file on this display.

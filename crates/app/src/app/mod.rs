@@ -1645,6 +1645,19 @@ impl App {
         // The saved ExplorerBlurMica effect applies through the resident
         // relay; an empty effect still runs apply_effect → reset(), which
         // unloads a stale EBM image left by an unclean shutdown.
+        if !app.state.config.settings.eco_mode
+            && !app.state.config.settings.eco_banner_dismissed
+            && coredesk_platform::wmf_wallpaper::detect_eco_recommended()
+            && let Some(t) = &app.tray
+        {
+            t.show_info(
+                "CoreDesk Engine",
+                coredesk_core::i18n::text(
+                    "低配置设备？启用节能模式可节省约 413 MB 内存和 49% 的显卡负载。",
+                ),
+                false,
+            );
+        }
         let fe = &app.state.config.settings;
         {
             let (effect, l, d) = (
@@ -2294,9 +2307,11 @@ impl App {
                     self.settings = None;
                     self.set_settings_ring(None);
                     self.resume_peek_hotkey();
+                    coredesk_platform::memstats::trim_working_set();
                 }
                 if self.fe_glass.as_ref().is_some_and(|h| h.hwnd() == hwnd) {
                     self.fe_glass = None;
+                    coredesk_platform::memstats::trim_working_set();
                 }
                 if self.clock.as_ref().is_some_and(|h| h.hwnd() == hwnd) {
                     self.clock = None;

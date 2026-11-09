@@ -119,7 +119,6 @@ function roundTop(c, x, y, w, h, r) {
 R = BUILDS[style]();
 
 function frame(now) {
-  raf = requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (snap.paused) {
@@ -130,6 +129,7 @@ function frame(now) {
     return;
   }
   if (frozen) { document.body.classList.remove('paused'); frozen = false; }
+  raf = requestAnimationFrame(frame);
   R.draw(ctx, W, H, snap, dt);
 }
 

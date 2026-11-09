@@ -174,6 +174,7 @@ fn viz_theme_json(s: &coredesk_core::Settings, sample: Option<&backdrop_probe::S
     let mut v = serde_json::json!({
         "t": "vizTheme",
         "adaptive": s.visualizer_adaptive_color,
+        "eco": s.eco_mode,
     });
     if let Some(sample) = sample {
         let o = v.as_object_mut().unwrap();
@@ -382,7 +383,7 @@ pub(super) struct VideoSwap {
     /// `sync_video_wallpaper` several times; each spawn used to invalidate the
     /// previous worker, killing fresh players at `frame_counter=1`).
     path: PathBuf,
-    letterbox: bool,
+    config: coredesk_platform::wmf_wallpaper::WallpaperRenderConfig,
     /// Recovery after shell loss vs. a user pick — the accept path logs/toasts
     /// them differently.
     reattach: bool,
@@ -440,7 +441,7 @@ fn reap_video_player(player: coredesk_platform::wmf_wallpaper::WmfWallpaperPlaye
 fn spawn_video_swap(
     old: Option<coredesk_platform::wmf_wallpaper::WmfWallpaperPlayer>,
     path: PathBuf,
-    letterbox: bool,
+    config: coredesk_platform::wmf_wallpaper::WallpaperRenderConfig,
     epoch: u64,
 ) -> std::sync::mpsc::Receiver<
     std::result::Result<coredesk_platform::wmf_wallpaper::WmfWallpaperPlayer, Option<String>>,
@@ -451,9 +452,10 @@ fn spawn_video_swap(
         .spawn(move || {
             let _g = VIDEO_SWAP_LOCK.lock().unwrap_or_else(|e| e.into_inner());
             drop(old);
-            let result =
-                coredesk_platform::wmf_wallpaper::WmfWallpaperPlayer::start(&path, letterbox)
-                    .map_err(Some);
+            let result = coredesk_platform::wmf_wallpaper::WmfWallpaperPlayer::start_with_config(
+                &path, config,
+            )
+            .map_err(Some);
             let result = match result {
                 Ok(player) if VIDEO_SWAP_EPOCH.load(Ordering::SeqCst) != epoch => {
                     drop(player);
@@ -496,9 +498,12 @@ impl App {
             // described the old setup — never trust a path a foreign file carried.
             new_settings.active_theme_path = None;
         } else {
-            // Language is a global user preference, not theme data: applying or
-            // re-fitting a `.cde` never changes the UI language.
+            // Language and hardware performance settings are global user preferences,
+            // not theme data: applying or re-fitting a `.cde` never changes them.
             new_settings.language = old_settings.language;
+            new_settings.eco_mode = old_settings.eco_mode;
+            new_settings.eco_banner_dismissed = old_settings.eco_banner_dismissed;
+            new_settings.wallpaper_res_cap = old_settings.wallpaper_res_cap.clone();
         }
         self.sync_desktop_if_available("config adopted");
         // `.cde` manifests bind fence contents to this desktop's actual files (names that
@@ -892,6 +897,7 @@ impl App {
         let Some(host) = &self.effects else {
             return;
         };
+        host.set_eco_mode(s.eco_mode);
         // Audio-reactive `le_*` effects draw from the visualizer engine's
         // shared spectrum: arm WASAPI capture even with no widget shown, and
         // feed the overlay the Windows accent as its adaptive tint (an
@@ -1211,17 +1217,33 @@ impl App {
         let monitors: Vec<serde_json::Value> = self
             .monitor_labels()
             .into_iter()
-            .map(|(id, label)| serde_json::json!({ "id": id, "label": label }))
+            .zip(self.state.work_areas.iter())
+            .map(|((id, label), w)| {
+                serde_json::json!({
+                    "id": id,
+                    "label": label,
+                    "x": w.mon_left,
+                    "y": w.mon_top,
+                    "w": (w.mon_right - w.mon_left).max(1),
+                    "h": (w.mon_bottom - w.mon_top).max(1),
+                    "dpi": w.dpi,
+                    "primary": w.mon_left == 0 && w.mon_top == 0,
+                })
+            })
             .collect();
         let accent = {
             let [r, g, b] = self.ctx.theme.borrow().accent_rgb8();
             format!("#{r:02X}{g:02X}{b:02X}")
         };
+        static ECO_RECOMMENDED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        let eco_recommended =
+            *ECO_RECOMMENDED.get_or_init(coredesk_platform::wmf_wallpaper::detect_eco_recommended);
         serde_json::json!({
             "type": "state",
             "locale": localization["locale"],
             "translations": localization["translations"],
             "settings": self.state.config.settings,
+            "ecoRecommended": eco_recommended,
             "desktopIconsHidden": coredesk_platform::shell_icons::desktop_icons_hidden(),
             "rules": self.state.config.rules,
             "fences": fences,
@@ -1433,6 +1455,7 @@ impl App {
             // The visualizer page is live: arm its design, then reveal.
             Some("vizReady") => {
                 if let Some(h) = &self.visualizer_host {
+                    h.note_document_ready();
                     h.post_json(&viz_style_json(
                         &self.state.config.settings.visualizer_style,
                     ));
@@ -2187,7 +2210,13 @@ impl App {
         let push_changed = new.roll_up.push_neighbors != old.roll_up.push_neighbors;
         let inbox_hiding_changed =
             new.hide_inbox_when_icons_shown != old.hide_inbox_when_icons_shown;
-        let fit_changed = new.contain_background != old.contain_background;
+        let fit_changed = new.contain_background != old.contain_background
+            || new.wallpaper_display_mode != old.wallpaper_display_mode
+            || new.wallpaper_res_cap != old.wallpaper_res_cap
+            || new.eco_mode != old.eco_mode
+            || new.secondary_offset_x != old.secondary_offset_x
+            || new.secondary_offset_y != old.secondary_offset_y;
+        let eco_changed = new.eco_mode != old.eco_mode;
         // 「调整大小时按整行整列对齐」 switched on keeps every rectangle: the rows fill any
         // height with whole icons (redrawn above), and rounding would undo fences lined up.
         self.state.config.settings = new;
@@ -2211,6 +2240,13 @@ impl App {
         if inbox_hiding_changed {
             self.sync_inbox_window();
         }
+        if eco_changed {
+            let s = self.state.config.settings.clone();
+            self.apply_desktop_effect(&s);
+            if let Some(h) = &self.visualizer_host {
+                h.post_json(&viz_theme_json(&s, None));
+            }
+        }
         if fit_changed {
             // Canvas re-anchoring and image refit run here; the video player's
             // cover/contain restart rides the sync right below.
@@ -2218,6 +2254,18 @@ impl App {
         }
         self.sync_video_wallpaper();
         self.push_settings_state();
+    }
+
+    fn wallpaper_render_config(&self) -> coredesk_platform::wmf_wallpaper::WallpaperRenderConfig {
+        let s = &self.state.config.settings;
+        coredesk_platform::wmf_wallpaper::WallpaperRenderConfig::from_res_cap(
+            s.contain_background,
+            s.wallpaper_display_mode == "span",
+            &s.wallpaper_res_cap,
+            s.secondary_offset_x,
+            s.secondary_offset_y,
+            s.eco_mode,
+        )
     }
 
     /// Starts or stops the WMF desktop video wallpaper player to match
@@ -2248,18 +2296,18 @@ impl App {
             return;
         };
         let path = PathBuf::from(&path_str);
-        let letterbox = self.contain_background();
+        let config = self.wallpaper_render_config();
         if self
             .video_swap
             .as_ref()
-            .is_some_and(|s| s.path == path && s.letterbox == letterbox)
+            .is_some_and(|s| s.path == path && s.config == config)
         {
             return; // the wanted target is already in flight — keep it
         }
         if self
             .wmf_player
             .as_ref()
-            .is_some_and(|p| p.path() == path && p.is_alive() && p.letterbox() == letterbox)
+            .is_some_and(|p| p.path() == path && p.is_alive() && p.config() == config)
         {
             return;
         }
@@ -2276,10 +2324,10 @@ impl App {
         self.video_swap = Some(VideoSwap {
             epoch,
             path: path.clone(),
-            letterbox,
+            config,
             reattach: false,
             toast: false,
-            rx: spawn_video_swap(old, path, letterbox, epoch),
+            rx: spawn_video_swap(old, path, config, epoch),
         });
     }
 
@@ -2312,7 +2360,7 @@ impl App {
                     .map(PathBuf::from)
                     .as_deref()
                     == Some(player.path())
-                    && player.letterbox() == self.contain_background();
+                    && player.config() == self.wallpaper_render_config();
                 if still_wanted && VIDEO_SWAP_EPOCH.load(Ordering::SeqCst) == swap.epoch {
                     self.static_under_video =
                         Self::static_wallpaper_now().map(|(path, mtime)| StaticBaseline {
@@ -2445,11 +2493,11 @@ impl App {
         // A swap for this exact target is already in flight — keep it; a swap
         // for a different target gets superseded by the spawn below.
         let path = PathBuf::from(&path_str);
-        let letterbox = self.contain_background();
+        let config = self.wallpaper_render_config();
         if self
             .video_swap
             .as_ref()
-            .is_some_and(|s| s.path == path && s.letterbox == letterbox)
+            .is_some_and(|s| s.path == path && s.config == config)
         {
             return;
         }
@@ -2479,10 +2527,10 @@ impl App {
         self.video_swap = Some(VideoSwap {
             epoch,
             path: path.clone(),
-            letterbox,
+            config,
             reattach: true,
             toast: false,
-            rx: spawn_video_swap(old, path, letterbox, epoch),
+            rx: spawn_video_swap(old, path, config, epoch),
         });
     }
 
@@ -2738,7 +2786,7 @@ impl App {
 
     pub(super) fn apply_video_wallpaper(&mut self, path: &Path) {
         tracing::info!(path = %path.display(), "applying video wallpaper from settings");
-        let letterbox = self.contain_background();
+        let config = self.wallpaper_render_config();
         // The same pick is already in flight (e.g. a theme apply racing a user
         // pick) — keep it and make sure its completion toasts.
         if let Some(t) = self.video_transcode.as_mut().filter(|t| t.src == path) {
@@ -2748,7 +2796,7 @@ impl App {
         if let Some(s) = self
             .video_swap
             .as_mut()
-            .filter(|s| s.path == path && s.letterbox == letterbox)
+            .filter(|s| s.path == path && s.config == config)
         {
             s.toast = true;
             return;
@@ -2775,10 +2823,10 @@ impl App {
             self.video_swap = Some(VideoSwap {
                 epoch,
                 path: path.to_path_buf(),
-                letterbox,
+                config,
                 reattach: false,
                 toast: true,
-                rx: spawn_video_swap(None, path.to_path_buf(), letterbox, epoch),
+                rx: spawn_video_swap(None, path.to_path_buf(), config, epoch),
             });
             return;
         };
@@ -3451,18 +3499,99 @@ impl App {
             let _ = std::fs::create_dir_all(d);
         }
         let contain = self.contain_background();
+        let cfg = self.wallpaper_render_config();
+        let areas = self.state.work_areas.clone();
+        // Span mode: one canvas composited over the virtual-screen union and
+        // applied with DWPOS_SPAN — secondary-monitor regions sample the image
+        // shifted by the bezel offsets so a continuous object lines up across
+        // physical bezels.
+        if cfg.span_mode && areas.len() >= 2 {
+            let ux = areas.iter().map(|a| a.mon_left).min().unwrap_or(0);
+            let uy = areas.iter().map(|a| a.mon_top).min().unwrap_or(0);
+            let uw = (areas.iter().map(|a| a.mon_right).max().unwrap_or(0) - ux).max(1) as u32;
+            let uh = (areas.iter().map(|a| a.mon_bottom).max().unwrap_or(0) - uy).max(1) as u32;
+            let (cw, ch) = cfg.clamped_buffer_size(uw, uh);
+            let (sx_scale, sy_scale) = (cw as f32 / uw as f32, ch as f32 / uh as f32);
+            let base = match ad::adaptive_fit(asset_w, asset_h, cw, ch, contain) {
+                ad::AspectFit::Cover => coredesk_platform::wallpaper::decode_stretched(bg, cw, ch),
+                ad::AspectFit::Capped { bg: rect, .. } => {
+                    coredesk_platform::wallpaper::adaptive_wallpaper(bg, cw, ch, rect)
+                }
+            };
+            if let Ok(mut img) = base {
+                let (ox, oy) = (
+                    (cfg.secondary_offset_x as f32 * sx_scale).round() as i32,
+                    (cfg.secondary_offset_y as f32 * sy_scale).round() as i32,
+                );
+                if ox != 0 || oy != 0 {
+                    let (bw, bh) = (img.width as usize, img.height as usize);
+                    let mut shifted = img.bgra.clone();
+                    for area in areas.iter().skip(1) {
+                        let rx0 = ((area.mon_left - ux) as f32 * sx_scale).round() as i32;
+                        let ry0 = ((area.mon_top - uy) as f32 * sy_scale).round() as i32;
+                        let rx1 = ((area.mon_right - ux) as f32 * sx_scale).round() as i32;
+                        let ry1 = ((area.mon_bottom - uy) as f32 * sy_scale).round() as i32;
+                        for dy in ry0.max(0)..ry1.min(bh as i32) {
+                            for dx in rx0.max(0)..rx1.min(bw as i32) {
+                                let sx = (dx - ox).clamp(0, bw as i32 - 1) as usize;
+                                let sy = (dy - oy).clamp(0, bh as i32 - 1) as usize;
+                                let d = (dy as usize * bw + dx as usize) * 4;
+                                let s = (sy * bw + sx) * 4;
+                                shifted[d..d + 4].copy_from_slice(&img.bgra[s..s + 4]);
+                            }
+                        }
+                    }
+                    img.bgra = shifted;
+                }
+                let applied = dir.as_ref().is_some_and(|d| {
+                    let dest = d.join("adaptive-span.jpg");
+                    coredesk_platform::wmf_wallpaper::encode_jpeg(img.width, img.height, &img.bgra)
+                        .ok()
+                        .and_then(|jpg| std::fs::write(&dest, &jpg).ok())
+                        .is_some_and(|_| {
+                            coredesk_platform::wallpaper::set_all_wallpaper(&dest).is_ok()
+                                && coredesk_platform::wallpaper::set_position_span().is_ok()
+                        })
+                });
+                if applied {
+                    tracing::info!("adaptive wallpapers committed (span)");
+                    return;
+                }
+                tracing::warn!("span wallpaper composite failed; falling back to per-monitor");
+            }
+        }
         let mut applied = 0usize;
-        for (i, area) in self.state.work_areas.clone().iter().enumerate() {
+        for (i, area) in areas.iter().enumerate() {
             let [mw, mh] = area.screen_px().map(|v| v.max(0) as u32);
-            let path = match ad::adaptive_fit(asset_w, asset_h, mw, mh, contain) {
+            // Internal resolution cap: composite at the capped size and let the
+            // OS Fill upscale — never changes the monitor's real resolution.
+            let (cmw, cmh) = cfg.clamped_buffer_size(mw, mh);
+            let capped = cmw != mw || cmh != mh;
+            let path = match ad::adaptive_fit(asset_w, asset_h, cmw, cmh, contain) {
                 // Cover: the raw asset — Windows "Fill" does the uniform
-                // scale-and-crop natively, so no composite is needed.
-                ad::AspectFit::Cover => bg.to_path_buf(),
+                // scale-and-crop natively, so no composite is needed (unless the
+                // resolution cap requires a downscaled file).
+                ad::AspectFit::Cover if !capped => bg.to_path_buf(),
+                ad::AspectFit::Cover => dir
+                    .as_ref()
+                    .and_then(|d| {
+                        let dest = d.join(format!("adaptive-cap-{i}.jpg"));
+                        coredesk_platform::wallpaper::decode_stretched(bg, cmw, cmh)
+                            .and_then(|img| {
+                                coredesk_platform::wmf_wallpaper::encode_jpeg(
+                                    img.width, img.height, &img.bgra,
+                                )
+                                .map(|jpg| (dest, jpg))
+                            })
+                            .ok()
+                            .and_then(|(dest, jpg)| std::fs::write(&dest, &jpg).ok().map(|_| dest))
+                    })
+                    .unwrap_or_else(|| bg.to_path_buf()),
                 ad::AspectFit::Capped { bg: rect, .. } => dir
                     .as_ref()
                     .and_then(|d| {
                         let dest = d.join(format!("adaptive-{i}.jpg"));
-                        coredesk_platform::wallpaper::adaptive_wallpaper(bg, mw, mh, rect)
+                        coredesk_platform::wallpaper::adaptive_wallpaper(bg, cmw, cmh, rect)
                             .and_then(|img| {
                                 coredesk_platform::wmf_wallpaper::encode_jpeg(
                                     img.width, img.height, &img.bgra,

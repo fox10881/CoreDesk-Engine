@@ -10,6 +10,7 @@ const CMD_SETTINGS: u32 = 4;
 const CMD_REPAIR_ICONS: u32 = 5;
 const CMD_HIDE_ICONS_AGAIN: u32 = 6;
 const CMD_FEEDBACK: u32 = 7;
+const CMD_TOGGLE_ECO_MODE: u32 = 8;
 const CMD_EXIT: u32 = 9;
 const CMD_PEEK: u32 = 10;
 /// Tray 「在桌面显示文件夹」 entries: 11..=14 (see `App::show_folder_submenu`).
@@ -213,6 +214,12 @@ impl App {
             )
             .icon(glyph::MESSAGE)
             .item(
+                CMD_TOGGLE_ECO_MODE,
+                coredesk_core::i18n::text("节能模式 (Eco Mode)"),
+                self.state.config.settings.eco_mode,
+                false,
+            )
+            .item(
                 CMD_SETTINGS,
                 coredesk_core::i18n::text("设置…"),
                 false,
@@ -246,6 +253,11 @@ impl App {
                 );
             }
             CMD_FEEDBACK => self.open_feedback(false),
+            CMD_TOGGLE_ECO_MODE => {
+                let mut next = self.state.config.settings.clone();
+                next.eco_mode = !next.eco_mode;
+                self.apply_settings(next);
+            }
             CMD_SETTINGS => self.queue.push(Command::OpenSettings),
             CMD_EXIT => self.queue.push(Command::Quit {
                 restart_shell: true,

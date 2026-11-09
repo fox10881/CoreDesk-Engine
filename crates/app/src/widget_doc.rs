@@ -20,17 +20,28 @@ use crate::clock_host::I18N_JS;
 
 const WIDGET_CSP_META: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src 'none'; connect-src 'none'; frame-src 'none';\">";
 
-fn inject_csp(doc: String) -> String {
+/// Eco-mode 30 FPS `requestAnimationFrame` throttle injected into Visualizer
+/// widget documents: when `vizTheme` carries `"eco": true`, `requestAnimationFrame`
+/// paces callbacks at ~33.3 ms (30 FPS); when `"eco": false`, it runs at native
+/// 60 FPS with zero overhead.
+const VIZ_ECO_SHIM: &str = "<script>(()=>{const origRaf=window.requestAnimationFrame.bind(window);let eco=false,last=0,attached=null;const handler=e=>{const m=e.data||{};if(m.t==='vizTheme'&&m.eco!==undefined)eco=!!m.eco;};const attach=()=>{try{const wv=window.chrome&&window.chrome.webview;if(wv&&wv!==attached){attached=wv;wv.addEventListener('message',handler);}}catch(_){attached=null;}setTimeout(attach,attached?500:10);};attach();window.requestAnimationFrame=cb=>{if(!eco)return origRaf(cb);return origRaf(now=>{if(now-last<32){setTimeout(()=>window.requestAnimationFrame(cb),Math.max(1,33-(now-last)));return;}last=now;cb(now);});};})();</script>";
+
+fn inject_csp(doc: String, is_visualizer: bool) -> String {
+    let extra = if is_visualizer {
+        format!("{WIDGET_CSP_META}{VIZ_ECO_SHIM}")
+    } else {
+        WIDGET_CSP_META.to_string()
+    };
     let lower = doc.to_ascii_lowercase();
     if let Some(idx) = lower.find("<head>") {
         let insert_at = idx + "<head>".len();
-        let mut out = String::with_capacity(doc.len() + WIDGET_CSP_META.len() + 1);
+        let mut out = String::with_capacity(doc.len() + extra.len() + 1);
         out.push_str(&doc[..insert_at]);
-        out.push_str(WIDGET_CSP_META);
+        out.push_str(&extra);
         out.push_str(&doc[insert_at..]);
         out
     } else {
-        format!("{WIDGET_CSP_META}{doc}")
+        format!("{extra}{doc}")
     }
 }
 
@@ -40,9 +51,10 @@ fn inject_csp(doc: String) -> String {
 /// `None` when no file resolves (factory missing + no user override) or it
 /// fails the size/UTF-8 checks — callers treat that like an unknown id.
 pub(crate) fn build_widget_document(category: &str, id: &str) -> Option<String> {
+    let is_viz = category == coredesk_core::styles_fs::VISUALIZER_WIDGET_DIR;
     let file = coredesk_core::styles_fs::load_widget_document(category, id)?;
     if !file.contains("<!-- COREDESK_LOCALE -->") && !file.contains("i18n.js") {
-        return Some(inject_csp(file));
+        return Some(inject_csp(file, is_viz));
     }
     let payload = coredesk_core::i18n::ui_payload()
         .to_string()
@@ -56,6 +68,7 @@ pub(crate) fn build_widget_document(category: &str, id: &str) -> Option<String> 
             "<script src=\"i18n.js\"></script>",
             &format!("<script>{I18N_JS}</script>"),
         ),
+        is_viz,
     ))
 }
 

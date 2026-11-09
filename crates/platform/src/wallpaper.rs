@@ -453,6 +453,27 @@ pub fn set_position_fill() -> Result<()> {
     unsafe { dw.SetPosition(DWPOS_FILL) }.ok()
 }
 
+/// One wallpaper on every monitor — `monitorID = NULL` covers the whole desktop —
+/// for the composited span canvas that maps 1:1 onto the virtual screen.
+pub fn set_all_wallpaper(path: &Path) -> Result<()> {
+    // SAFETY: standard COM activation.
+    let dw: IDesktopWallpaper =
+        unsafe { CoCreateInstance(&DesktopWallpaper, None, CLSCTX_ALL as u32)? };
+    let path_w = path.as_os_str().encode_wide_nul();
+    // SAFETY: `path_w` is a NUL-terminated buffer that outlives the call.
+    unsafe { dw.SetWallpaper(PCWSTR::null(), PCWSTR(path_w.as_ptr())) }.ok()
+}
+
+/// `DWPOS_SPAN` — the composited virtual-screen canvas stretches edge to edge across
+/// the union of all monitor rects so each display shows its own slice of one image.
+pub fn set_position_span() -> Result<()> {
+    // SAFETY: standard COM activation.
+    let dw: IDesktopWallpaper =
+        unsafe { CoCreateInstance(&DesktopWallpaper, None, CLSCTX_ALL as u32)? };
+    // SAFETY: COM call on a live interface.
+    unsafe { dw.SetPosition(DWPOS_SPAN) }.ok()
+}
+
 /// Decoded opaque BGRA pixels.
 #[derive(Clone, Debug)]
 pub struct DecodedImage {
