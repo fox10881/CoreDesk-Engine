@@ -311,6 +311,10 @@ pub fn background_entry(cfg: &mut Config, src: &Path) -> Option<(String, Vec<u8>
             )
         })
         .unwrap_or_else(|| "jpg".into());
+    // `video_master_path` is machine-local cache state: a bundle always
+    // re-derives it from the persisted `theme-background-*` media on import,
+    // so the exporting machine's absolute path must never ship.
+    cfg.settings.video_master_path = None;
     if ext != "mp4" {
         if let Some(stale) = cfg.settings.video_wallpaper_path.take() {
             // A still-configured video path reaching an image bundle means a caller

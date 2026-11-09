@@ -160,6 +160,13 @@ pub struct Settings {
     /// Active H.264 `.mp4` video wallpaper path played by CoreDesk Engine's WMF desktop player.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video_wallpaper_path: Option<String>,
+    /// Highest-fidelity source of `video_wallpaper_path`: the asset in
+    /// `imported_wallpapers/` every res-cap variant transcodes from. Cap
+    /// changes always derive from this file — never from the playing variant —
+    /// so downscaling never throws the resolution ceiling away. `None` = the
+    /// configured path itself is the best asset known (pre-field configs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub video_master_path: Option<String>,
     /// The Start Menu style applied through Windhawk's
     /// `windows-11-start-menu-styler` mod — a [`crate::start_menu_themes`]
     /// catalog id, `""` = Windows Default (the mod's `theme` setting cleared).
@@ -947,6 +954,7 @@ impl Default for Settings {
             icons: IconSettings::default(),
             desktop_path: None,
             video_wallpaper_path: None,
+            video_master_path: None,
             start_menu_style: String::new(),
             taskbar_style: String::new(),
             notification_center_style: String::new(),

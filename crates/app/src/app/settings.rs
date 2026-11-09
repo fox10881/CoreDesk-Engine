@@ -393,37 +393,49 @@ pub(super) struct VideoSwap {
     >,
 }
 
-/// A `wmf_transcode::transcode_for_display` run in flight on a worker.
-/// `poll_video_transcode` flips `video_wallpaper_path` to the optimized file
-/// when it lands — while a transcode is pending, `sync_video_wallpaper` and
-/// `ensure_video_wallpaper` hold off starting the player entirely.
+/// A `wmf_transcode` optimize run in flight on a worker: the lineage master
+/// resolved first, then the cap-targeted variant transcoded FROM it.
+/// `poll_video_transcode` records the master and flips
+/// `video_wallpaper_path` to the variant when the pair lands — while a run
+/// is pending, `sync_video_wallpaper` and `ensure_video_wallpaper` hold off
+/// starting the player entirely.
 pub(super) struct VideoTranscode {
     epoch: u64,
     /// The original pick — `video_wallpaper_path` holds it until the optimized
-    /// file lands.
+    /// file lands; for a cap-change re-derive it is the master instead.
     src: PathBuf,
     /// `(w, h)` the worker encodes to — a cap-change re-transcode spawns only
     /// when this differs from the in-flight run's.
     target: (u32, u32),
     toast: bool,
-    rx: std::sync::mpsc::Receiver<std::result::Result<Option<PathBuf>, String>>,
+    /// `(master, variant)` on success — `variant = None` means the master
+    /// already fits the cap and is what should play.
+    rx: std::sync::mpsc::Receiver<std::result::Result<(PathBuf, Option<PathBuf>), String>>,
 }
 
-/// Worker-side transcode: decodes, scales to `target` physical px, re-encodes
-/// H.264 into `cache_dir`. `Ok(None)` = source already compliant; `Ok(Some)` =
-/// the optimized file; `Err` = caller falls back to the source.
+/// Worker-side optimize: resolves the lineage master first (an asset inside
+/// `cache_dir` at the source's native resolution — see
+/// `wmf_transcode::ensure_video_master`), then transcodes THAT to `target`
+/// physical px. Yields `(master, variant)`: `variant = None` means the master
+/// itself already fits the target and is what should play. `Err` = caller
+/// falls back to the source.
 fn spawn_video_transcode(
     src: PathBuf,
     cache_dir: PathBuf,
     target: (u32, u32),
-) -> std::sync::mpsc::Receiver<std::result::Result<Option<PathBuf>, String>> {
+) -> std::sync::mpsc::Receiver<std::result::Result<(PathBuf, Option<PathBuf>), String>> {
     let (tx, rx) = std::sync::mpsc::channel();
     let _ = std::thread::Builder::new()
         .name("coredesk-video-transcode".into())
         .spawn(move || {
-            let _ = tx.send(coredesk_platform::wmf_transcode::transcode_for_display(
-                &src, &cache_dir, target.0, target.1,
-            ));
+            let result = coredesk_platform::wmf_transcode::ensure_video_master(&src, &cache_dir)
+                .and_then(|master| {
+                    coredesk_platform::wmf_transcode::transcode_for_display(
+                        &master, &cache_dir, target.0, target.1,
+                    )
+                    .map(|variant| (master, variant))
+                });
+            let _ = tx.send(result);
         });
     rx
 }
@@ -2332,37 +2344,57 @@ impl App {
             return false;
         }
         let target = self.video_transcode_target();
+        let src = self.video_master_or_playing();
         let epoch = VIDEO_SWAP_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
         self.video_transcode = Some(VideoTranscode {
             epoch,
-            src: path.to_path_buf(),
+            src: src.clone(),
             target,
             toast: false,
-            rx: spawn_video_transcode(path.to_path_buf(), dir, target),
+            rx: spawn_video_transcode(src, dir, target),
         });
         true
     }
 
-    /// `wallpaper_res_cap` moved: re-optimize the configured video for the new
-    /// box. Down-caps rewrite the cache file (the sink keeps only the newest
-    /// `video-*` sibling); up-caps probe-skip and keep the current asset —
-    /// transcoding can shrink, never regrow. Silent and async: the running
-    /// player holds the old file until `poll_video_transcode` flips the path.
+    /// The file cap variants derive from: `video_master_path` while it still
+    /// names a real asset, else the configured playing path — configs written
+    /// before the field existed have no master recorded, so today's best
+    /// asset is the file itself.
+    fn video_master_or_playing(&self) -> PathBuf {
+        let s = &self.state.config.settings;
+        s.video_master_path
+            .as_deref()
+            .map(PathBuf::from)
+            .filter(|p| p.is_file())
+            .unwrap_or_else(|| {
+                s.video_wallpaper_path
+                    .as_deref()
+                    .map(PathBuf::from)
+                    .unwrap_or_default()
+            })
+    }
+
+    /// `wallpaper_res_cap` moved: re-derive the configured video for the new
+    /// box from the lineage MASTER (`video_master_path`) — never from the
+    /// playing variant, so an up-cap can regrow what a down-cap derived.
+    /// Same-stem `video-*` variants persist, so moving back to a previously
+    /// derived cap reuses the cached file instead of re-encoding. Silent and
+    /// async: the running player holds the old file until
+    /// `poll_video_transcode` flips the path.
     fn retranscode_video_for_cap(&mut self) {
-        let Some(src) = self
+        // No configured video → nothing to re-derive (the master field alone
+        // is not a playback request).
+        if self
             .state
             .config
             .settings
             .video_wallpaper_path
-            .clone()
-            .filter(|s| !s.is_empty())
-            .map(PathBuf::from)
-        else {
-            return;
-        };
-        if !src.is_file() {
+            .as_deref()
+            .is_none_or(|s| s.is_empty())
+        {
             return;
         }
+        let src = self.video_master_or_playing();
         let Some(dir) = self
             .state
             .config_path()
@@ -2552,30 +2584,42 @@ impl App {
         match t.rx.try_recv() {
             Ok(res) => {
                 let t = self.video_transcode.take().unwrap();
+                // `src` is the pick path for a user pick and the master path for
+                // a cap-change re-derive — either configured field matching
+                // means the result still describes the wanted video.
                 let fresh = VIDEO_SWAP_EPOCH.load(Ordering::SeqCst) == t.epoch
-                    && self
+                    && (self
                         .state
                         .config
                         .settings
                         .video_wallpaper_path
                         .as_deref()
                         .map(PathBuf::from)
-                        == Some(t.src.clone());
+                        == Some(t.src.clone())
+                        || self
+                            .state
+                            .config
+                            .settings
+                            .video_master_path
+                            .as_deref()
+                            .map(PathBuf::from)
+                            == Some(t.src.clone()));
                 match res {
-                    Ok(Some(optimized)) if fresh => {
-                        self.state.config.settings.video_wallpaper_path =
-                            Some(optimized.to_string_lossy().into_owned());
+                    Ok((master, variant)) if fresh => {
+                        {
+                            let s = &mut self.state.config.settings;
+                            s.video_master_path = Some(master.to_string_lossy().into_owned());
+                            // `variant = None` — the master itself already fits
+                            // the cap and is what plays.
+                            s.video_wallpaper_path =
+                                Some(variant.unwrap_or(master).to_string_lossy().into_owned());
+                        }
                         self.settings_mutated();
                         if t.toast {
                             self.pending_video_toast = true;
                         }
                     }
-                    Ok(Some(_)) => {} // superseded pick — named cache file stays for reuse
-                    Ok(None) => {
-                        if t.toast {
-                            self.pending_video_toast = true;
-                        }
-                    }
+                    Ok(_) => {} // superseded pick — named cache files stay for reuse
                     Err(error) => {
                         tracing::warn!(%error, "video transcode failed; playing source as-is");
                         if fresh && t.toast {
@@ -2777,6 +2821,7 @@ impl App {
         }
         self.static_under_video = None;
         self.state.config.settings.video_wallpaper_path = None;
+        self.state.config.settings.video_master_path = None;
         // `settings_mutated` — not bare `schedule_save` — or the cleared path never
         // reaches disk (`save_if_dirty` writes only flagged state) and the next
         // launch resurrects the video.
@@ -2897,6 +2942,7 @@ impl App {
         }
         self.static_under_video = None;
         self.state.config.settings.video_wallpaper_path = None;
+        self.state.config.settings.video_master_path = None;
         self.settings_mutated();
     }
 
@@ -2939,8 +2985,9 @@ impl App {
         self.static_under_video = None;
         // The config holds the original until the optimized file lands —
         // `poll_video_transcode` flips it, and the swap pipeline starts the
-        // player from there. `.cde` exports therefore always bundle the
-        // downscaled asset, never the 4K source.
+        // player from there. The worker also pins the native-resolution master
+        // into `imported_wallpapers/` — the asset `.cde` exports bundle and
+        // every res-cap variant derives from.
         self.state.config.settings.video_wallpaper_path = Some(path.to_string_lossy().into_owned());
         self.settings_mutated();
         let epoch = VIDEO_SWAP_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
@@ -3267,7 +3314,25 @@ impl App {
 
     pub(super) fn export_theme_to(&mut self, dest: &Path) {
         self.state.save_if_dirty();
-        let bg = self.current_background_source();
+        let bg = self.current_background_source().map(|p| {
+            // A bundle must carry the lineage's fidelity ceiling — the master —
+            // not the cap-limited variant currently playing: downscales are
+            // one-way, so shipping the variant would strand the theme at the
+            // lowest resolution ever selected.
+            if !p.extension().is_some_and(|e| e.eq_ignore_ascii_case("mp4")) {
+                return p;
+            }
+            self.state
+                .config
+                .settings
+                .video_master_path
+                .as_deref()
+                .map(PathBuf::from)
+                .filter(|m| {
+                    m.is_file() && m.extension().is_some_and(|e| e.eq_ignore_ascii_case("mp4"))
+                })
+                .unwrap_or(p)
+        });
         tracing::info!(dest = %dest.display(), background = ?bg, "theme export: background source selected");
         // The live frame backs the preview only when the video is the bundled background —
         // a stopped player still holds its last frame, which would paint over the image.
@@ -4513,8 +4578,12 @@ impl App {
             cfg.settings.video_wallpaper_path = persisted_bg
                 .as_ref()
                 .map(|p| p.to_string_lossy().into_owned());
+            // The bundled media IS the lineage's fidelity ceiling: it is the
+            // best copy this theme carries, so cap variants derive from it.
+            cfg.settings.video_master_path = cfg.settings.video_wallpaper_path.clone();
         } else if persisted_bg.is_some() {
             cfg.settings.video_wallpaper_path = None;
+            cfg.settings.video_master_path = None;
         }
 
         // A picked file joins the library first: the card it becomes (not the file the

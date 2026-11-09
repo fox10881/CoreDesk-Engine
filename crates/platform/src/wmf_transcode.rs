@@ -1,15 +1,20 @@
-//! One-time video wallpaper transcode for imports.
+//! One-time video wallpaper transcode for imports, with a master + variants
+//! split.
 //!
 //! `IMFSourceReader` decodes the source while its video processor scales each
-//! frame down to the largest display's physical pixels; `IMFSinkWriter`
-//! re-encodes those frames to H.264 (hardware MFTs allowed) at a
-//! wallpaper-class bitrate. The product lands in `imported_wallpapers/` as a
-//! deterministic `video-<srclen>-<srcmtime>-<W>x<H>.mp4` — the name alone is the
-//! reuse key, so re-picking the same file or re-applying an exported theme's
-//! already-optimized `background.mp4` never pays a second encode.
+//! frame down to a target size; `IMFSinkWriter` re-encodes those frames to
+//! H.264 (hardware MFTs allowed) at a wallpaper-class bitrate. Products land
+//! in `imported_wallpapers/` as deterministic `video-<srclen>-<srcmtime>-<W>x<H>.mp4`
+//! files — the name alone is the reuse key, so re-picking the same file or
+//! re-deriving a cap variant never pays a second encode.
 //!
-//! `.cde` bundles ship the optimized file: a 250 MB 4K loop arrives as a
-//! ~10 MB device-matched MP4 the player also fits in the RAM byte-stream cache.
+//! [`ensure_video_master`] pins the lineage's fidelity ceiling: the asset in
+//! `imported_wallpapers/` at the source's NATIVE resolution that every
+//! res-cap variant transcodes from. Raising the cap therefore re-derives from
+//! the master instead of trying to regrow pixels a downscale discarded.
+//!
+//! `.cde` bundles ship the master: a 250 MB 4K loop arrives as a ~30 MB
+//! native-resolution MP4 the player also fits in the RAM byte-stream cache.
 
 use crate::wide::to_wide;
 use crate::wmf_bindings::{
@@ -115,13 +120,64 @@ fn wallpaper_bitrate(w: u32, h: u32) -> u32 {
 
 /// Deterministic optimized-asset name — the (source, monitor set) reuse key.
 fn optimized_name(src: &Path, src_len: u64, target_w: u32, target_h: u32) -> String {
+    format!("{}{target_w}x{target_h}.mp4", stem_prefix(src, src_len))
+}
+
+/// The `video-<srclen>-<srcmtime>-` prefix every variant transcoded from the
+/// same source shares — the lineage key the sibling sweep uses to tell a
+/// master's own cap variants from another lineage's orphans.
+fn stem_prefix(src: &Path, src_len: u64) -> String {
     let mtime = std::fs::metadata(src)
         .and_then(|m| m.modified())
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    format!("video-{src_len:x}-{mtime:x}-{target_w}x{target_h}.mp4")
+    format!("video-{src_len:x}-{mtime:x}-")
+}
+
+/// Resolves the transcode/archive master for `src`: `src` itself when it
+/// already lives inside `cache_dir` (a bundled `theme-background-*`, an
+/// existing `video-*` asset — it is the best copy the app owns), else an
+/// asset INSIDE `cache_dir` at the source's native resolution — a re-encode
+/// at wallpaper bitrate, or the source's own bytes adopted under the
+/// canonical `video-*` name when the compliance probe says no encode is
+/// needed. Every res-cap variant transcodes from this file, so it is the
+/// resolution ceiling the app never throws away.
+pub fn ensure_video_master(src: &Path, cache_dir: &Path) -> std::result::Result<PathBuf, String> {
+    let abs_src = std::path::absolute(src).map_err(|e| format!("abs src: {e}"))?;
+    let abs_dir = std::path::absolute(cache_dir).map_err(|e| format!("abs dir: {e}"))?;
+    if abs_src.starts_with(&abs_dir) {
+        return Ok(src.to_path_buf());
+    }
+    // Probe once up front: the encode target is the source's own frame size —
+    // the master keeps the full resolution regardless of the current res-cap.
+    let probe = probe_video(src).map_err(|e| format!("probe {}: {e}", src.display()))?;
+    if let Some(encoded) = transcode_for_display(src, cache_dir, probe.width, probe.height)? {
+        return Ok(encoded);
+    }
+    // Already lean at native size — no re-encode, but the master must still
+    // live inside the cache so an external pick's later deletion (or a theme
+    // export) cannot strand the lineage. Adopt the bytes under the same
+    // `video-*` name an encode would have written: the reuse key stays exact.
+    std::fs::create_dir_all(cache_dir).map_err(|e| format!("cache dir: {e}"))?;
+    let dest = std::path::absolute(cache_dir)
+        .map_err(|e| format!("cache dir: {e}"))?
+        .join(optimized_name(
+            src,
+            probe.file_len,
+            probe.width,
+            probe.height,
+        ));
+    if !dest.is_file() {
+        std::fs::copy(src, &dest).map_err(|e| format!("adopt master: {e}"))?;
+        tracing::info!(
+            src = %src.display(),
+            dest = %dest.display(),
+            "wmf transcode: adopted lean source as video master"
+        );
+    }
+    Ok(dest)
 }
 
 /// The reader's negotiated output type: the *native* type cloned (so every
@@ -249,16 +305,28 @@ pub fn transcode_for_display(
     match unsafe { transcode_inner(src, &tmp, &probe, out.0, out.1, bitrate) } {
         Ok(()) => {
             std::fs::rename(&tmp, &dest).map_err(|e| format!("rename {}: {e}", dest.display()))?;
-            // Siblings from other sources/monitors are orphans — `video-*`
-            // files are owned by this cache; `background.mp4` theme imports
-            // are not.
+            // Orphans are `video-*` files from OTHER lineages. Kept: `dest`,
+            // `src` itself (a master's variants transcode from it — deleting
+            // the source under its own variants would strand the ceiling), and
+            // every sibling sharing this run's `video-<len>-<mtime>-` stem —
+            // the other res-cap variants of the same lineage stay so a later
+            // cap switch reuses them instead of re-encoding.
+            // `src` is compared by file name, not path: `read_dir` yields
+            // `absolute(cache_dir)`-formed paths while callers may hand a
+            // differently-normalized `src` — a missed equality would delete
+            // the master under its own variants.
+            let src_name = src.file_name().and_then(|n| n.to_str());
+            let keep_stem = stem_prefix(src, probe.file_len);
             if let Ok(rd) = std::fs::read_dir(cache_dir) {
                 for e in rd.flatten() {
                     let p = e.path();
                     if p != dest
-                        && p.file_name()
-                            .and_then(|n| n.to_str())
-                            .is_some_and(|n| n.starts_with("video-") && n.ends_with(".mp4"))
+                        && p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                            n.starts_with("video-")
+                                && n.ends_with(".mp4")
+                                && !n.starts_with(&keep_stem)
+                                && Some(n) != src_name
+                        })
                     {
                         let _ = std::fs::remove_file(&p);
                     }
