@@ -1408,44 +1408,42 @@ unsafe fn paint_surface_dc(hwnd: HWND, dc: HDC) {
         };
         let wmf_dc = crate::wmf_bindings::HDC(dc.0);
         let _ = SetStretchBltMode(wmf_dc, HALFTONE);
-        // The blurred backdrop covers the whole window in letterbox mode, and
-        // also in cover mode when a bezel offset could uncover a strip — the
-        // video blits then leave the backdrop visible where they were shifted
-        // away from.
-        if surface.margin.len() == (surface.out_w * surface.out_h * 4) as usize {
-            let mbi = crate::wmf_bindings::BITMAPINFO {
-                bmiHeader: crate::wmf_bindings::BITMAPINFOHEADER {
-                    biSize: size_of::<crate::wmf_bindings::BITMAPINFOHEADER>() as u32,
-                    biWidth: surface.out_w,
-                    biHeight: -surface.out_h,
-                    biPlanes: 1,
-                    biBitCount: 32,
-                    biCompression: BI_RGB as u32,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-            let _ = StretchDIBits(
-                wmf_dc,
-                0,
-                0,
-                surface.out_w,
-                surface.out_h,
-                0,
-                0,
-                surface.out_w,
-                surface.out_h,
-                Some(surface.margin.as_ptr().cast()),
-                &mbi,
-                DIB_RGB_COLORS as u32,
-                SRCCOPY,
-            );
-        }
         // Duplicate mode: one blit per monitor tile (each display shows the whole
         // frame, fit to its own rect); span keeps one window-wide blit shifted by
         // the bezel offsets.
         let (ox, oy) = surface.offset;
         if let Some((dl, dt, dr, db)) = surface.dst {
+            // Letterbox: blurred backdrop covers the whole window; the video frame
+            // draws uncropped into its centered contain rect.
+            if surface.margin.len() == (surface.out_w * surface.out_h * 4) as usize {
+                let mbi = crate::wmf_bindings::BITMAPINFO {
+                    bmiHeader: crate::wmf_bindings::BITMAPINFOHEADER {
+                        biSize: size_of::<crate::wmf_bindings::BITMAPINFOHEADER>() as u32,
+                        biWidth: surface.out_w,
+                        biHeight: -surface.out_h,
+                        biPlanes: 1,
+                        biBitCount: 32,
+                        biCompression: BI_RGB as u32,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let _ = StretchDIBits(
+                    wmf_dc,
+                    0,
+                    0,
+                    surface.out_w,
+                    surface.out_h,
+                    0,
+                    0,
+                    surface.out_w,
+                    surface.out_h,
+                    Some(surface.margin.as_ptr().cast()),
+                    &mbi,
+                    DIB_RGB_COLORS as u32,
+                    SRCCOPY,
+                );
+            }
             if surface.tiles.len() > 1 {
                 for &((tl, tt, tr, tb), (ox_i, oy_i)) in &surface.tiles {
                     let (cl, ct, cr, cb) =
@@ -1718,15 +1716,12 @@ struct GpuPipeline {
     /// with the bezel offset it slides by (buffer px) — duplicate mode draws
     /// the whole frame into every tile, span mode draws the buffer slice each
     /// monitor shows. Only the Settings "offset target" tile carries a
-    /// nonzero offset. Fewer than two entries ⇒ the one-blit `single_dst`
-    /// path, whose in-buffer shift carries the offset there instead.
+    /// nonzero offset. Fewer than two entries ⇒ the one-blit path, whose
+    /// visual-level translate in `visual_off` then carries the shift.
     tiles: Vec<(crate::wmf_bindings::RECT, (i32, i32))>,
-    /// The one-blit destination — `dst_rect` pre-shifted by the bezel offset
-    /// (buffer px) for the tile-less paths (lone monitor, nothing enumerable).
-    /// Shifting inside the buffer leaves the uncovered strip painted with the
-    /// blurred backdrop, where a whole-visual translate would expose the
-    /// layered window behind it as plain black.
-    single_dst: crate::wmf_bindings::RECT,
+    /// The whole-visual translate applied when `tiles` is empty — the lone
+    /// monitor and the nothing-enumerable topologies keep the offset alive.
+    visual_off: (f32, f32),
     config: WallpaperRenderConfig,
 }
 
@@ -1809,25 +1804,19 @@ impl GpuPipeline {
         let (buf_w, buf_h) = config.clamped_buffer_size(win_w, win_h);
         let mons = sorted_monitors();
         let tiles = monitor_tiles(hwnd, win_w, win_h, buf_w, buf_h, &config, &mons);
-        // The tile-less blit shifts its destination INSIDE the buffer (scaled
-        // to buffer px): a lone real display is itself the only possible
-        // target in either mode, and the nothing-enumerable topology keeps
-        // the legacy whole-surface shift. With several displays enumerated
-        // but all but one filtered away, only a target of 0 can meaningfully
-        // slide the lone in-window region.
-        let (tsx, tsy) = (
-            buf_w as f32 / win_w.max(1) as f32,
-            buf_h as f32 / win_h.max(1) as f32,
-        );
-        let single_off =
-            if mons.len() < 2 || (config.offset_target.max(0) as usize).min(mons.len() - 1) == 0 {
-                (
-                    (config.secondary_offset_x as f32 * tsx).round() as i32,
-                    (config.secondary_offset_y as f32 * tsy).round() as i32,
-                )
-            } else {
-                (0, 0)
-            };
+        // With no per-monitor tiles the whole-visual translate carries the
+        // shift: a lone real display is itself the only possible target (both
+        // modes), and the nothing-enumerable fallback keeps span's legacy
+        // translate. Duplicate never had a translate — it stays put when
+        // nothing enumerates.
+        let visual_off = if tiles.is_empty() && (config.span_mode || !mons.is_empty()) {
+            (
+                config.secondary_offset_x as f32,
+                config.secondary_offset_y as f32,
+            )
+        } else {
+            (0.0, 0.0)
+        };
         unsafe {
             let video_dev: ID3D11VideoDevice = device
                 .cast()
@@ -1877,16 +1866,16 @@ impl GpuPipeline {
                 .SetContent(&swapchain)
                 .ok()
                 .map_err(|e| format!("DComp SetContent: {e}"))?;
-            // The bezel offset always lives inside the buffer (per-tile blits
-            // or the shifted `single_dst`) — a whole-visual translate would
-            // slide every display at once AND expose a black strip.
+            // Per-monitor tiles own the bezel offset in their blits; the
+            // visual-level translate only lives in the tile-less fallbacks
+            // (it would slide every display at once otherwise).
             let matrix = windows_numerics::Matrix3x2 {
                 m11: win_w as f32 / buf_w.max(1) as f32,
                 m12: 0.0,
                 m21: 0.0,
                 m22: win_h as f32 / buf_h.max(1) as f32,
-                m31: 0.0,
-                m32: 0.0,
+                m31: visual_off.0,
+                m32: visual_off.1,
             };
             let _ = visual.SetTransform2(&matrix);
             target
@@ -1980,23 +1969,18 @@ impl GpuPipeline {
                 right: dr,
                 bottom: db,
             };
-            // The tile-less blit slides by the bezel offset inside the buffer;
-            // the uncovered strip keeps the blurred backdrop burn-in.
-            let single_dst = crate::wmf_bindings::RECT {
-                left: dl + single_off.0,
-                top: dt + single_off.1,
-                right: dr + single_off.0,
-                bottom: db + single_off.1,
-            };
-            // The output target must equal the (shifted) dst: a full-window
-            // target makes the video processor paint everything OUTSIDE it
-            // with its background color — erasing the blurred margins and the
-            // offset strip alike every frame.
-            let out_rect = crate::wmf_bindings::RECT {
-                left: single_dst.left.max(0),
-                top: single_dst.top.max(0),
-                right: single_dst.right.min(buf_w as i32),
-                bottom: single_dst.bottom.min(buf_h as i32),
+            // The output target must equal the contain rect in letterbox mode: a full-
+            // window target makes the video processor paint everything OUTSIDE dst_rect
+            // with its background color, erasing the blurred margins every frame.
+            let out_rect = if letterbox {
+                dst_rect
+            } else {
+                crate::wmf_bindings::RECT {
+                    left: 0,
+                    top: 0,
+                    right: buf_w as i32,
+                    bottom: buf_h as i32,
+                }
             };
             video_ctx.VideoProcessorSetStreamSourceRect(&vp, 0, true, Some(&src_rect));
             video_ctx.VideoProcessorSetStreamDestRect(&vp, 0, true, Some(&dst_rect));
@@ -2036,7 +2020,7 @@ impl GpuPipeline {
                 fps_num,
                 fps_den,
                 tiles = tiles.len(),
-                single_off = ?single_off,
+                visual_off = ?visual_off,
                 offset_target = config.offset_target,
                 off_x = config.secondary_offset_x,
                 off_y = config.secondary_offset_y,
@@ -2063,7 +2047,7 @@ impl GpuPipeline {
                 buf_w,
                 buf_h,
                 tiles,
-                single_dst,
+                visual_off,
                 config,
             })
         }
@@ -2091,16 +2075,15 @@ impl GpuPipeline {
                 .SetContent(&self.swapchain)
                 .ok()
                 .map_err(|e| format!("rebind SetContent: {e}"))?;
-            // Same rule as at creation: the offset lives inside the buffer
-            // (per-tile blits or the shifted single dst) — never a visual
-            // translate, which would slide every display AND show black.
+            // Same rule as at creation: per-monitor tiles own the offset;
+            // only the tile-less fallback keeps the whole-visual translate.
             let matrix = windows_numerics::Matrix3x2 {
                 m11: self.win_w as f32 / self.buf_w.max(1) as f32,
                 m12: 0.0,
                 m21: 0.0,
                 m22: self.win_h as f32 / self.buf_h.max(1) as f32,
-                m31: 0.0,
-                m32: 0.0,
+                m31: self.visual_off.0,
+                m32: self.visual_off.1,
             };
             let _ = visual.SetTransform2(&matrix);
             target
@@ -2350,7 +2333,7 @@ impl GpuPipeline {
                 }
                 last
             } else {
-                blit(&self.src_rect, &self.single_dst)
+                blit(&self.src_rect, &self.dst_rect)
             };
             // Reclaim the input view inside the ManuallyDrop so the COM ref is released.
             let _iv_back = ManuallyDrop::into_inner(core::mem::replace(
@@ -2709,12 +2692,9 @@ unsafe fn run_gpu_attached(
             // Frame #0 straight to the screen through the GPU path.
             gp.present(first_buf, first_tex, first_slice)?;
             let thumb = gp.capture_thumb(first_tex, first_slice).unwrap_or_default();
-            // Blurred backdrop into both buffers: letterbox margins keep it
-            // forever, and so does the strip a bezel offset uncovers — the
-            // video processor clips to the (shifted) dst and never repaints
-            // outside it. Without the fill the strip would stay black.
-            let has_offsets = config.secondary_offset_x != 0 || config.secondary_offset_y != 0;
-            if (letterbox || has_offsets) && !thumb.is_empty() {
+            if letterbox && !thumb.is_empty() {
+                // Blurred backdrop into both buffers: the video processor only writes the
+                // contain rect each frame, so the margins keep this fill forever.
                 let backdrop = crate::wallpaper::blurred_backdrop_bgra(
                     &thumb,
                     THUMB_W,
@@ -3193,18 +3173,6 @@ fn run_player_thread(
                     win_h as usize,
                 );
                 surf.dst = Some(contain_rect(vid_w as i32, vid_h as i32, win_w, win_h));
-            } else if config.secondary_offset_x != 0 || config.secondary_offset_y != 0 {
-                // Cover mode with a bezel offset: the same blurred backdrop
-                // paints under the blits so the uncovered strip keeps image
-                // colours instead of a stale smear. `dst` stays None — it is
-                // what selects the letterbox paint branch.
-                surf.margin = crate::wallpaper::blurred_backdrop_bgra(
-                    &raw_frame,
-                    vid_w as usize,
-                    vid_h as usize,
-                    win_w as usize,
-                    win_h as usize,
-                );
             }
         }
         present_hwnd(hwnd);
@@ -3363,7 +3331,6 @@ fn run_player_thread(
             }
 
             if let Ok(mut surf) = surface.lock() {
-                let dims_changed = surf.width != vid_w as i32 || surf.height != vid_h as i32;
                 surf.out_w = win_w;
                 surf.out_h = win_h;
                 surf.width = vid_w as i32;
@@ -3386,16 +3353,6 @@ fn run_player_thread(
                             win_h as usize,
                         );
                     }
-                } else if dims_changed
-                    && (config.secondary_offset_x != 0 || config.secondary_offset_y != 0)
-                {
-                    surf.margin = crate::wallpaper::blurred_backdrop_bgra(
-                        &surf.bgra,
-                        vid_w as usize,
-                        vid_h as usize,
-                        win_w as usize,
-                        win_h as usize,
-                    );
                 }
             }
             frame_counter = frame_counter.wrapping_add(1);
