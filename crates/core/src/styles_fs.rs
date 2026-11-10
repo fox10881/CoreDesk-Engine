@@ -138,8 +138,26 @@ This folder is YOUR layer of the style catalog. It mirrors the factory
 set shipped at <install>\\Styles — a file dropped here appears in the
 matching Settings dropdown automatically. No restart, no registration.
 
-Folders
--------
+  Contents
+  --------
+  1.  The six folders
+  2.  File naming rules (id, label, shadowing)
+  3.  Shell style .json — document schema
+  4.  Target selector grammar
+  5.  Style rule grammar (=, :=, @state, captures, {{templates}})
+  6.  styleConstants — $name substitution
+  7.  themeResourceVariables — Dark/Light resources
+  8.  Markup objects you can use (<WindhawkBlur/>, brushes, transforms)
+  9.  Image assets beside a style file
+  10. DANGER ZONE — rules that keep Explorer alive (read before shipping)
+  11. Live Effects presets
+  12. Widget .html contract
+  13. .cde theme archives
+  14. Failure behavior + testing workflow
+
+
+1. The six folders
+------------------
 The engine creates all six for you — empty is normal, they mark where
 each kind of file belongs.
 
@@ -150,58 +168,323 @@ each kind of file belongs.
   Visualizer Widget          Audio visualizer designs — one .html per design
   Live Effects               Direct2D overlay presets — one .json per effect
 
-File name = id
---------------
-The file's name without its extension is what the engine saves, what .cde
-themes reference, and what the dropdown lists. Name files like the
-dropdown shows them (\"Orbital Geometry.html\", \"Neon Rain.json\").
-Widget files may carry <!-- cde-meta {\"id\",\"label\"} --> at the top —
-\"label\" overrides the dropdown text; without it the file name is shown.
+  .user-backups              The app's own backups of your files — never
+                             edit or store anything here yourself.
 
-Shadowing
----------
-A file here OVERRIDES the factory file with the same name. Drop
+
+2. File naming rules
+--------------------
+The file's name WITHOUT its extension is the style's id — what the engine
+saves in config, what .cde themes reference, and what the dropdown keys
+off. Legal characters: A-Z a-z 0-9, space, underscore, ampersand, dot,
+dash — 128 characters max. Anything else (/ \\ : * ? \" < > | or an empty
+stem) makes the file invisible.
+
+\"label\" inside the document (or the widget's cde-meta comment) is the
+displayed text; without it the file name is shown. Widget .html files may
+carry <!-- cde-meta {\"id\":\"…\",\"label\":\"…\"} --> on the first line.
+
+A file here OVERRIDES the factory file with the same name — drop
 \"Cyber Glass Flip.html\" into Clock Widget\\ and your version replaces
-the stock design — delete it and the factory original returns.
-Your files are never touched by installs or factory resets.
+the stock design; delete it and the factory original returns. WARNING:
+a BROKEN user file hides its factory twin entirely (it does not fall
+back) — fix or delete it, don't leave it half-written.
 
-Formats
--------
-- Shell styles (.json): the Windhawk-style theme document
-  {\"id\",\"label\",\"targetStyles\",\"styleConstants\"}. Copy a factory
-  file from <install>\\Styles and edit it — the schema is unchanged.
-- Live Effects (.json): a preset over a compiled effect —
-  {\"id\",\"label\",\"base\",\"params\"}. \"base\" must name a built-in
-  effect (rain, snow, fireflies, matrix, …); \"params\" accepts
-  particleCount, speed, wind, gravity, primaryColor, glowRadius.
-- Widgets (.html): one self-contained page per design — inline your CSS,
-  JS and assets (data URIs; there is no base URL for relative paths).
-  After loading, post {\"type\":\"clockReady\"} or {\"type\":\"vizReady\"}
-  so the host arms it; the host then drives the page with the design's
-  messages (clockStyle/clockTheme/clockLocale, vizStyle/vizTheme and the
-  33 ms vizSpectrum audio feed). A page may only post its own ready
-  message — other channels are ignored.
+Edit copies in THIS folder only — the factory set under <install>\\Styles
+is wiped by reinstalls, upgrades and factory resets.
 
-Failure behavior
-----------------
-- A broken or unparseable .json style falls back to Windows Default when
-  applied — a mistake can't wedge the shell.
-- A missing or broken widget file keeps the current design; armed at a
-  cold start it simply shows nothing until fixed.
-- No file watching: dropdowns refresh when Settings opens or state is
-  pushed; a file is read once when applied.
-- Edit copies in THIS folder only — the factory set under <install>\\Styles
-  is wiped by reinstalls, upgrades and factory resets.
 
-.cde themes
------------
-A .cde theme stores only ids — never file contents. A theme referencing
-\"Neon Rain\" needs \"Neon Rain.json\" present on the target machine, or
-that slot silently falls back to the default. One exception: custom
-files in THIS folder (and the relative image assets they reference)
-are bundled inside the archive on export and unpacked back into this
-folder when the theme is applied — factory styles are not bundled
-since every install already ships them.
+3. Shell style .json — document schema
+--------------------------------------
+One JSON object per file (Taskbar / Start Menu / Notification Center):
+
+{
+  \"id\": \"My Style\",                 // must equal the file name
+  \"label\": \"My Style\",              // dropdown text (optional)
+  \"author\": \"you\",                  // optional, informational
+  \"version\": 1,                       // optional, informational
+  \"variantFeature\": 1234,             // optional — see \"OS variants\" below
+  \"targetStyles\": [
+    { \"target\": \"Type#Name > Child\", \"styles\": [\"Prop=value\", …] },
+    …
+  ],
+  \"styleConstants\": [
+    \"Name=value\",                     // referenced as $Name elsewhere
+    …
+  ],
+  \"themeResourceVariables\": [         // optional — section 7
+    \"key@Dark=value\", …
+  ],
+  \"weatherVariant\": { … }             // optional alternate payload
+}
+
+Unknown top-level fields are ignored — a document missing a key simply
+contributes nothing for it. A document that is not valid JSON is treated
+as \"no style\" (the slot shows Windows Default when applied).
+
+Comments: a string starting with \"//\" is skipped inside targetStyles
+targets, styles lists, styleConstants and themeResourceVariables — the
+standard way to disable one entry without deleting it.
+
+OS variants: \"variantFeature\" names an OS feature id (as reported by
+RtlQueryFeatureConfiguration). When that feature is enabled on the host,
+the \"weatherVariant\" document is applied INSTEAD of the top-level one
+(used by Squircle to ship a weather-enabled and a clean payload).
+
+
+4. Target selector grammar
+--------------------------
+\"target\" is a comma-separated list of selectors — a comma inside
+brackets […] does NOT split, so [AutomationProperties.X=a,b] is safe.
+Each selector is matchers joined by \" > \" (spaces around > required),
+matched leaf-first like CSS child combinators:
+
+  Type[#Name][[Prop=Value]][[N]][@VisualStateGroup]
+
+  Type      required. A bare name resolves to Windows.UI.Xaml.Controls.*
+            (Microsoft.UI.Xaml.Controls.* on the File-Explorer surface);
+            the bare word Rectangle resolves to the Shapes namespace.
+            Aliases: taskbar:  systemtray:  udk:  muxc:  StartMenu:
+            expand to Taskbar. SystemTray. WindowsUdk.UI.Shell.
+            Microsoft.UI.Xaml.Controls. and StartMenu. respectively —
+            or just write the fully-qualified type name.
+  #Name     the element's x:Name (one per matcher).
+  [P=V]     property filter — may repeat; value compares literally.
+  [N]       a bare number = one-based index among matching siblings.
+  @Group    the VisualStateGroup this rule listens to (max one per
+            matcher — usually CommonStates or a host-specific group).
+  *         wildcard parent — never the leaf, never the leftmost part,
+            never adjacent to another *.
+  :root     the surface's root — only legal as the leftmost part.
+
+A target with no \" > \" styles the matched element directly.
+If the leaf type doesn't exist on the host's XAML build the whole
+ruleset is skipped (logged \"resolve failed\" in the tap log) — the
+style keeps working, that piece just doesn't apply. Renamed by a
+Windows update = silently unstyled, never an error.
+
+
+5. Style rule grammar
+---------------------
+Every entry in \"styles\" is one line:
+
+  Prop=value            XAML string value — enums by name or ordinal
+                        (Visibility=Collapsed or Visibility=1), numbers,
+                        Thickness lists (\"0,0,0,1\"), colors (#AARRGGBB).
+  Prop:=<Object …/>     Object-element markup — brushes, transforms,
+                        anything XamlReader accepts under Setter.Value.
+                        Use := whenever the value is a <…> element.
+  Prop:=                Empty object value → {x:Null} — CLEARS the
+                        property (factory styles use Shadow:= to strip
+                        the stock drop shadow).
+  Prop@StateName=value  Only applies while the element sits in that
+                        visual state (re-applied on every state change).
+  Prop=>var             CAPTURE: reads the element's current Prop into
+                        variable $var for later rules. No @state or :=
+                        on a capture; var must be [A-Za-z_][A-Za-z0-9_]*.
+
+  {{var}} inside a value makes it DYNAMIC — re-evaluated per element
+  with that element's captured variables. Use it to feed back a
+  captured size/color into a later rule.
+
+Rules apply in file order; later rules win. Properties that don't
+resolve on the element are skipped, not fatal.
+
+
+6. styleConstants — $name substitution
+--------------------------------------
+\"styleConstants\" is a list of \"Name=value\" strings. Before anything
+is sent to the shell, every $Name token inside targets, styles,
+constants and resource variables is replaced with the constant's text.
+
+  - Referenced as $Name — e.g. \"BorderThickness=0.3,1,0.3,1\" then
+    \"BorderThickness=$BorderThickness\".
+  - A constant's value may reference EARLIER constants only (each value
+    expands against the constants defined above it — order matters).
+  - Replacement happens longest-name-first, so $Accent beats $Acc.
+  - An unknown $name is left literally — typos silently no-op; check
+    the tap log (resolve/styled counts) if a rule doesn't show.
+  - Constants may hold markup: \"Bg=<WindhawkBlur …/>\" used via
+    \"Background:=$Bg\" — := required, since the expanded text is markup.
+
+
+7. themeResourceVariables — Dark/Light resources
+------------------------------------------------
+Optional top-level array; each entry is \"key=value\" merged into the
+shell's resource dictionary:
+
+  \"MyBrush@Dark:=<SolidColorBrush Color='#FF202020'/>\"
+  \"MyBrush@Light:=<SolidColorBrush Color='#FFF0F0F0'/>\"
+  \"MyColor@Dark=#FF202020\"
+  \"Existing={ThemeResource SystemAccentColor}\"   // alias a stock key
+
+  - @Dark / @Light splits the value into theme dictionaries.
+  - key:=xaml stores a parsed object; key=value stores a typed value.
+  - {ThemeResource X} copies an existing resource under your key.
+  - Plain \"key=value\" with NO @theme, := or ThemeResource is SKIPPED
+    (logged \"non-themed value unsupported\") — always theme-tag or
+    mark :=.
+  - Duplicate keys are ignored — first write wins.
+
+
+8. Markup objects you can use
+-----------------------------
+Anything XamlReader.Load accepts inside <Setter.Value> works with :=.
+The catalog-tested set:
+
+  <WindhawkBlur BlurAmount=\"15\" TintColor=\"#140A0C10\"
+                TintOpacity=\"0.72\" />
+      CoreDesk extension (Windhawk-compatible): builds a real
+      compositor acrylic brush. BlurAmount is the radius; TintColor is
+      #AARRGGBB or #RRGGBB; TintOpacity multiplies the tint alpha;
+      TintColor=\"{ThemeResource X}\" also works. On File-Explorer's
+      WinUI3 islands it degrades to a translucent solid (in-app
+      acrylic can't see the desktop there) — still looks right because
+      the DWM accent already blurs behind the window.
+
+  <AcrylicBrush TintColor=\"#0A0C10\" TintOpacity=\"0.95\"
+                TintLuminosityOpacity=\"0.6\" />
+      Native acrylic — see the DANGER rules below before placing it.
+
+  <ImageBrush Stretch=\"UniformToFill\" AlignmentY=\"0.78\"
+              ImageSource=\"bg.jpg\" />
+      ImageSource may be a relative file (section 9), file:/// URI,
+      https:// or data: URI.
+
+  <SolidColorBrush Color=\"#FF202020\"/>   <LinearGradientBrush …>
+  <TranslateTransform X=\"0\" Y=\"0\"/>     <ScaleTransform …/>
+  …plus any other XAML type that parses — RenderTransform, Geometry,
+  collections, etc.
+
+
+9. Image assets beside a style file
+-----------------------------------
+A relative ImageSource=\"bg.jpg\" (or Source=) resolves against the
+style file's OWN directory — the engine rewrites it to an absolute
+file:/// URI before the shell ever sees it. Rules:
+
+  - Only bare filenames or clean relative subpaths are portable:
+    bg.jpg, assets/bg.png. These get bundled into .cde exports.
+  - '..' , '.', drive letters and rooted paths are REJECTED — a style
+    can never reach outside its own folder.
+  - URIs with a scheme pass through untouched: file:///, https://,
+    data:image/png;base64,…, ms-appx:.
+  - Keep assets next to the .json — a missing file leaves the brush
+    empty (element renders nothing, no crash).
+
+
+10. DANGER ZONE — rules that keep Explorer alive
+------------------------------------------------
+The styler runs INSIDE explorer.exe / StartMenuExperienceHost / the
+shell islands. A legal-but-hostile rule can throw inside the host's own
+render pass — that exception can't be caught and kills the shell
+(stowed 0x800f1000 in combase.dll). These are the proven landmines:
+
+  ! NEVER assign AcrylicBrush / WindhawkBlur (composition brushes) as
+    Fill or Background on ProgressBar internals —
+    Rectangle#DeterminateProgressBarIndicator, Rectangle#ProgressBarTrack,
+    or ProgressBar elements inside taskbar buttons. Proven on
+    26100.9711: the moment a real determinate bar renders, the acrylic
+    brush throws in the composition path and Explorer dies ~4s after
+    apply, every time. Use a solid color there (Fill:=#C1272D works).
+
+  ! Same class of risk on other sprite/native-drawn internals:
+    AnimatedIcon / AnimatedVisualPlayer children, RatingControl glyphs —
+    anything the host paints through its own compositor path rather
+    than plain XAML layout. Prefer plain values (colors, margins,
+    Visibility) inside those; keep brushes/transforms on containers
+    (Grid, Border, Panels) which accept them safely.
+
+  ! Don't put object markup (:=brushes/transforms) on overly broad
+    selectors (ContentPresenter, Border, Grid alone) — each match is a
+    new render-path experiment; narrow with #Name or a parent chain.
+
+  ! No file:// paths into random dirs, no .. — assets only beside the
+    style (rule above exists exactly so this stays true).
+
+  ! Don't hand-edit the armed style while it is applied: edit, then
+    re-apply — partial payloads reach the shell mid-save otherwise.
+
+Safety net (don't rely on it): if the shell respawns 4 times within
+180 s the app force-disarms every shell style and writes the cleared
+slots to config (log: \"shell crash loop detected — disarming\"). Your
+file is untouched; the style slot is just cleared.
+
+A ruleset whose leaf TYPE can't resolve is skipped harmlessly — danger
+comes only from rules that DO apply to live elements.
+
+
+11. Live Effects presets
+------------------------
+{\"id\",\"label\",\"author\",\"version\",\"base\",\"params\"} — \"base\"
+must be one of the compiled effects:
+
+  rain thunderstorm snow fireflies embers sakura mist aurora
+  starfield matrix ripples constellation magic_trail shatter_clicks
+  quantum_swarm cyber_grid_reveal repulsion_dust bokeh leaves warp
+  pulse meteors le_rain le_grid le_bloom le_aurora le_rings
+
+\"params\" accepts: particleCount (clamped to the engine max),
+speed, wind, gravity, primaryColor (\"#RRGGBB\" or null = no tint),
+glowRadius. A \"name\" field is informational only — ignored.
+Unknown params/bases are dropped, never fatal.
+
+
+12. Widget .html contract
+-------------------------
+One self-contained page per design — inline all CSS/JS and use data:
+URIs for assets (no base URL: relative paths load nothing).
+
+  - After loading, post exactly one of
+      {\"type\":\"clockReady\"}   (clock designs)
+      {\"type\":\"vizReady\"}     (visualizer designs)
+      {\"type\":\"vizDiag\", …}   (optional viz diagnostics)
+    Anything else the page posts is dropped.
+  - The host then drives the page:
+      clock → {\"t\":\"clockStyle\"} {\"t\":\"clockTheme\"}
+              {\"t\":\"clockLocale\",\"locale\":…,\"translations\":…}
+      viz   → {\"t\":\"vizStyle\",\"style\":id} {\"t\":\"vizTheme\",…,
+              \"eco\":bool} (eco caps requestAnimationFrame to ~30 fps)
+              {\"t\":\"vizSpectrum\",\"bands\":[…],\"level\":x,
+              \"peak\":y,\"paused\":b} every ~33 ms.
+  - Draw only when your ready message has been acked — the host reveals
+    the widget on it.
+
+
+13. .cde theme archives
+-----------------------
+A .cde is a ZIP with a strict contract:
+
+  - EVERY entry must be stored UNCOMPRESSED (method 0 / STORE). A
+    Deflate entry makes the whole import fail with \"unsupported
+    compression method in .cde archive\". Compress-Archive / most zip
+    tools compress by default — when building by hand use STORE (in
+    Python: zipfile.ZipFile(…, 'w', zipfile.ZIP_STORED)).
+  - Styles travel only when they live in THIS folder (user layer):
+    the style .json plus every relative image asset it references is
+    bundled under styles/<category>/… and unpacked back here on apply.
+    Factory styles are never bundled — every install ships them.
+  - A theme references styles BY ID: if the target machine lacks the
+    file, that slot falls back to Windows Default silently.
+
+
+14. Failure behavior + testing workflow
+---------------------------------------
+- Unparseable .json → the slot reads as empty (Windows Default);
+  a broken USER file also masks its factory twin — fix or delete it.
+- Missing/renamed file referenced by a theme → that slot defaults.
+- No file watching: dropdowns refresh when Settings opens; a file is
+  read once when applied — re-apply after every edit.
+- The tap resident logs every apply to %TEMP%\\coredesk_tap.log —
+  \"resolving N rulesets\", \"resolve failed for 'Type'\", \"styled …
+  props=N\" — read it when a rule doesn't land.
+- Test workflow for a NEW taskbar style:
+    1) apply it, watch the taskbar ~10 s;
+    2) a flash/TaskbarCreated respawn means one of your rules is
+       hostile — bisect: comment out half of targetStyles, apply,
+       narrow until the guilty entry is alone;
+    3) most killers are object markup on sprite-drawn internals —
+       swap the brush for a solid color and retest.
 ";
 
 /// Scaffolds the user layer so the folder explains itself the moment a
