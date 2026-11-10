@@ -177,7 +177,7 @@
     {
       "target": "Windows.UI.Xaml.Shapes.Rectangle#DeterminateProgressBarIndicator",
       "styles": [
-        "Fill:=$AccentColor"
+        "Fill:=#C1272D"
       ]
     },
     {
