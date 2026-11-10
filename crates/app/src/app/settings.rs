@@ -53,10 +53,12 @@ fn rect_near(a: RECT, b: RECT) -> bool {
         && (a.bottom - b.bottom).abs() <= 4
 }
 
-/// `true` when a visible widget host lacks a live WebView companion at
-/// its rect. Widgets stacked on one spot get companions at the same
-/// rect — they can't be told apart — so every visible host on a rect
-/// needs its own live companion counted there.
+/// `true` when a visible widget host's surface is effectively dead:
+/// either no live WebView companion is glued to its rect, or the input
+/// twin has gone hittable and is swallowing the clicks the host's own
+/// drag/context-menu codes should see. Widgets stacked on one spot get
+/// companions at the same rect — they can't be told apart — so every
+/// visible host on a rect needs its own live companion counted there.
 fn widget_surface_lost(host: HWND, other: Option<HWND>) -> bool {
     if !desktop::is_visible(host) || desktop::is_iconic(host) {
         return false;
@@ -65,7 +67,7 @@ fn widget_surface_lost(host: HWND, other: Option<HWND>) -> bool {
     let need = 1 + usize::from(other.is_some_and(|o| {
         desktop::is_visible(o) && !desktop::is_iconic(o) && rect_near(window::window_rect(o), r)
     }));
-    desktop::webview_companions_at(r) < need
+    desktop::webview_companions_at(r) < need || desktop::webview_input_capturing(host, r)
 }
 
 /// Overlay sidecar-on-disk authored deltas under `s`'s in-memory dicts,
@@ -947,6 +949,20 @@ impl App {
     /// does the widget get the same soft restart the menu would run (the
     /// live rect is preserved either way).
     pub(super) fn check_widget_surfaces(&mut self) {
+        // Occluded → exposed edge (returned to the desktop from another
+        // window): the runtime can leave a companion's input link and the
+        // page's visibility parked from the covered state — revive both
+        // surfaces once rather than waiting for the user to hit Win+D.
+        let occluded = coredesk_platform::wmf_wallpaper::should_pause_playback();
+        if self.widgets_occluded && !occluded {
+            if let Some(h) = &self.visualizer_host {
+                h.revive_surface();
+            }
+            if let Some(h) = &self.clock {
+                h.revive_surface();
+            }
+        }
+        self.widgets_occluded = occluded;
         let mut restart_viz = false;
         let mut restart_clock = false;
         if let Some(h) = &self.visualizer_host {

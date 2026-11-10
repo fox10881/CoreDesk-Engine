@@ -311,6 +311,10 @@ pub struct App {
     /// it and the widget gets a soft restart (see `check_widget_surfaces`).
     clock_surface_misses: u8,
     viz_surface_misses: u8,
+    /// Last probe tick's desktop-occlusion state — the occlusion→exposed
+    /// edge revives both widget surfaces (the runtime parks the page's
+    /// visibility and the companion's input link while covered).
+    widgets_occluded: bool,
     /// Signature of the last `feState` pushed to the glass editor — repeat
     /// pushes are skipped so its unsaved draft is never clobbered (empty
     /// forces a push: fresh page, or after close).
@@ -1398,6 +1402,7 @@ impl App {
             visualizer_host: None,
             clock_surface_misses: 0,
             viz_surface_misses: 0,
+            widgets_occluded: false,
             fe_glass_pushed: RefCell::new(String::new()),
             settings_focus_fence: None,
             feedback: Default::default(),

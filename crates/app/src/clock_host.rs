@@ -294,14 +294,20 @@ impl ClockHost {
     }
 
     /// Re-pins a lost companion without a respawn: uncloaks the host,
-    /// then re-attaches the DComp visual and re-notifies the position —
-    /// the notify resurrects a parked companion where a plain show does
-    /// not.
+    /// flicks it through the topmost band — the same band hop a
+    /// show-desktop float performs, which re-glues a detached companion
+    /// and resets its input twin where a plain same-band raise does not —
+    /// then re-attaches the DComp visual, re-marks the page visible, and
+    /// re-notifies the position. The notify resurrects a parked companion
+    /// where a plain show does not.
     pub fn revive_surface(&self) {
         let hwnd = self.window.hwnd();
         if desktop::is_cloaked(hwnd) {
             let _ = desktop::set_cloak(hwnd, false);
         }
+        let _ = desktop::set_topmost(hwnd, true);
+        let _ = desktop::set_topmost(hwnd, false);
+        let _ = desktop::raise_in_band(hwnd);
         self.rearm_transparency();
     }
 

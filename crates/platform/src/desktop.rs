@@ -592,6 +592,50 @@ pub fn webview_companions_at(rect: RECT) -> usize {
         .count()
 }
 
+/// `true` when a Chromium companion window glued to `host`'s rect is
+/// hittable at a sampled interior point. While healthy the WebView input
+/// twin stays transparent to hit-testing and `WindowFromPoint` falls
+/// through to `host` itself; when the runtime stops re-syncing it, the
+/// twin captures every click in the browser process and the widget's
+/// drag/context-menu handling on the host never runs. Only windows glued
+/// to the host's exact rect count — a foreign window simply covering the
+/// widget isn't its fault.
+pub fn webview_input_capturing(host: HWND, rect: RECT) -> bool {
+    let qw = (rect.right - rect.left) / 4;
+    let qh = (rect.bottom - rect.top) / 4;
+    let pts = [
+        (rect.left + qw * 2, rect.top + qh * 2),
+        (rect.left + qw, rect.top + qh * 2),
+        (rect.left + qw * 3, rect.top + qh * 2),
+        (rect.left + qw * 2, rect.top + qh),
+        (rect.left + qw * 2, rect.top + qh * 3),
+    ];
+    for (x, y) in pts {
+        let hit = window_from_point(x, y);
+        if hit.0.is_null() || hit == host {
+            continue;
+        }
+        let cls = class_name(hit);
+        let twin = cls == "Chrome_WidgetWin_1"
+            || cls == "Chrome_RenderWidgetHostHWND"
+            || cls == "Intermediate D3D Window";
+        if !twin {
+            continue;
+        }
+        let mut r = RECT::default();
+        // SAFETY: HWND from WindowFromPoint, sized output rect.
+        if (unsafe { GetWindowRect(hit, &mut r).as_bool() })
+            && (r.left - rect.left).abs() <= 4
+            && (r.top - rect.top).abs() <= 4
+            && (r.right - rect.right).abs() <= 4
+            && (r.bottom - rect.bottom).abs() <= 4
+        {
+            return true;
+        }
+    }
+    false
+}
+
 /// Inserts `hwnd` directly below `reference` in the z-order.
 pub fn insert_after(hwnd: HWND, reference: HWND) -> Result<()> {
     // SAFETY: plain FFI call.
