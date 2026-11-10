@@ -381,6 +381,14 @@ const WM_TIMER: u32 = 0x0113;
 /// cheap forever after.
 const RETRY_TIMER_ID: usize = 1;
 const RETRY_TIMER_MS: u32 = 2000;
+
+// ---------------------------------------------------------------------------
+// Desktop drag watch — REMOVED. The MOVESIZE stamp only fed `drag_active`
+// gates, and freezing all element-path work mid-drag was what made the whole
+// taskbar visibly restyle after every drag. The corruption paths it guarded
+// against are closed structurally instead (BSTR borrow-only, no mux session
+// in shell pids, thread pinning, weakref upgrades).
+
 /// Start Menu (`CDES-SMS1`) markers — sent to the `CoreDeskTAPSM` window.
 const CDS_THEME: usize = u32::from_be_bytes(*b"SMST") as usize;
 const CDS_RESET: usize = u32::from_be_bytes(*b"SMSR") as usize;

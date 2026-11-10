@@ -83,6 +83,7 @@ windows_core::link!("kernel32.dll" "system" fn ExitProcess(uexitcode: u32) -> ()
 windows_core::link!("kernel32.dll" "system" fn GetTickCount64() -> u64);
 windows_core::link!("kernel32.dll" "system" fn DisableThreadLibraryCalls(hlibmodule: HMODULE) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn GetCurrentProcessId() -> u32);
+windows_core::link!("kernel32.dll" "system" fn GetCurrentThreadId() -> u32);
 windows_core::link!("kernel32.dll" "system" fn GetModuleFileNameW(hmodule: HMODULE, lpfilename: PWSTR, nsize: u32) -> u32);
 windows_core::link!("kernel32.dll" "system" fn GetModuleHandleW(lpmodulename: PCWSTR) -> HMODULE);
 windows_core::link!("kernel32.dll" "system" fn GetProcAddress(hmodule: HMODULE, lpprocname: PCSTR) -> FARPROC);
@@ -100,6 +101,8 @@ windows_core::link!("kernel32.dll" "system" fn UnregisterWaitEx(waithandle: HAND
 windows_core::link!("kernel32.dll" "system" fn WaitForSingleObject(hhandle: HANDLE, dwmilliseconds: u32) -> u32);
 windows_core::link!("ole32.dll" "system" fn RoInitialize(roinittype: i32) -> windows_core::HRESULT);
 windows_core::link!("user32.dll" "system" fn CallNextHookEx(hhk: *mut core::ffi::c_void, ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT);
+windows_core::link!("user32.dll" "system" fn SetWinEventHook(eventmin: u32, eventmax: u32, hmodwineventproc: HMODULE, pfnwineventproc: *const core::ffi::c_void, idprocess: u32, idthread: u32, dwflags: u32) -> HANDLE);
+windows_core::link!("user32.dll" "system" fn UnhookWinEvent(hwineventhook: HANDLE) -> BOOL);
 windows_core::link!("user32.dll" "system" fn CreateWindowExW(dwexstyle: u32, lpclassname: PCWSTR, lpwindowname: PCWSTR, dwstyle: u32, x: i32, y: i32, nwidth: i32, nheight: i32, hwndparent: HWND, hmenu: *mut core::ffi::c_void, hinstance: HINSTANCE, lpparam: *const core::ffi::c_void) -> HWND);
 windows_core::link!("user32.dll" "system" fn DefWindowProcW(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT);
 windows_core::link!("user32.dll" "system" fn DestroyWindow(hwnd: HWND) -> BOOL);

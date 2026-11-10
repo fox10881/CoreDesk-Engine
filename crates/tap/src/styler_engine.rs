@@ -181,6 +181,14 @@ fn known() -> std::sync::MutexGuard<'static, BTreeMap<u64, String>> {
 /// leave Task View wedged for the whole explorer session.
 const IMMERSIVE_PREFIX: &str = "WindowsInternal.ComposableShell.Experiences.";
 
+/// SnapLayout's flyout spins a WUX island inside the dragged window's own
+/// process — it constructs AND tears down elements while a drag is still
+/// in flight, so deferred writes our watcher queued onto them land on
+/// recycled objects and corrupt the host heap (0xc0000374). Themes do
+/// target `SnapLayout.*` for flyout cosmetics, but stability wins: the
+/// whole subtree takes the exclusion path like the immersive one.
+const SNAP_PREFIX: &str = "SnapLayout.";
+
 /// Handles inside the immersive subtree. A reported `Experiences.*` type
 /// marks a subtree root; `relation.Parent` then propagates the mark to
 /// every descendant, so generic children (`Border`, `Grid`,
@@ -201,8 +209,9 @@ fn is_immersive(handle: u64, parent: u64, reported_type: &str) -> bool {
     if set.contains(&handle) {
         return true;
     }
-    if reported_type.starts_with(IMMERSIVE_PREFIX) {
-        crate::tap_log!("styler: immersive subtree excluded root={reported_type}");
+    if reported_type.starts_with(IMMERSIVE_PREFIX) || reported_type.starts_with(SNAP_PREFIX)
+    {
+        crate::tap_log!("styler: excluded subtree root={reported_type}");
         set.insert(handle);
         return true;
     }
@@ -213,9 +222,80 @@ fn is_immersive(handle: u64, parent: u64, reported_type: &str) -> bool {
     false
 }
 
+/// Shell-pid write scope — the whitelist inverse of `immersive()`. In the
+/// shell explorer the WUX session sees every island in the process (taskbar,
+/// SnapLayout's drag flyout, overflow flyouts, tooltips); the isolated
+/// `nowrite` test proved OUR writes into foreign islands seed the heap
+/// corruption the drag later detects. Only handles rooted at a `Taskbar.`
+/// element may be written; children inherit scope via the parent mark.
+const TASKBAR_PREFIX: &str = "Taskbar.";
+
+/// Handles inside the taskbar subtree — same propagation shape as
+/// `immersive()`: a `Taskbar.*` type marks a scope root and `relation.Parent`
+/// spreads the mark to every descendant (`SystemTray.*`, generic `Grid`s…).
+fn taskbar_scope() -> std::sync::MutexGuard<'static, std::collections::BTreeSet<u64>> {
+    static SCOPE: Mutex<std::collections::BTreeSet<u64>> =
+        Mutex::new(std::collections::BTreeSet::new());
+    SCOPE.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// `true` when `handle` belongs to the taskbar subtree — its reported type
+/// starts with `TASKBAR_PREFIX`, it was already marked, or its parent was.
+fn in_taskbar_scope(handle: u64, parent: u64, reported_type: &str) -> bool {
+    let mut set = taskbar_scope();
+    if set.contains(&handle) {
+        return true;
+    }
+    if reported_type.starts_with(TASKBAR_PREFIX) || set.contains(&parent) {
+        set.insert(handle);
+        return true;
+    }
+    false
+}
+
 /// `g_elementPropertyModifying` — set while we write a property so the
 /// re-apply callback skips our own writes.
 static MODIFYING: AtomicBool = AtomicBool::new(false);
+
+/// Hard mute for the element path during a foreign-island burst. SnapLayout's
+/// drag flyout spins up ~hundreds of visual-tree events in <200ms inside the
+/// shell explorer; processing them (materialize, weak capture, deferred
+/// writes) on mid-construction elements corrupted the host heap
+/// (0xc0000374). Organic taskbar traffic stays far below this rate, so a
+/// rolling-window counter mutes ALL element work — including bookkeeping —
+/// until the host settles. `storm_limited` still covers the slower
+/// sustained-churn case where bookkeeping is safe.
+const MUTE_EVENTS_PER_WINDOW: u32 = 25;
+const MUTE_WINDOW_MS: u128 = 100;
+const MUTE_QUIET_MS: u128 = 400;
+
+fn churn_muted() -> bool {
+    static S: Mutex<(Vec<std::time::Instant>, Option<std::time::Instant>)> =
+        Mutex::new((Vec::new(), None));
+    if state().readvising {
+        return false;
+    }
+    let now = std::time::Instant::now();
+    let mut s = S.lock().unwrap_or_else(|p| p.into_inner());
+    // Inside a muted period: stay muted until quiet for MUTE_QUIET_MS.
+    if let Some(since) = s.1 {
+        if now.duration_since(since).as_millis() < MUTE_QUIET_MS {
+            s.1 = Some(now);
+            return true;
+        }
+        s.1 = None;
+        s.0.clear();
+    }
+    s.0.push(now);
+    let cutoff = now - std::time::Duration::from_millis(MUTE_WINDOW_MS as u64);
+    s.0.retain(|t| *t >= cutoff);
+    if s.0.len() as u32 >= MUTE_EVENTS_PER_WINDOW {
+        s.0.clear();
+        s.1 = Some(now);
+        return true;
+    }
+    false
+}
 
 /// Visual-tree events per second that mean the host is in a layout loop
 /// (a vertically docked taskbar's XAML never converges — every churned
@@ -3921,17 +4001,17 @@ fn drain_releases() {
         if element_has_state(h) {
             continue;
         }
-        // A released object may still live via other refs — only forget the
-        // handle when the release actually destroyed it.
-        let weak = unsafe { diag.GetIInspectableFromHandle(InstanceHandle(h)) }
-            .ok()
-            .and_then(|o| o.downgrade().ok());
+        // `GetIInspectableFromHandle` + `downgrade` on a handle whose element
+        // already died writes into the dead object's control block — the
+        // drag-time churn storm made that a reliable heap corruption
+        // (0xc0000374). `unregister` is service-side bookkeeping the
+        // diagnostics contract accepts on dead handles, so keep the drain
+        // to that alone and forget the handle outright: a still-live
+        // element simply re-registers on its next report.
         if unsafe { hooks.unregister(InstanceHandle(h)) }.is_err() {
             continue;
         }
-        if weak.as_ref().is_none_or(|w| w.upgrade().is_none()) {
-            known().remove(&h);
-        }
+        known().remove(&h);
     }
 }
 
@@ -3943,6 +4023,9 @@ fn drain_releases() {
 /// captures (propagating each removal), unregister reapply callbacks + drop
 /// consumer entries, restore originals, drop the element state.
 fn cleanup_element(handle: u64, es: &ElemState) {
+    // Unregisters must never be skipped (a skipped unregister leaves a
+    // live callback pointing at freed state). The weakref resolves to
+    // `None` on dead elements, so dead-element paths stay untouched.
     let dobj = es
         .upgrade_el()
         .and_then(|el| Interface::cast::<DependencyObject>(&el).ok());
@@ -4555,7 +4638,47 @@ fn retry_failed_rules(type_name: &str) {
 
 /// Tests an element against every ruleset (reverse file order → later rules
 /// win); applies on match. `fallback_type` = the reported `element.Type`.
+/// Diagnostic kill-switch: `%LOCALAPPDATA%\CoreDeskEngine\nowrite.flag`
+/// existing skips the whole write phase — the watcher stays advised, the
+/// marshal still fires, matchers still run, but no `SetValue`/`ClearValue`/
+/// callback-registration ever touches a host element. A clean drag with the
+/// flag present means OUR writes seed the heap corruption; a crash means the
+/// diagnostics service's own marshal is the corruptor. Resolved once — the
+/// flag is set before the resident injects.
+fn writes_disabled() -> bool {
+    static DISABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *DISABLED.get_or_init(|| {
+        let Ok(local) = std::env::var("LOCALAPPDATA") else {
+            return false;
+        };
+        std::path::Path::new(&local)
+            .join("CoreDeskEngine")
+            .join("nowrite.flag")
+            .exists()
+    })
+}
+
 fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _parent: u64) -> bool {
+    if writes_disabled() {
+        return false;
+    }
+    // The corruption seed: the drag is likely only the DETECTOR (SnapLayout's
+    // alloc storm walks the heap), while a write landing on an element that
+    // died between capture and apply is the planter — task buttons churn
+    // constantly, so seeds can be planted at any time. `known()` drops a
+    // handle the moment the service reports its Remove; anything absent is
+    // a corpse whose COM proxy still upgrades. And a still-reported handle
+    // may already be detached — `VisualTreeHelper::GetParent` fails on
+    // zombies. Both gates run for every write, not just during drags.
+    if !known().contains_key(&handle) {
+        return false;
+    }
+    let attached = Interface::cast::<DependencyObject>(el)
+        .ok()
+        .is_some_and(|d| VisualTreeHelper::GetParent(&d).is_ok());
+    if !attached && !fallback_type.starts_with(TASKBAR_PREFIX) {
+        return false;
+    }
     let prev = state().elements.remove(&handle);
     if let Some(old) = prev {
         cleanup_element(handle, &old);
@@ -4606,11 +4729,33 @@ pub fn on_element(
     if crate::command::is_unloaded() {
         return;
     }
+    // No drag gate: writes on live taskbar elements are safe now that the
+    // real corruptors are closed (BSTR double-free, mux session marshal of
+    // SnapLayout's WinUI3 island, stale-handle writes, foreign-thread
+    // callbacks). Freezing style work mid-drag was what made the whole
+    // taskbar visibly restyle on every drag attempt.
+    // Burst-mute first: a drag-time foreign island's element storm must not
+    // reach bookkeeping, materialization, or the deferred-write queue at all.
+    if churn_muted() {
+        crate::tap_log!("styler: churn muted handle={} type={reported_type}", element.Handle.0);
+        return;
+    }
     if is_immersive(element.Handle.0, parent, reported_type) {
         // Excluded subtree — release the reported handles without any
         // matcher, dispatcher or write work. Immersive churn also stays
         // out of the storm counter so a Task View open can never pause
         // taskbar styling.
+        queue_release(element.Handle.0);
+        queue_release(parent);
+        return;
+    }
+    // Shell-pid whitelist: outside the taskbar subtree nothing may be
+    // written — foreign-island elements (SnapLayout, overflow flyouts,
+    // tooltips) are released like the immersive path. Other pids (SMEH,
+    // ShellHost, SearchHost) keep their full element surface.
+    if crate::site::is_shell_tray_host()
+        && !in_taskbar_scope(element.Handle.0, parent, reported_type)
+    {
         queue_release(element.Handle.0);
         queue_release(parent);
         return;
@@ -4726,7 +4871,15 @@ pub fn on_element(
             }
             let p = &payload;
             if let Some(el) = p.0.upgrade() {
-                let _ = style_element(handle, &el, &ty, parent);
+                // Weak upgrade proves the COM proxy lives — not that the
+                // XAML node is still attached. Detached zombies take a
+                // SetValue write into recycled nodes; skip them.
+                let attached = Interface::cast::<DependencyObject>(&el)
+                    .ok()
+                    .is_some_and(|d| VisualTreeHelper::GetParent(&d).is_ok());
+                if attached {
+                    let _ = style_element(handle, &el, &ty, parent);
+                }
             }
             Ok(())
         });
@@ -4738,9 +4891,13 @@ pub fn on_element(
 /// `OnVisualTreeChange` (Remove) — `CleanupCustomizations`: drop state,
 /// unregister, restore originals, propagate capture removal.
 pub fn on_element_removed(handle: u64) {
-    // Handles recycle across tree lifetimes — drop the mark so a reused
-    // handle is never mistaken for immersive later.
+    // Eviction runs even mid-drag — skipping it is what left stale handles
+    // marked taskbar-scoped, recycled into SnapLayout's flyout and then
+    // written through the whitelist.
+    // Handles recycle across tree lifetimes — drop the marks so a reused
+    // handle is never mistaken for immersive/taskbar-scoped later.
     immersive().remove(&handle);
+    taskbar_scope().remove(&handle);
     known().remove(&handle);
     queue_release(handle);
     {

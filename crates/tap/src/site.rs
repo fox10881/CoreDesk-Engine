@@ -7,7 +7,7 @@ use crate::bindings::*;
 use crate::shared;
 use crate::win32;
 use std::sync::Mutex;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use windows_core::{GUID, HRESULT, implement};
 
 /// CLSID the XAML framework instantiates in `InitializeXamlDiagnosticsEx`.
@@ -280,6 +280,16 @@ fn load_udk_from_systemapps() -> win32::HMODULE {
 }
 
 fn install_winui3_inner() {
+    // The shell pid hosts WinUI3 islands too (SnapLayout's drag flyout is
+    // one), and `wants_session` stays true there because the *taskbar*
+    // theme is applied — so the mux session attaches and its advise
+    // marshals SnapLayout's mid-construction island: the proven
+    // 0xc0000374 path. The live check alone misses cold boot (the tray
+    // window doesn't exist yet), the flag alone misses pids whose install
+    // ran early — check both.
+    if owns_shell_tray() || is_shell_tray_host() {
+        return;
+    }
     // Attach only once the host loaded the framework itself: pulling the
     // UDK in before `Microsoft.UI.Xaml.dll` exists would bootstrap WinUI3
     // on *our* worker thread instead.
@@ -384,6 +394,27 @@ pub fn ensure_watching_winui3() {
     if crate::command::is_unloaded() {
         return;
     }
+    // Shell pids never keep the mux session — its advise marshals
+    // SnapLayout's WinUI3 island mid-drag. A session armed before this pid
+    // became tray owner (cold-boot race) is torn down here, every tick.
+    if is_shell_tray_host() {
+        let previous = {
+            let mut shared = shared::lock();
+            let pair = shared
+                .tree_service_winui3
+                .take()
+                .zip(shared.watcher_winui3.take());
+            shared.diagnostics_winui3 = None;
+            pair
+        };
+        if let Some((service, watcher)) = previous {
+            crate::tap_log!("winui3: unadvising mux session in shell pid");
+            unsafe {
+                let _ = service.UnadviseVisualTreeChange(&*watcher);
+            }
+        }
+        return;
+    }
     {
         let shared = shared::lock();
         if shared.watcher_winui3.is_none() {
@@ -399,7 +430,74 @@ pub fn ensure_watching_winui3() {
     }
 }
 
+/// `true` when this process owns the `Shell_TrayWnd` window — the shell
+/// explorer (taskbar host), not a File Explorer cabinet pid. The WUX
+/// diagnostics session is process-wide: arming it in a cabinet pid made
+/// SnapLayout's drag-time island feed our watcher, and touching those
+/// mid-construction/mid-teardown elements corrupted the host heap
+/// (0xc0000374 in `ntdll` on every drag). Cabinet pids need only the
+/// command window (EBML relay) — the mux session stays separately gated
+/// by `wants_session`, so they never attach any diagnostics.
+fn owns_shell_tray() -> bool {
+    unsafe {
+        let self_pid = win32::GetCurrentProcessId();
+        let mut after = HWND(core::ptr::null_mut());
+        loop {
+            let tray = win32::FindWindowExW(
+                HWND(core::ptr::null_mut()),
+                after,
+                windows_core::w!("Shell_TrayWnd"),
+                windows_core::PCWSTR::null(),
+            );
+            if tray.0.is_null() {
+                return false;
+            }
+            let mut pid = 0u32;
+            let _ = win32::GetWindowThreadProcessId(tray, &mut pid);
+            if pid == self_pid {
+                return true;
+            }
+            after = tray;
+        }
+    }
+}
+
+/// `true` in the pid owning `Shell_TrayWnd` — the only process where the WUX
+/// diagnostics session shares its address space with SnapLayout's drag-time
+/// island. `styler_engine` uses this to scope every element write to the
+/// `Taskbar.` subtree: foreign-island SetValue calls are the proven
+/// 0xc0000374 heap-corruption path (isolated: advised watcher + zero writes
+/// = clean drag).
+static SHELL_TRAY_HOST: AtomicBool = AtomicBool::new(false);
+
+/// `true` when this resident runs inside the shell (taskbar-owning)
+/// explorer — the pid whose WUX session must whitelist writes to the
+/// `Taskbar.` subtree only. Self-healing: the flag is first stored during
+/// `install_inner`, which can run before `Shell_TrayWnd` exists — a stale
+/// `false` in the shell pid would silently disable the whitelist, the
+/// thread pin and the mux-session block (the proven crash path). While it
+/// is `false` we re-check the live window tree; once it flips to `true` it
+/// can never flip back (the tray only leaves when the process dies).
+pub fn is_shell_tray_host() -> bool {
+    if SHELL_TRAY_HOST.load(Ordering::Acquire) {
+        return true;
+    }
+    let owns = owns_shell_tray();
+    if owns {
+        SHELL_TRAY_HOST.store(true, Ordering::Release);
+    }
+    owns
+}
+
 fn install_inner() {
+    // Only pids that render styled WUX chrome earn the diagnostics session —
+    // taskbar (shell explorer) / Start Menu / Notification Center / Search
+    // hosts. File Explorer cabinet pids skip it entirely.
+    let shell_tray = owns_shell_tray();
+    SHELL_TRAY_HOST.store(shell_tray, Ordering::Release);
+    if !crate::is_smeh() && !crate::is_nch() && !crate::is_searchhost() && !shell_tray {
+        return;
+    }
     if !host_warm_enough() {
         if !WARMUP_LOGGED.swap(true, Ordering::Relaxed) {
             crate::tap_log!("IXDEx deferred — host still warming up");
@@ -564,6 +662,13 @@ impl IObjectWithSite_Impl for TapSite_Impl {
             );
             if let Some(diagnostics) = diagnostics {
                 if winui3 {
+                    // The shell pid must never arm a mux session — its
+                    // advise marshals SnapLayout's WinUI3 island (the drag
+                    // crash path). Drop the site; nothing else consumes it.
+                    if is_shell_tray_host() {
+                        crate::tap_log!("SetSite: winui3 diagnostics dropped — shell pid");
+                        return Ok(());
+                    }
                     WINUI3_SETSITE.fetch_add(1, Ordering::AcqRel);
                     // WindhawkTAP::SetSite semantics — a NEW island session
                     // (new File Explorer window's endpoint) REPLACES the
@@ -782,24 +887,14 @@ impl IVisualTreeServiceCallback2_Impl for VisualTreeWatcher_Impl {
     }
 }
 
-/// The callback owns the `VisualElement` strings (xamlOM.h contract): take the
-/// `BSTR`s out of the borrowed struct so dropping frees them once.
-unsafe fn free_element_strings(element: &VisualElement) {
-    unsafe {
-        drop(core::mem::ManuallyDrop::into_inner(core::ptr::read(
-            &element.Type,
-        )));
-        drop(core::mem::ManuallyDrop::into_inner(core::ptr::read(
-            &element.Name,
-        )));
-        drop(core::mem::ManuallyDrop::into_inner(core::ptr::read(
-            &element.SrcInfo.FileName,
-        )));
-        drop(core::mem::ManuallyDrop::into_inner(core::ptr::read(
-            &element.SrcInfo.Hash,
-        )));
-    }
-}
+/// Shell-pid thread pin: the taskbar island's UI thread is the only thread
+/// whose callbacks may reach the styler. SnapLayout and every other foreign
+/// island report on *their own* UI threads — dropping those callbacks at
+/// the entry keeps foreign-island elements away from reads, writes and
+/// bookkeeping entirely (no ancestry tracking needed). Pinned on the first
+/// `Taskbar.`-typed element; until then all threads pass (the taskbar floods
+/// callbacks before foreign islands ever report, so the pin lands early).
+static PINNED_TID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 fn on_visual_tree_change(
     session: u8,
@@ -808,8 +903,28 @@ fn on_visual_tree_change(
     mutationtype: VisualMutationType,
 ) {
     if crate::command::is_unloaded() {
-        unsafe { free_element_strings(element) };
         return;
+    }
+    // `VisualElement` strings are read-only loans — the diagnostics service
+    // owns and frees them at return. Never `SysFreeString` them: a double
+    // free is the exact `0xc0000374` signature this whole hunt chased.
+    let shell = is_shell_tray_host();
+    // The mux session must never feed the shell pid — a straggler session
+    // racing its teardown still gets its elements dropped at the door.
+    if session == 2 && shell {
+        return;
+    }
+    let tid = unsafe { win32::GetCurrentThreadId() };
+    let pinned = PINNED_TID.load(Ordering::Acquire);
+    if shell {
+        if pinned == 0 {
+            let ty = String::from_utf16_lossy(&element.Type[..]);
+            if ty.starts_with("Taskbar.") {
+                PINNED_TID.store(tid, Ordering::Release);
+            }
+        } else if tid != pinned {
+            return;
+        }
     }
     // DIAG: element-feed telemetry while bringing up the taskbar styler —
     // counts callbacks and logs the first element types seen per resident.
@@ -855,5 +970,4 @@ fn on_visual_tree_change(
             }
         }
     }
-    unsafe { free_element_strings(element) };
 }
