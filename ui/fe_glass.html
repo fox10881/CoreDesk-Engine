@@ -245,6 +245,14 @@
   footer button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   footer button:hover { filter: brightness(1.12); }
 
+  /* ------------------------------------------- crash-breaker warning */
+  .haltWarn {
+    margin: 4px 0 10px; padding: 9px 12px; border-radius: 8px;
+    background: rgba(255,150,40,.10); border: 1px solid rgba(255,150,40,.45);
+    color: #f5b35e; font-size: 12px; line-height: 1.5;
+  }
+  .haltWarn[hidden] { display: none; }
+
   /* ------------------------------------------------------------- toast */
   #toast {
     position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
@@ -290,6 +298,7 @@
         <option value="micaalt">Mica Alt</option>
       </select>
     </div>
+    <div class="haltWarn" id="haltWarn" hidden></div>
 
     <h2>ExplorerBlurMica</h2>
     <div class="row" id="rowAddress">
@@ -405,7 +414,8 @@
 
   // Draft state — edits stay local until Apply; Cancel discards them.
   const s = {
-    effect: '', clearAddress: false, clearBarBg: false, clearWinuiBg: false,
+    effect: '', halted: false, haltedText: '',
+    clearAddress: false, clearBarBg: false, clearWinuiBg: false,
     showLine: false, lightRgba: '', darkRgba: '',
   };
   let systemLight = true;
@@ -467,6 +477,9 @@
       $(id).style.pointerEvents = optsOn ? '' : 'none';
     });
     $('effectSel').disabled = false;
+    const hw = $('haltWarn');
+    hw.hidden = !s.halted;
+    if (s.halted) hw.textContent = s.haltedText || '';
   }
 
   // ------------------------------------------------------------ controls
@@ -638,6 +651,7 @@
         if (!bgPicked) selectBg(systemLight ? 1 : 0, false);
         const fe = m.fe || {};
         s.effect = fe.effect || '';
+        s.halted = !!m.halted; s.haltedText = m.haltedText || '';
         s.clearAddress = !!fe.clearAddress; s.clearBarBg = !!fe.clearBarBg;
         s.clearWinuiBg = !!fe.clearWinuiBg; s.showLine = !!fe.showLine;
         s.lightRgba = fe.lightRgba || ''; s.darkRgba = fe.darkRgba || '';

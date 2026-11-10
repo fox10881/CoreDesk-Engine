@@ -41,9 +41,22 @@ windows_core::link!("advapi32.dll" "system" fn RegOpenKeyExW(hkey: isize, subkey
 windows_core::link!("advapi32.dll" "system" fn RegCloseKey(hkey: isize) -> i32);
 windows_core::link!("kernel32.dll" "system" fn OpenProcess(dwdesiredaccess: u32, binherithandle: windows_core::BOOL, dwprocessid: u32) -> *mut core::ffi::c_void);
 windows_core::link!("kernel32.dll" "system" fn CloseHandle(hobject: *mut core::ffi::c_void) -> windows_core::BOOL);
+windows_core::link!("kernel32.dll" "system" fn GetExitCodeProcess(hprocess: *mut core::ffi::c_void, lpexitcode: *mut u32) -> windows_core::BOOL);
+windows_core::link!("kernel32.dll" "system" fn WaitForSingleObject(hhandle: *mut core::ffi::c_void, dwmilliseconds: u32) -> u32);
+windows_core::link!("kernel32.dll" "system" fn TerminateProcess(hprocess: *mut core::ffi::c_void, uexitcode: u32) -> windows_core::BOOL);
+windows_core::link!("kernel32.dll" "system" fn QueryFullProcessImageNameW(hprocess: *mut core::ffi::c_void, dwflags: u32, lpexename: windows_core::PWSTR, lpdwsize: *mut u32) -> windows_core::BOOL);
 
 /// `PROCESS_QUERY_LIMITED_INFORMATION` — enough to test the pid's death.
 const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+/// `PROCESS_TERMINATE` — kill a still-armed pid once the breaker trips.
+const PROCESS_TERMINATE: u32 = 0x0001;
+/// `SYNCHRONIZE` — lets `WaitForSingleObject` observe the process's death.
+const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
+/// `WAIT_TIMEOUT` — the handle is not signaled: still running (or a
+/// WER-suspended corpse mid-dump).
+const WAIT_STILL_RUNNING: u32 = 0x102;
+/// `STILL_ACTIVE` — reported while WER holds the process open.
+const EXIT_STILL_ACTIVE: u32 = 259;
 
 /// `COPYDATASTRUCT.dwData` values — must match `crates/tap/src/command.rs`.
 /// `EBML` = load `ExplorerBlurMica.dll` (payload: UTF-16 path + NUL);
@@ -104,9 +117,19 @@ struct Fe {
     /// taskbar and the Alt-Tab switcher — so `EBML` waits until the pid
     /// survived a whole settle window instead of landing mid-creation.
     first_seen: HashMap<u32, Instant>,
-    /// pid → when `EBML` was last delivered. A pid that dies inside
-    /// `EBM_CRASH_WINDOW` of a delivery is a suspected EBM crash.
-    delivered_at: HashMap<u32, Instant>,
+    /// pid → when `EBML` was last delivered + a process handle held open
+    /// from that moment — a pid that dies inside `EBM_CRASH_WINDOW` of a
+    /// delivery is a suspected EBM crash, and the held handle keeps its
+    /// EXIT CODE readable afterwards: `GetExitCodeProcess` returns the
+    /// exception code on a crash but 0 on a natural exit (closing the last
+    /// cabinet exits a separate-process explorer) — that's the
+    /// crash-vs-shutdown discriminator `OpenProcess`-polling can't see.
+    delivered_at: HashMap<u32, Delivery>,
+    /// When the last ini-relevant change landed. A burst of applies (the
+    /// settings tint slider pushes one per tick) must collapse into ONE
+    /// `EBMU`+`EBML` reload — `FreeLibrary` mid-detour is the crash-prone
+    /// path, so deliveries wait `EBM_RELOAD_SETTLE` for writes to settle.
+    last_ini_change: Option<Instant>,
     /// Suspected EBM crashes this session; `EBM_MAX_STRIKES` trips `halted`.
     strikes: u32,
     /// Circuit breaker: no more `EBML` this session (unloads still flow).
@@ -114,6 +137,25 @@ struct Fe {
 }
 
 static FE: Mutex<Option<Fe>> = Mutex::new(None);
+
+/// One `delivered_at` entry — the delivery instant plus a `SYNCHRONIZE`
+/// handle opened at deliver time. `Drop` closes it; `delivered` re-entries
+/// and map clears therefore never leak handles.
+struct Delivery {
+    at: Instant,
+    proc: *mut core::ffi::c_void,
+}
+impl Drop for Delivery {
+    fn drop(&mut self) {
+        if !self.proc.is_null() {
+            unsafe {
+                let _ = CloseHandle(self.proc);
+            }
+        }
+    }
+}
+unsafe impl Send for Delivery {}
+
 /// Whether a File Explorer effect is armed — read lock-free.
 static ARMED: AtomicBool = AtomicBool::new(false);
 
@@ -383,6 +425,113 @@ const EBM_PID_WARMUP: Duration = Duration::from_secs(3);
 const EBM_CRASH_WINDOW: Duration = Duration::from_secs(90);
 /// Suspected crashes before `EBML` stops for the session.
 const EBM_MAX_STRIKES: u32 = 2;
+/// How long `deliver_all` waits after the last ini change before issuing
+/// an `EBMU`+`EBML` reload — collapses slider bursts into one reload.
+const EBM_RELOAD_SETTLE: Duration = Duration::from_millis(400);
+/// A persisted breaker older than this expires — enough time for the
+/// crashing contract (or a Windows update) to be worth retrying fresh.
+const BREAKER_TTL_SECS: u64 = 24 * 60 * 60;
+
+/// `residents/ebm-breaker.json` — `{"effect": "...", "at": <unix secs>}`.
+/// Persists the crash breaker across app restarts: without it every launch
+/// re-arms EBM and the crash loop resumes exactly as before.
+fn breaker_path() -> Option<PathBuf> {
+    Some(residents_dir()?.join("ebm-breaker.json"))
+}
+
+/// Reads the persisted breaker record: `(effect, unix_secs)` when present.
+fn breaker_record() -> Option<(String, u64)> {
+    let text = std::fs::read_to_string(breaker_path()?).ok()?;
+    // Tiny hand-parse — the record is two fields and `effect` is one of the
+    // fixed ASCII ids (`blur`/`acrylic`/...), so no escapes can appear.
+    let find = |key: &str| -> Option<String> {
+        let pat = format!("\"{key}\":");
+        let rest = text.split(&pat).nth(1)?.trim_start();
+        if rest.starts_with('"') {
+            Some(rest.trim_start_matches('"').split('"').next()?.to_owned())
+        } else {
+            Some(
+                rest.trim_end_matches(['}', ' ', '\n', '\r', '\t'])
+                    .to_owned(),
+            )
+        }
+    };
+    let effect = find("effect")?;
+    let at = find("at")?.parse().ok()?;
+    Some((effect, at))
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// `true` when the persisted breaker names this exact effect contract and
+/// is still fresh — a different effect is a new contract the user opted in
+/// to, so it retries cleanly.
+fn breaker_marked_for(effect: &str) -> bool {
+    match breaker_record() {
+        Some((eff, at)) => eff == effect && unix_now().saturating_sub(at) < BREAKER_TTL_SECS,
+        None => false,
+    }
+}
+
+fn breaker_save(effect: &str) {
+    let Some(path) = breaker_path() else { return };
+    let _ = std::fs::write(
+        path,
+        format!("{{\"effect\":\"{effect}\",\"at\":{}}}", unix_now()),
+    );
+}
+
+fn breaker_clear() {
+    if let Some(path) = breaker_path() {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
+/// `EBMU` broadcast — unloads the material in every resident regardless of
+/// delivery bookkeeping. Used by `reset_ebm`, by a halted apply (a pid can
+/// still carry the module), and by the crash breaker when it trips.
+fn broadcast_ebm_unload() {
+    for hwnd in crate::tap::resident_windows_all() {
+        let _ = crate::tap::send_copydata(hwnd, CDS_EBM_UNLOAD, &[]);
+    }
+}
+
+/// `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` + image-name check —
+/// `true` only when the pid is alive AND still `explorer.exe`. `delivered`
+/// keeps entries for dead pids until the next clear, and a recycled pid
+/// must never be terminated as an EBM victim.
+fn pid_is_explorer(pid: u32) -> bool {
+    let h = unsafe {
+        OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION,
+            windows_core::BOOL(0),
+            pid,
+        )
+    };
+    if h.is_null() {
+        return false;
+    }
+    let mut buf = [0u16; 260];
+    let mut len = buf.len() as u32;
+    let ok = unsafe {
+        QueryFullProcessImageNameW(h, 0, windows_core::PWSTR(buf.as_mut_ptr()), &mut len)
+    };
+    unsafe {
+        let _ = CloseHandle(h);
+    }
+    if ok.0 == 0 {
+        return false;
+    }
+    let name = String::from_utf16_lossy(&buf[..len as usize]);
+    name.rsplit('\\')
+        .next()
+        .is_some_and(|f| f.eq_ignore_ascii_case("explorer.exe"))
+}
 
 /// `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` — a live pid answers.
 fn pid_alive(pid: u32) -> bool {
@@ -505,6 +654,14 @@ fn deliver_all() {
                     // next ensure() tick delivers.
                     continue;
                 }
+                if fe
+                    .last_ini_change
+                    .is_some_and(|t| now.duration_since(t) < EBM_RELOAD_SETTLE)
+                {
+                    // Config is still settling (a burst of applies): one
+                    // reload with the final ini beats a FreeLibrary storm.
+                    continue;
+                }
                 if task_switcher_foreground() {
                     tracing::debug!(pid, "deliver_all: task switcher foreground — deferred");
                     continue;
@@ -512,7 +669,16 @@ fn deliver_all() {
                 deliver_ebm(cmd, &wide);
                 tracing::debug!(pid, epoch = fe.epoch, "deliver_all: EBML sent");
                 fe.delivered.insert(pid, current);
-                fe.delivered_at.insert(pid, Instant::now());
+                // Hold the pid open so its exit code stays readable after
+                // death — `insert` drops (and closes) any prior handle.
+                let proc = unsafe {
+                    OpenProcess(
+                        PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+                        windows_core::BOOL(0),
+                        pid,
+                    )
+                };
+                fe.delivered_at.insert(pid, Delivery { at: now, proc });
             }
         }
     }
@@ -520,16 +686,41 @@ fn deliver_all() {
     // set that also failed `OpenProcess` inside the window is a strike. A
     // pid that merely closed its last cabinet (still alive — the shared
     // shell explorer) is not.
+    let mut trip_halt = false;
+    let mut armed_victims = Vec::new();
     {
         let mut guard = lock();
         if let Some(fe) = guard.as_mut() {
             let now = Instant::now();
             let mut dead = Vec::new();
-            fe.delivered_at.retain(|pid, when| {
+            fe.delivered_at.retain(|pid, d| {
                 if live_pids.contains(pid) {
                     return true;
                 }
-                if now.duration_since(*when) < EBM_CRASH_WINDOW && !pid_alive(*pid) {
+                if now.duration_since(d.at) >= EBM_CRASH_WINDOW {
+                    return false; // outside the crash window — forget
+                }
+                if d.proc.is_null() {
+                    // No handle to judge by — fall back to the old probe.
+                    if pid_alive(*pid) {
+                        return true;
+                    }
+                    dead.push(*pid);
+                    return false;
+                }
+                if unsafe { WaitForSingleObject(d.proc, 0) } == WAIT_STILL_RUNNING {
+                    // Alive, or a WER-suspended corpse mid-dump — judged
+                    // next tick once the object signals.
+                    return true;
+                }
+                // Signaled = terminated; the exit code says how. A natural
+                // exit (last cabinet closed → `ExitProcess(0)`) is not a
+                // strike; an exception code is.
+                let mut code = 0u32;
+                if unsafe { GetExitCodeProcess(d.proc, &mut code) }.0 != 0
+                    && code != 0
+                    && code != EXIT_STILL_ACTIVE
+                {
                     dead.push(*pid);
                 }
                 false
@@ -544,12 +735,57 @@ fn deliver_all() {
             }
             if !fe.halted && fe.strikes >= EBM_MAX_STRIKES {
                 fe.halted = true;
-                tracing::warn!(
-                    strikes = fe.strikes,
-                    "EBM halted for the session after repeated explorer crashes"
-                );
+                armed_victims = fe
+                    .delivered
+                    .keys()
+                    .chain(fe.delivered_at.keys())
+                    .copied()
+                    .collect();
+                fe.delivered.clear();
+                trip_halt = true;
             }
             fe.first_seen.retain(|pid, _| live_pids.contains(pid));
+        }
+    }
+    if trip_halt {
+        let effect = lock()
+            .as_ref()
+            .map(|fe| fe.effect.clone())
+            .unwrap_or_default();
+        breaker_save(&effect);
+        tracing::warn!(
+            effect = %effect,
+            "EBM halted after repeated explorer crashes — material disarmed until the effect changes"
+        );
+        // Halting must not just stop NEW deliveries: pids that already
+        // carry the module keep crashing until it unloads — EBMU restores
+        // their originals.
+        broadcast_ebm_unload();
+        // EBMU is only best-effort: the module self-pins inside a live pid
+        // (observed: image still mapped a minute after the unload, and the
+        // pid crashed 13 s later) — and seeded heap corruption does not
+        // need the hooks active to detonate later. The only certain fix
+        // for a still-armed pid is to terminate it; the shell respawns its
+        // explorer and a separate-process cabinet just closes — the same
+        // blink the crash was about to cause anyway.
+        armed_victims.sort_unstable();
+        armed_victims.dedup();
+        for pid in armed_victims {
+            if !pid_is_explorer(pid) {
+                continue;
+            }
+            let h = unsafe { OpenProcess(PROCESS_TERMINATE, windows_core::BOOL(0), pid) };
+            if h.is_null() {
+                continue;
+            }
+            unsafe {
+                let _ = TerminateProcess(h, 0);
+                let _ = CloseHandle(h);
+            }
+            tracing::warn!(
+                pid,
+                "terminated still-armed explorer pid after breaker trip"
+            );
         }
     }
     crate::tap::prune_extra_residents(&live_pids);
@@ -681,11 +917,33 @@ pub fn apply_effect(cfg: &FeGlassConfig) -> bool {
         fe.dark_rgba = cfg.dark_rgba.to_string();
         fe.dll_path = dll_path.display().to_string();
         fe.epoch += 1; // pids whose generation trails reload EBM once
+        // The settle timer starts NOW — `deliver_all` holds the reload
+        // until the ini burst quiets, collapsing it into one EBMU+EBML.
+        fe.last_ini_change = Some(Instant::now());
         // A real config change is a fresh contract — clear the crash
         // breaker so a fixed config is not held guilty by an old engine.
         fe.strikes = 0;
         fe.halted = false;
     }
+    // The persisted breaker outranks the fresh-contract reset: a contract
+    // that already crashed Explorer twice stays disarmed until the user
+    // actually changes the effect — an app restart alone is not a retry.
+    if breaker_marked_for(cfg.effect) {
+        if let Some(fe) = lock().as_mut() {
+            fe.halted = true;
+            fe.delivered.clear();
+        }
+        ARMED.store(true, Ordering::Release);
+        broadcast_ebm_unload();
+        finish();
+        tracing::warn!(
+            effect = cfg.effect,
+            "EBM apply honored but kept disarmed — persisted crash breaker"
+        );
+        return true;
+    }
+    // Unmarked contract — drop any stale record for a different effect.
+    breaker_clear();
     ARMED.store(true, Ordering::Release);
     finish();
     tracing::info!(
@@ -701,9 +959,7 @@ pub fn apply_effect(cfg: &FeGlassConfig) -> bool {
 fn reset_ebm() -> bool {
     let residents = crate::tap::resident_windows_all();
     tracing::debug!(residents = residents.len(), "reset_ebm: EBMU broadcast");
-    for hwnd in residents {
-        let _ = crate::tap::send_copydata(hwnd, CDS_EBM_UNLOAD, &[]);
-    }
+    broadcast_ebm_unload();
     disarm_legacy();
     disarm_xaml();
     if let Some(fe) = lock().as_mut() {

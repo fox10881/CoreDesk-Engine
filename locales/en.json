@@ -669,6 +669,7 @@
   "#AARRGGBB — 系统深色主题下的玻璃混色（EBM [dark]）": "#AARRGGBB — glass blend color under the dark theme (EBM [dark])",
   "Windows 默认": "Windows default",
   "资源管理器背景效果未能更改，请稍后重试。": "Couldn't change the File Explorer background effect; try again.",
+  "资源管理器背景效果已暂停：资源管理器反复崩溃。更改效果类型可重试。": "File Explorer background effect paused: Explorer crashed repeatedly. Change the effect type to retry.",
   "选择颜色": "Choose color",
   "恢复默认": "Restore default",
   "高级设置": "Advanced settings",

@@ -1286,6 +1286,10 @@ impl App {
             "locale": localization["locale"],
             "translations": localization["translations"],
             "systemLight": systheme::apps_use_light_theme(),
+            "halted": coredesk_platform::file_explorer_styler::halted(),
+            "haltedText": coredesk_core::i18n::text(
+                "资源管理器背景效果已暂停：资源管理器反复崩溃。更改效果类型可重试。",
+            ),
             "fe": {
                 "effect": s.fe_effect,
                 "clearAddress": s.fe_clear_address,
@@ -1305,7 +1309,7 @@ impl App {
     fn fe_glass_sig(&self) -> String {
         let s = &self.state.config.settings;
         format!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             s.fe_effect,
             s.fe_clear_address,
             s.fe_clear_bar_bg,
@@ -1315,6 +1319,7 @@ impl App {
             s.fe_dark_rgba,
             systheme::apps_use_light_theme(),
             coredesk_core::i18n::ui_payload()["locale"],
+            coredesk_platform::file_explorer_styler::halted(),
         )
     }
 
@@ -1359,10 +1364,19 @@ impl App {
         self.apply_settings(new);
         let applied = self.state.config.settings.fe_effect == wanted;
         if let Some(h) = &self.fe_glass {
+            let paused = coredesk_platform::file_explorer_styler::halted();
             let (text, error) = if !applied {
                 (
                     coredesk_core::i18n::text("资源管理器背景效果未能更改，请稍后重试。")
                         .to_string(),
+                    true,
+                )
+            } else if paused {
+                (
+                    coredesk_core::i18n::text(
+                        "资源管理器背景效果已暂停：资源管理器反复崩溃。更改效果类型可重试。",
+                    )
+                    .to_string(),
                     true,
                 )
             } else {

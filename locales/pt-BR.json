@@ -669,6 +669,7 @@
   "#AARRGGBB — 系统深色主题下的玻璃混色（EBM [dark]）": "#AARRGGBB — cor de mescla do vidro no tema escuro (EBM [dark])",
   "Windows 默认": "Padrão do Windows",
   "资源管理器背景效果未能更改，请稍后重试。": "Não foi possível alterar o efeito de fundo do Explorador; tente novamente.",
+  "资源管理器背景效果已暂停：资源管理器反复崩溃。更改效果类型可重试。": "Efeito de fundo do Explorador pausado: o Explorador falhou repetidamente. Altere o tipo de efeito para tentar novamente.",
   "选择颜色": "Escolher cor",
   "恢复默认": "Restaurar padrão",
   "高级设置": "Configurações avançadas",
