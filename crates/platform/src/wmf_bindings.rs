@@ -75,6 +75,11 @@ pub unsafe fn GetParent(hwnd: HWND) -> HWND {
     unsafe { GetParent(hwnd) }
 }
 #[inline]
+pub unsafe fn IntersectClipRect(hdc: HDC, left: i32, top: i32, right: i32, bottom: i32) -> i32 {
+    windows_core::link!("gdi32.dll" "system" fn IntersectClipRect(hdc : HDC, left : i32, top : i32, right : i32, bottom : i32) -> i32);
+    unsafe { IntersectClipRect(hdc, left, top, right, bottom) }
+}
+#[inline]
 pub unsafe fn MFCreateAttributes(
     ppmfattributes: *mut Option<IMFAttributes>,
     cinitialsize: u32,
@@ -184,6 +189,11 @@ pub unsafe fn MFStartup(version: u32, dwflags: u32) -> windows_core::HRESULT {
     unsafe { MFStartup(version, dwflags) }
 }
 #[inline]
+pub unsafe fn RestoreDC(hdc: HDC, nsaveddc: i32) -> windows_core::BOOL {
+    windows_core::link!("gdi32.dll" "system" fn RestoreDC(hdc : HDC, nsaveddc : i32) -> windows_core::BOOL);
+    unsafe { RestoreDC(hdc, nsaveddc) }
+}
+#[inline]
 pub unsafe fn SHCreateMemStream(pinit: Option<&[u8]>) -> Option<IStream> {
     windows_core::link!("shlwapi.dll" "system" fn SHCreateMemStream(pinit : *const u8, cbinit : u32) -> Option < IStream >);
     unsafe {
@@ -194,24 +204,14 @@ pub unsafe fn SHCreateMemStream(pinit: Option<&[u8]>) -> Option<IStream> {
     }
 }
 #[inline]
-pub unsafe fn SetParent(hwndchild: HWND, hwndnewparent: Option<HWND>) -> HWND {
-    windows_core::link!("user32.dll" "system" fn SetParent(hwndchild : HWND, hwndnewparent : HWND) -> HWND);
-    unsafe { SetParent(hwndchild, hwndnewparent.unwrap_or(core::mem::zeroed()) as _) }
-}
-#[inline]
 pub unsafe fn SaveDC(hdc: HDC) -> i32 {
     windows_core::link!("gdi32.dll" "system" fn SaveDC(hdc : HDC) -> i32);
     unsafe { SaveDC(hdc) }
 }
 #[inline]
-pub unsafe fn RestoreDC(hdc: HDC, nsaveddc: i32) -> windows_core::BOOL {
-    windows_core::link!("gdi32.dll" "system" fn RestoreDC(hdc : HDC, nsaveddc : i32) -> windows_core::BOOL);
-    unsafe { RestoreDC(hdc, nsaveddc) }
-}
-#[inline]
-pub unsafe fn IntersectClipRect(hdc: HDC, left: i32, top: i32, right: i32, bottom: i32) -> i32 {
-    windows_core::link!("gdi32.dll" "system" fn IntersectClipRect(hdc : HDC, left : i32, top : i32, right : i32, bottom : i32) -> i32);
-    unsafe { IntersectClipRect(hdc, left, top, right, bottom) }
+pub unsafe fn SetParent(hwndchild: HWND, hwndnewparent: Option<HWND>) -> HWND {
+    windows_core::link!("user32.dll" "system" fn SetParent(hwndchild : HWND, hwndnewparent : HWND) -> HWND);
+    unsafe { SetParent(hwndchild, hwndnewparent.unwrap_or(core::mem::zeroed()) as _) }
 }
 #[inline]
 pub unsafe fn SetStretchBltMode(hdc: HDC, mode: i32) -> i32 {

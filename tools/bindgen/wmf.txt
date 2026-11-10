@@ -116,6 +116,9 @@
     StretchDIBits
     BitBlt
     SRCCOPY
+    SaveDC
+    RestoreDC
+    IntersectClipRect
     SetStretchBltMode
     HALFTONE
     COLORONCOLOR

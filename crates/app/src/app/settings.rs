@@ -1024,7 +1024,7 @@ impl App {
             if widget_surface_lost(host, other) {
                 let misses = self.viz_surface_misses.saturating_add(1);
                 self.viz_surface_misses = misses;
-                if misses == 1 || misses % REVIVE_EVERY == 0 {
+                if misses == 1 || misses.is_multiple_of(REVIVE_EVERY) {
                     h.revive_surface();
                 }
                 restart_viz = misses >= RESTART_AT && self.viz_restarts < RESTART_MAX;
@@ -1046,7 +1046,7 @@ impl App {
             if widget_surface_lost(host, other) {
                 let misses = self.clock_surface_misses.saturating_add(1);
                 self.clock_surface_misses = misses;
-                if misses == 1 || misses % REVIVE_EVERY == 0 {
+                if misses == 1 || misses.is_multiple_of(REVIVE_EVERY) {
                     h.revive_surface();
                 }
                 restart_clock = misses >= RESTART_AT && self.clock_restarts < RESTART_MAX;
