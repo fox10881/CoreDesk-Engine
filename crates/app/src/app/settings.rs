@@ -1637,7 +1637,16 @@ impl App {
                     Some([get("x"), get("y"), get("w"), get("h")]);
                 self.schedule_save();
                 if let Some(h) = &self.clock {
-                    h.revive_surface();
+                    let host = h.hwnd();
+                    let rect = window::window_rect(host);
+                    let other = self.visualizer_host.as_ref().map(|v| v.hwnd());
+                    let broken = widget_surface_lost(host, other)
+                        || desktop::webview_input_capturing(host, rect);
+                    if broken {
+                        h.revive_surface();
+                    } else {
+                        desktop::heal_webview_companion_input(rect);
+                    }
                 }
                 self.probe_clock_backdrop();
             }
@@ -1667,8 +1676,22 @@ impl App {
                         .or_default()
                         .bounds = Some([get("x"), get("y"), get("w"), get("h")]);
                     self.schedule_save();
+                    // A clean resize needs no surface surgery — the heavy
+                    // revive's topmost band flick churns the very WebView
+                    // surface it heals and can blank the canvas. Run it only
+                    // when the companion is actually missing or capturing
+                    // input; otherwise just re-arm its input transparency.
                     if let Some(h) = &self.visualizer_host {
-                        h.revive_surface();
+                        let host = h.hwnd();
+                        let rect = window::window_rect(host);
+                        let other = self.clock.as_ref().map(|c| c.hwnd());
+                        let broken = widget_surface_lost(host, other)
+                            || desktop::webview_input_capturing(host, rect);
+                        if broken {
+                            h.revive_surface();
+                        } else {
+                            desktop::heal_webview_companion_input(rect);
+                        }
                     }
                     self.probe_viz_backdrop();
                 }

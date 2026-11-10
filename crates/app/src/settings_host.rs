@@ -59,7 +59,12 @@ impl WebEnvironment {
         // (`--process-per-site --disable-site-isolation-trials --renderer-process-limit=1`)
         // and disable unnecessary Chromium background services (Network Service
         // background tasks, Crashpad/Breakpad, component updater, domain reliability).
-        const BASE_BROWSER_ARGS: &str = "--process-per-site --disable-site-isolation-trials --renderer-process-limit=1 --disable-background-networking --disable-breakpad --disable-crash-reporter --no-pings --disable-component-update --disable-domain-reliability --disable-sync --disable-features=Translate,OptimizationHints,MediaRouter,CalculateNativeWinOcclusion";
+        // `--disable-backgrounding-occluded-windows --disable-renderer-backgrounding
+        // --disable-background-timer-throttling`: keep a widget page's renderer
+        // and timers at full speed even when Chromium decides the surface is
+        // backgrounded — a throttled page freezes `requestAnimationFrame`
+        // mid-resize and leaves the visualizer's just-cleared canvas blank.
+        const BASE_BROWSER_ARGS: &str = "--process-per-site --disable-site-isolation-trials --renderer-process-limit=1 --disable-background-networking --disable-breakpad --disable-crash-reporter --no-pings --disable-component-update --disable-domain-reliability --disable-sync --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=Translate,OptimizationHints,MediaRouter,CalculateNativeWinOcclusion";
         let browser_args = if cfg!(debug_assertions) {
             match coredesk_core::brand::var("COREDESK_WEBVIEW_ARGS") {
                 Ok(extra) if !extra.trim().is_empty() => format!("{BASE_BROWSER_ARGS} {extra}"),

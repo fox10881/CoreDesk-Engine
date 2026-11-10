@@ -20,6 +20,18 @@ use crate::clock_host::I18N_JS;
 
 const WIDGET_CSP_META: &str = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src 'none'; connect-src 'none'; frame-src 'none';\">";
 
+/// rAF de-freezer injected into Visualizer widget documents (installed *before*
+/// the eco shim so eco's requests stay tracked): WebView2's runtime can stop
+/// scheduling `requestAnimationFrame` while the widget's own `resize` handler
+/// has already wiped the canvas — the widget then renders nothing forever
+/// because the pending rAF id stays non-zero and the page's own `!raf` re-arm
+/// guard never trips. The wrapper tracks every outstanding callback; a
+/// `setInterval` watchdog (timers keep running when rAF is frozen) cancels any
+/// callback stalled >250 ms and runs it synchronously, so the paint loop
+/// re-arms itself and the canvas repaints even while Chromium still believes
+/// the surface should stay idle.
+const VIZ_RAF_SHIM: &str = "<script>(()=>{const realRaf=window.requestAnimationFrame.bind(window),realCancel=window.cancelAnimationFrame.bind(window),pending=new Map();window.requestAnimationFrame=cb=>{let id=0;const run=now=>{pending.delete(id);cb(now);};id=realRaf(run);pending.set(id,{run:run,at:performance.now()});return id;};window.cancelAnimationFrame=id=>{pending.delete(id);realCancel(id);};setInterval(()=>{if(!pending.size)return;const now=performance.now();for(const[id,p]of pending){if(now-p.at>250){pending.delete(id);realCancel(id);try{p.run(now);}catch(_){}}}},125);})();</script>";
+
 /// Eco-mode 30 FPS `requestAnimationFrame` throttle injected into Visualizer
 /// widget documents: when `vizTheme` carries `"eco": true`, `requestAnimationFrame`
 /// paces callbacks at ~33.3 ms (30 FPS); when `"eco": false`, it runs at native
@@ -28,7 +40,7 @@ const VIZ_ECO_SHIM: &str = "<script>(()=>{const origRaf=window.requestAnimationF
 
 fn inject_csp(doc: String, is_visualizer: bool) -> String {
     let extra = if is_visualizer {
-        format!("{WIDGET_CSP_META}{VIZ_ECO_SHIM}")
+        format!("{WIDGET_CSP_META}{VIZ_RAF_SHIM}{VIZ_ECO_SHIM}")
     } else {
         WIDGET_CSP_META.to_string()
     };
