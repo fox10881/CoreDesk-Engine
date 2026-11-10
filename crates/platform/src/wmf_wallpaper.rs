@@ -994,10 +994,16 @@ fn surface_tiles_and_offset(
     (i32, i32),
 ) {
     let (ox, oy) = (config.secondary_offset_x, config.secondary_offset_y);
-    let target = config.offset_target.max(0) as usize;
     if config.span_mode {
         let mons = sorted_monitors();
-        if mons.len() < 2 || (ox == 0 && oy == 0) || target >= mons.len() {
+        if mons.is_empty() {
+            // Nothing enumerable — keep the legacy whole-surface translate.
+            return (Vec::new(), Vec::new(), (ox, oy));
+        }
+        // A stale/out-of-range target resolves to the nearest real display; a
+        // single-monitor rig has exactly one thing the offset can mean.
+        let target = (config.offset_target.max(0) as usize).min(mons.len() - 1);
+        if mons.len() < 2 || (ox == 0 && oy == 0) {
             return (
                 Vec::new(),
                 Vec::new(),
@@ -1796,10 +1802,8 @@ fn span_tiles(
     if mons.len() < 2 {
         return Vec::new();
     }
-    let target = config.offset_target.max(0) as usize;
-    if target >= mons.len() {
-        return Vec::new();
-    }
+    // Out-of-range targets slide the last real display rather than nothing.
+    let target = (config.offset_target.max(0) as usize).min(mons.len() - 1);
     let mut wr = RECT::default();
     let (wx0, wy0) = unsafe {
         if GetWindowRect(crate::bindings::HWND(hwnd.0), &mut wr).as_bool() {
