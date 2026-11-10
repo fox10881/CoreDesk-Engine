@@ -238,12 +238,20 @@ pub fn window_desktop(hwnd: HWND) -> Option<u128> {
     })
 }
 
-/// Whether a virtual-desktop switch can change the picture: more than one desktop, and they
-/// do not all keep the same one (one without a picture of its own differs from one with;
-/// Windows 10 keeps none per desktop). A hint like [`desktop_wallpapers`].
+/// Whether a virtual-desktop switch can change the picture: at least two desktops
+/// RECORD a picture of their own, and the recorded pictures differ. A desktop with
+/// no record (`None`) shows the shared image — it can never report a different one,
+/// and counting it as differing would hold every real apply hostage for the very
+/// common never-customized-second-desktop case (Windows 10 keeps none per desktop,
+/// which is why this returns false there anyway). A hint like [`desktop_wallpapers`].
 pub fn desktops_differ() -> bool {
-    let desktops = desktop_wallpapers();
-    desktops.len() > 1 && desktops.iter().any(|(_, path)| *path != desktops[0].1)
+    let mut recorded = desktop_wallpapers()
+        .into_iter()
+        .filter_map(|(_, path)| path);
+    let Some(first) = recorded.next() else {
+        return false;
+    };
+    recorded.any(|p| p != first)
 }
 
 /// Watch both wallpaper settings and Explorer's virtual-desktop state. The latter is only

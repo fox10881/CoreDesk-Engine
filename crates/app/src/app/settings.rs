@@ -2998,14 +2998,13 @@ impl App {
             return;
         }
         if let Some(b) = self.static_under_video.as_ref() {
-            // The reported file predates the player's baseline — Explorer
-            // re-asserted a pre-existing transcode cache, not a user apply
-            // (a real apply writes a fresh `Transcoded_*` file).
-            if now
-                .as_ref()
-                .and_then(|(_, m)| *m)
-                .is_some_and(|m| m <= b.recorded_at)
-            {
+            // An OLD Transcoded_* cache predating the player's baseline is
+            // Explorer re-asserting a pre-existing transcode, not a user apply.
+            // User files (e.g. Photos copies) keep their original mtimes too,
+            // so only the cache filename may carry this heuristic.
+            if now.as_ref().is_some_and(|(p, m)| {
+                Self::is_transcoded_cache(p) && m.is_some_and(|m| m <= b.recorded_at)
+            }) {
                 tracing::debug!(
                     wallpaper = ?now,
                     "wallpaper signal predates video baseline; keeping video intent"
@@ -3079,6 +3078,22 @@ impl App {
         }
     }
 
+    /// A Windows-managed transcode cache — `%APPDATA%\Microsoft\Windows\Themes\`
+    /// `Transcoded*` files. The only paths whose old mtime proves a shell
+    /// re-assert rather than a user apply: Explorer re-points IDesktopWallpaper
+    /// at these pre-existing caches on rebuild. Photos copies and user files
+    /// keep their ORIGINAL mtime too, so extending the mtime heuristic to them
+    /// would reject every re-applied older picture forever.
+    fn is_transcoded_cache(p: &Path) -> bool {
+        p.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.starts_with("Transcoded"))
+            && p.parent()
+                .and_then(|d| d.file_name())
+                .and_then(|d| d.to_str())
+                .is_some_and(|d| d.eq_ignore_ascii_case("Themes"))
+    }
+
     /// The static wallpaper `(path, file mtime)` as `IDesktopWallpaper` resolves it —
     /// the same provider `follow_snapshot` compares `static_under_video` against, so a
     /// SPI↔IDW divergence (`TranscodedWallpaper` vs the source path) cannot look like a
@@ -3126,10 +3141,11 @@ impl App {
             );
             return;
         }
-        // The reported file predates the player's baseline — Explorer
-        // re-pointed IDesktopWallpaper at a pre-existing `Transcoded_*`
-        // cache (its per-monitor naming differs from the SPI path's).
-        if now.1.is_some_and(|m| m <= baseline.recorded_at) {
+        // An OLD Transcoded_* cache predating the player's baseline is Explorer
+        // re-pointing IDesktopWallpaper at a pre-existing cache (its per-monitor
+        // naming differs from the SPI path's). A user-chosen picture keeps its
+        // own mtime — Photos copies included — and must not be gated by it.
+        if Self::is_transcoded_cache(&now.0) && now.1.is_some_and(|m| m <= baseline.recorded_at) {
             tracing::debug!(
                 applied = %now.0.display(),
                 "static wallpaper report predates video baseline; keeping video"
