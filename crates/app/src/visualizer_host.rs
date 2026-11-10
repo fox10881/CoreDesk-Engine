@@ -46,6 +46,12 @@ struct HostState {
     /// freezes deliberately — then posting stops until the desktop is visible
     /// again. Nothing rendering-related runs while this is `true`.
     posted_paused: Cell<bool>,
+    /// One-shot post-ready pulse: a page that loads while the engine is
+    /// slumbering gets `paused:true` on the first feed and freezes with a
+    /// never-painted canvas — the widget is born blank. The first feed after
+    /// `vizReady` therefore carries a forced `paused:false` so the page draws
+    /// at least one frame before the real pause state re-freezes it painted.
+    prime_unpause: Cell<bool>,
     /// The design file currently navigated — a style swap to a *different*
     /// file re-navigates; same-file re-posts just re-arm the params.
     design_id: RefCell<String>,
@@ -78,6 +84,7 @@ impl VisualizerHost {
             mouse_tracked: Cell::new(false),
             spectrum,
             posted_paused: Cell::new(false),
+            prime_unpause: Cell::new(false),
             design_id: RefCell::new(String::new()),
         }));
 
@@ -133,12 +140,21 @@ impl VisualizerHost {
                             let snap = s.spectrum.read().map(|g| *g).unwrap_or_default();
                             // Edge-triggered pause: one `paused:true` frame lets
                             // the page freeze; silent ticks while occluded keep
-                            // the WebView at a hard 0 %.
-                            if !snap.paused || !s.posted_paused.get() {
+                            // the WebView at a hard 0 %. The post-ready prime
+                            // posts one forced-unpaused frame so a page that
+                            // loaded mid-slumber paints once before freezing.
+                            if !snap.paused || !s.posted_paused.get() || s.prime_unpause.get() {
                                 if let Some(c) = s.comp.as_ref() {
-                                    c.post_json(&snap.json());
+                                    if s.prime_unpause.replace(false) && snap.paused {
+                                        let mut pulse = snap;
+                                        pulse.paused = false;
+                                        c.post_json(&pulse.json());
+                                        s.posted_paused.set(false);
+                                    } else {
+                                        c.post_json(&snap.json());
+                                        s.posted_paused.set(snap.paused);
+                                    }
                                 }
-                                s.posted_paused.set(snap.paused);
                             }
                             Some(0)
                         }
@@ -305,9 +321,13 @@ impl VisualizerHost {
 
     /// A fresh page announced itself (`vizReady`): re-arm the paused edge so
     /// the next feed tick posts the current snapshot — a page that loads while
-    /// the engine is slumbering must still see its one `paused:true` frame.
+    /// the engine is slumbering must still see its one `paused:true` frame —
+    /// and prime one forced-unpaused pulse so it paints a frame before that
+    /// freeze instead of being born with a blank canvas.
     pub fn note_document_ready(&self) {
-        self.state.borrow().posted_paused.set(false);
+        let s = self.state.borrow();
+        s.posted_paused.set(false);
+        s.prime_unpause.set(true);
     }
 
     /// Design swap moves the widget to that design's remembered rect — each

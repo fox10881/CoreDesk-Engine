@@ -1645,6 +1645,10 @@ impl App {
                     if broken {
                         h.revive_surface();
                     } else {
+                        // No surface surgery — but the WebView still needs its
+                        // final bounds committed: skipping put_Bounds leaves it
+                        // rendering at the drag-start size in the corner.
+                        h.rearm_transparency();
                         desktop::heal_webview_companion_input(rect);
                     }
                 }
@@ -1701,6 +1705,9 @@ impl App {
                         if broken {
                             h.revive_surface();
                         } else {
+                            // Same corner-render hazard as the clock: commit
+                            // the final WebView bounds without the z-flick.
+                            h.rearm_transparency();
                             desktop::heal_webview_companion_input(rect);
                         }
                     }
