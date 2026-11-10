@@ -503,7 +503,7 @@ pub(super) fn capped_transcode_target(monitors: &[(u32, u32)], res_cap: &str) ->
         .max_by_key(|(w, h)| w * h)
         .unwrap_or((1920, 1080));
     coredesk_platform::wmf_wallpaper::WallpaperRenderConfig::from_res_cap(
-        false, false, res_cap, 0, 0, false,
+        false, false, res_cap, 0, 0, 1, false,
     )
     .clamped_buffer_size(mw, mh)
 }
@@ -1683,10 +1683,7 @@ impl App {
             // (`raf-ok`) — correlates blank-canvas reports with the runtime's
             // own IsVisible flag and the page's visibilityState.
             Some("vizDiag") => {
-                let vis = self
-                    .visualizer_host
-                    .as_ref()
-                    .and_then(|h| h.comp_visible());
+                let vis = self.visualizer_host.as_ref().and_then(|h| h.comp_visible());
                 tracing::info!(msg = %v, ctl_visible = ?vis, "visualizer page diagnostic");
             }
             // Drag/resize ended — the bounds are per design: the rect lands
@@ -2478,7 +2475,8 @@ impl App {
             || new.wallpaper_res_cap != old.wallpaper_res_cap
             || new.eco_mode != old.eco_mode
             || new.secondary_offset_x != old.secondary_offset_x
-            || new.secondary_offset_y != old.secondary_offset_y;
+            || new.secondary_offset_y != old.secondary_offset_y
+            || new.secondary_offset_target != old.secondary_offset_target;
         let res_cap_changed = new.wallpaper_res_cap != old.wallpaper_res_cap;
         let eco_changed = new.eco_mode != old.eco_mode;
         // 「调整大小时按整行整列对齐」 switched on keeps every rectangle: the rows fill any
@@ -2533,6 +2531,7 @@ impl App {
             &s.wallpaper_res_cap,
             s.secondary_offset_x,
             s.secondary_offset_y,
+            s.secondary_offset_target,
             s.eco_mode,
         )
     }
@@ -3948,7 +3947,11 @@ impl App {
                 if ox != 0 || oy != 0 {
                     let (bw, bh) = (img.width as usize, img.height as usize);
                     let mut shifted = img.bgra.clone();
-                    for area in areas.iter().skip(1) {
+                    // Only the monitor the Advanced-Display selector targets
+                    // samples the shifted source — every other display keeps
+                    // its un-shifted slice of the span.
+                    let target = (cfg.offset_target.max(0) as usize).min(areas.len() - 1);
+                    for area in areas.iter().skip(target).take(1) {
                         let rx0 = ((area.mon_left - ux) as f32 * sx_scale).round() as i32;
                         let ry0 = ((area.mon_top - uy) as f32 * sy_scale).round() as i32;
                         let rx1 = ((area.mon_right - ux) as f32 * sx_scale).round() as i32;

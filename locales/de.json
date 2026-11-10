@@ -764,5 +764,7 @@
   "启用节能模式": "Eco-Modus aktivieren",
   "隐藏": "Ausblenden",
   "完成": "Fertig",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Video-Hintergründe, Wetter-/Partikeleffekte und Audio-Visualizer bleiben aktiv — begrenzt die Bildrate auf 30 FPS und senkt die Effektkosten, ohne die Renderauflösung zu ändern"
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Video-Hintergründe, Wetter-/Partikeleffekte und Audio-Visualizer bleiben aktiv — begrenzt die Bildrate auf 30 FPS und senkt die Effektkosten, ohne die Renderauflösung zu ändern",
+  "偏移目标显示器": "Zielmonitor für Versatz",
+  "选择应用偏移量的显示器，其余显示器保持不动": "Wählen Sie, auf welchen Monitor der Versatz angewendet wird – die anderen bleiben unverändert"
 }

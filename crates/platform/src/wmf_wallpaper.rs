@@ -28,14 +28,15 @@ use crate::wmf_bindings::{
     IDCompositionDesktopDevice, IDCompositionTarget, IDCompositionVisual, IDCompositionVisual2,
     IDXGIAdapter, IDXGIDevice, IDXGIFactory2, IDXGIOutput, IDXGISwapChain1, IMF2DBuffer,
     IMFAttributes, IMFDXGIBuffer, IMFDXGIDeviceManager, IMFMediaBuffer, IMFSample, IMFSourceReader,
-    IMFTransform, IWICBitmapEncoder, IWICBitmapFrameEncode, MF_MT_DEFAULT_STRIDE, MF_MT_FRAME_RATE,
-    MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE, MF_SOURCE_READER_ALL_STREAMS,
-    MF_SOURCE_READER_FIRST_VIDEO_STREAM, MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED,
-    MF_SOURCE_READERF_ENDOFSTREAM, MF_SOURCE_READERF_ERROR, MF_VERSION, MFCreateAttributes,
-    MFCreateDXGIDeviceManager, MFCreateMFByteStreamOnStream, MFCreateMediaType,
-    MFCreateSourceReaderFromByteStream, MFCreateSourceReaderFromURL, MFMediaType_Video,
-    MFSTARTUP_NOSOCKET, MFShutdown, MFStartup, PROPVARIANT, SHCreateMemStream, SRCCOPY, SetParent,
-    SetStretchBltMode, StretchDIBits, VARTYPE, WICBitmapEncoderNoCache,
+    IMFTransform, IWICBitmapEncoder, IWICBitmapFrameEncode, IntersectClipRect,
+    MF_MT_DEFAULT_STRIDE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
+    MF_SOURCE_READER_ALL_STREAMS, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
+    MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED, MF_SOURCE_READERF_ENDOFSTREAM,
+    MF_SOURCE_READERF_ERROR, MF_VERSION, MFCreateAttributes, MFCreateDXGIDeviceManager,
+    MFCreateMFByteStreamOnStream, MFCreateMediaType, MFCreateSourceReaderFromByteStream,
+    MFCreateSourceReaderFromURL, MFMediaType_Video, MFSTARTUP_NOSOCKET, MFShutdown, MFStartup,
+    PROPVARIANT, RestoreDC, SHCreateMemStream, SRCCOPY, SaveDC, SetParent, SetStretchBltMode,
+    StretchDIBits, VARTYPE, WICBitmapEncoderNoCache,
 };
 use std::mem::ManuallyDrop;
 use std::path::{Path, PathBuf};
@@ -958,27 +959,79 @@ struct SharedSurface {
     /// Duplicate mode: one blit per monitor rect (window coordinates) — each
     /// display shows the whole frame. Empty ⇒ the span/single-monitor blit.
     tiles: Vec<(i32, i32, i32, i32)>,
+    /// Span mode on a multi-monitor topology: one blit per monitor rect with a
+    /// per-tile offset (window coordinates) — only the monitor the settings
+    /// selector points at carries the bezel offset; every other tile is (0,0)
+    /// so the rest of the wallpaper never moves with it. Empty ⇒ the
+    /// single-blit span path.
+    span_tiles: Vec<((i32, i32, i32, i32), (i32, i32))>,
     /// Span mode: the bezel-offset translate applied to the destination rect.
     offset: (i32, i32),
 }
 
-/// Window-coordinate monitor rects for the GDI path's Duplicate mode, plus the
-/// span-mode bezel offset applied to the destination rect. `tiles` stays empty
-/// for span or a single-monitor topology — the paint path then blits the frame
-/// window-wide.
+/// Monitors in the primary-first order the Settings UI lists them — the
+/// `secondary_offset_target` index selects from this ordering, so the
+/// renderer must enumerate it identically.
+fn sorted_monitors() -> Vec<crate::monitors::MonitorInfo> {
+    let mut mons = crate::monitors::enumerate();
+    mons.sort_by_key(|m| !m.primary);
+    mons
+}
+
+/// Window-coordinate monitor tiles for the GDI path, plus the span-mode
+/// fallback offset applied to a single window-wide blit.
+/// - Duplicate: `tiles` = one rect per monitor (each shows the whole frame).
+/// - Span, chosen-monitor offset: `span_tiles` = per-monitor clip rects; the
+///   target monitor's tile carries (ox,oy), all others (0,0).
+/// - Span single-monitor / unresolved topology: `offset` falls back to the
+///   legacy whole-surface translate when screen 1 is the target.
 fn surface_tiles_and_offset(
     hwnd: HWND,
     config: WallpaperRenderConfig,
-) -> (Vec<(i32, i32, i32, i32)>, (i32, i32)) {
+) -> (
+    Vec<(i32, i32, i32, i32)>,
+    Vec<((i32, i32, i32, i32), (i32, i32))>,
+    (i32, i32),
+) {
+    let (ox, oy) = (config.secondary_offset_x, config.secondary_offset_y);
+    let target = config.offset_target.max(0) as usize;
     if config.span_mode {
-        return (
-            Vec::new(),
-            (config.secondary_offset_x, config.secondary_offset_y),
-        );
+        let mons = sorted_monitors();
+        if mons.len() < 2 || (ox == 0 && oy == 0) || target >= mons.len() {
+            return (
+                Vec::new(),
+                Vec::new(),
+                if target == 0 { (ox, oy) } else { (0, 0) },
+            );
+        }
+        let mut wr = RECT::default();
+        let (wx0, wy0) = unsafe {
+            if GetWindowRect(crate::bindings::HWND(hwnd.0), &mut wr).as_bool() {
+                (wr.left, wr.top)
+            } else {
+                (0, 0)
+            }
+        };
+        let span_tiles = mons
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                (
+                    (
+                        m.bounds.left - wx0,
+                        m.bounds.top - wy0,
+                        m.bounds.right - wx0,
+                        m.bounds.bottom - wy0,
+                    ),
+                    if i == target { (ox, oy) } else { (0, 0) },
+                )
+            })
+            .collect();
+        return (Vec::new(), span_tiles, (0, 0));
     }
     let mons = crate::monitors::enumerate();
     if mons.len() < 2 {
-        return (Vec::new(), (0, 0));
+        return (Vec::new(), Vec::new(), (0, 0));
     }
     let mut wr = RECT::default();
     let (wx0, wy0) = unsafe {
@@ -999,6 +1052,7 @@ fn surface_tiles_and_offset(
                 )
             })
             .collect(),
+        Vec::new(),
         (0, 0),
     )
 }
@@ -1014,6 +1068,10 @@ pub struct WallpaperRenderConfig {
     pub max_height: u32,
     pub secondary_offset_x: i32,
     pub secondary_offset_y: i32,
+    /// Which display the span-mode offsets slide: an index into the
+    /// primary-first monitor order the Settings UI shows. Other monitors keep
+    /// their un-shifted slice — only this one's moves.
+    pub offset_target: i32,
     pub eco_mode: bool,
 }
 
@@ -1026,6 +1084,7 @@ impl Default for WallpaperRenderConfig {
             max_height: 2160,
             secondary_offset_x: 0,
             secondary_offset_y: 0,
+            offset_target: 1,
             eco_mode: false,
         }
     }
@@ -1038,6 +1097,7 @@ impl WallpaperRenderConfig {
         res_cap: &str,
         secondary_offset_x: i32,
         secondary_offset_y: i32,
+        offset_target: i32,
         eco_mode: bool,
     ) -> Self {
         // Resolution is the res-cap's exclusive job — Eco Mode only throttles
@@ -1055,6 +1115,7 @@ impl WallpaperRenderConfig {
             max_height,
             secondary_offset_x,
             secondary_offset_y,
+            offset_target,
             eco_mode,
         }
     }
@@ -1419,6 +1480,32 @@ unsafe fn paint_surface_dc(hwnd: HWND, dc: HDC) {
                 }
                 return;
             }
+            if !surface.span_tiles.is_empty() {
+                // Span, chosen-monitor offset: the contain rect shifts only on
+                // the selected display, clipped to its tile — margins elsewhere
+                // (already painted) stay blurred underneath.
+                for &((tl, tt, tr, tb), (ox_i, oy_i)) in &surface.span_tiles {
+                    let _ = SaveDC(wmf_dc);
+                    let _ = IntersectClipRect(wmf_dc, tl, tt, tr, tb);
+                    let _ = StretchDIBits(
+                        wmf_dc,
+                        dl + ox_i,
+                        dt + oy_i,
+                        dr - dl,
+                        db - dt,
+                        0,
+                        0,
+                        surface.width,
+                        surface.height,
+                        Some(surface.bgra.as_ptr().cast()),
+                        &bmi,
+                        DIB_RGB_COLORS as u32,
+                        SRCCOPY,
+                    );
+                    let _ = RestoreDC(wmf_dc, -1);
+                }
+                return;
+            }
             let _ = StretchDIBits(
                 wmf_dc,
                 dl + ox,
@@ -1454,6 +1541,34 @@ unsafe fn paint_surface_dc(hwnd: HWND, dc: HDC) {
                     DIB_RGB_COLORS as u32,
                     SRCCOPY,
                 );
+            }
+            return;
+        }
+        if !surface.span_tiles.is_empty() {
+            // Span, chosen-monitor offset: the window-wide cover blit runs once
+            // per display clipped to its rect; only the selected monitor's
+            // slice slides by its offset, the rest stay put.
+            let (sx, sy, sw, sh) =
+                cover_crop(surface.width, surface.height, surface.out_w, surface.out_h);
+            for &((tl, tt, tr, tb), (ox_i, oy_i)) in &surface.span_tiles {
+                let _ = SaveDC(wmf_dc);
+                let _ = IntersectClipRect(wmf_dc, tl, tt, tr, tb);
+                let _ = StretchDIBits(
+                    wmf_dc,
+                    ox_i,
+                    oy_i,
+                    surface.out_w,
+                    surface.out_h,
+                    sx,
+                    sy,
+                    sw,
+                    sh,
+                    Some(surface.bgra.as_ptr().cast()),
+                    &bmi,
+                    DIB_RGB_COLORS as u32,
+                    SRCCOPY,
+                );
+                let _ = RestoreDC(wmf_dc, -1);
             }
             return;
         }
@@ -1606,6 +1721,12 @@ struct GpuPipeline {
     /// space — each blit renders the whole video into its own monitor's slice.
     /// Empty or single-entry ⇒ the span/single-monitor one-blit path.
     tile_rects: Vec<crate::wmf_bindings::RECT>,
+    /// Span mode with a chosen-monitor bezel offset: per-monitor clip rects in
+    /// buffer space paired with per-tile dst offsets — only the monitor the
+    /// settings selector targets carries the offset, so the rest of the span
+    /// never moves. Empty ⇒ the one-blit span path (with the visual-level
+    /// translate as the fallback).
+    span_tiles: Vec<(crate::wmf_bindings::RECT, (i32, i32))>,
     config: WallpaperRenderConfig,
 }
 
@@ -1652,6 +1773,65 @@ fn duplicate_tiles(
         .collect()
 }
 
+/// Per-monitor clip rects in swap-chain buffer space for Span mode, each paired
+/// with the bezel offset (scaled to buffer pixels) it applies to the whole-
+/// buffer destination rect. Only `offset_target`'s tile carries a nonzero
+/// offset — the other displays keep the un-shifted slice of the span. Empty
+/// when there is nothing to slide (offsets zero, fewer than two monitors, or
+/// an out-of-range target) — the caller then keeps the legacy visual-level
+/// translate / one-blit path.
+fn span_tiles(
+    hwnd: HWND,
+    win_w: u32,
+    win_h: u32,
+    buf_w: u32,
+    buf_h: u32,
+    config: &WallpaperRenderConfig,
+) -> Vec<(crate::wmf_bindings::RECT, (i32, i32))> {
+    let (ox, oy) = (config.secondary_offset_x, config.secondary_offset_y);
+    if !config.span_mode || (ox == 0 && oy == 0) {
+        return Vec::new();
+    }
+    let mons = sorted_monitors();
+    if mons.len() < 2 {
+        return Vec::new();
+    }
+    let target = config.offset_target.max(0) as usize;
+    if target >= mons.len() {
+        return Vec::new();
+    }
+    let mut wr = RECT::default();
+    let (wx0, wy0) = unsafe {
+        if GetWindowRect(crate::bindings::HWND(hwnd.0), &mut wr).as_bool() {
+            (wr.left, wr.top)
+        } else {
+            (
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+            )
+        }
+    };
+    let sx = buf_w as f32 / win_w.max(1) as f32;
+    let sy = buf_h as f32 / win_h.max(1) as f32;
+    let buf_off = (
+        (ox as f32 * sx).round() as i32,
+        (oy as f32 * sy).round() as i32,
+    );
+    mons.iter()
+        .enumerate()
+        .filter_map(|(i, m)| {
+            let r = crate::wmf_bindings::RECT {
+                left: ((m.bounds.left - wx0) as f32 * sx).round() as i32,
+                top: ((m.bounds.top - wy0) as f32 * sy).round() as i32,
+                right: ((m.bounds.right - wx0) as f32 * sx).round() as i32,
+                bottom: ((m.bounds.bottom - wy0) as f32 * sy).round() as i32,
+            };
+            (r.right > 0 && r.bottom > 0 && r.left < buf_w as i32 && r.top < buf_h as i32)
+                .then_some((r, if i == target { buf_off } else { (0, 0) }))
+        })
+        .collect()
+}
+
 impl GpuPipeline {
     /// Builds the whole presentation chain on `hwnd` (`win_w`x`win_h` at monitor size)
     /// for a `vid_w`x`vid_h` NV12 stream at `fps_num`/`fps_den`.
@@ -1676,6 +1856,7 @@ impl GpuPipeline {
         } else {
             duplicate_tiles(hwnd, win_w, win_h, buf_w, buf_h)
         };
+        let span_tiles = span_tiles(hwnd, win_w, win_h, buf_w, buf_h, &config);
         unsafe {
             let video_dev: ID3D11VideoDevice = device
                 .cast()
@@ -1725,7 +1906,10 @@ impl GpuPipeline {
                 .SetContent(&swapchain)
                 .ok()
                 .map_err(|e| format!("DComp SetContent: {e}"))?;
-            let (ox, oy) = if config.span_mode {
+            // Span offsets normally move the whole visual — but when per-monitor
+            // tiles exist the offset lives in the per-tile blits instead, and
+            // translating the visual would slide every display at once.
+            let (ox, oy) = if config.span_mode && span_tiles.is_empty() {
                 (
                     config.secondary_offset_x as f32,
                     config.secondary_offset_y as f32,
@@ -1906,6 +2090,7 @@ impl GpuPipeline {
                 buf_w,
                 buf_h,
                 tile_rects,
+                span_tiles,
                 config,
             })
         }
@@ -1933,7 +2118,9 @@ impl GpuPipeline {
                 .SetContent(&self.swapchain)
                 .ok()
                 .map_err(|e| format!("rebind SetContent: {e}"))?;
-            let (ox, oy) = if self.config.span_mode {
+            // Same rule as at creation: per-monitor span tiles own the offset;
+            // only the tile-less fallback keeps the whole-visual translate.
+            let (ox, oy) = if self.config.span_mode && self.span_tiles.is_empty() {
                 (
                     self.config.secondary_offset_x as f32,
                     self.config.secondary_offset_y as f32,
@@ -2155,6 +2342,37 @@ impl GpuPipeline {
                         )
                     };
                     last = blit(&src, &dst);
+                    if last.is_err() {
+                        break;
+                    }
+                }
+                last
+            } else if !self.span_tiles.is_empty() {
+                // Span, chosen-monitor offset: the whole-buffer slice blits once
+                // per display, output-clipped to its tile. The selected monitor's
+                // dst shifts by its offset; the output target is the intersection
+                // so uncovered strips (and letterbox margins) keep what was
+                // already in the buffer instead of being repainted.
+                let mut last = windows_core::HRESULT(0);
+                for (tile, (ox_i, oy_i)) in &self.span_tiles {
+                    let dst = crate::wmf_bindings::RECT {
+                        left: self.dst_rect.left + ox_i,
+                        top: self.dst_rect.top + oy_i,
+                        right: self.dst_rect.right + ox_i,
+                        bottom: self.dst_rect.bottom + oy_i,
+                    };
+                    let out = crate::wmf_bindings::RECT {
+                        left: tile.left.max(dst.left),
+                        top: tile.top.max(dst.top),
+                        right: tile.right.min(dst.right),
+                        bottom: tile.bottom.min(dst.bottom),
+                    };
+                    if out.right <= out.left || out.bottom <= out.top {
+                        continue;
+                    }
+                    self.video_ctx
+                        .VideoProcessorSetOutputTargetRect(&self.vp, true, Some(&out));
+                    last = blit(&self.src_rect, &dst);
                     if last.is_err() {
                         break;
                     }
@@ -2955,6 +3173,7 @@ fn run_player_thread(
             margin: Vec::new(),
             dst: None,
             tiles: Vec::new(),
+            span_tiles: Vec::new(),
             offset: (0, 0),
         }));
         let surface_ptr = &*surface as *const Mutex<SharedSurface>;
@@ -2987,8 +3206,9 @@ fn run_player_thread(
             surf.width = vid_w as i32;
             surf.height = vid_h as i32;
             surf.bgra.clone_from(&raw_frame);
-            let (tiles, offset) = surface_tiles_and_offset(hwnd, config);
+            let (tiles, span_tiles, offset) = surface_tiles_and_offset(hwnd, config);
             surf.tiles = tiles;
+            surf.span_tiles = span_tiles;
             surf.offset = offset;
             if letterbox {
                 surf.margin = crate::wallpaper::blurred_backdrop_bgra(
@@ -3070,8 +3290,10 @@ fn run_player_thread(
                             if let Ok(mut surf) = surface.lock() {
                                 surf.out_w = w;
                                 surf.out_h = h;
-                                let (tiles, offset) = surface_tiles_and_offset(hwnd, config);
+                                let (tiles, span_tiles, offset) =
+                                    surface_tiles_and_offset(hwnd, config);
                                 surf.tiles = tiles;
+                                surf.span_tiles = span_tiles;
                                 surf.offset = offset;
                             }
                             present_hwnd(hwnd);

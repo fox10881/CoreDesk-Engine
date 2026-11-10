@@ -199,6 +199,21 @@ pub unsafe fn SetParent(hwndchild: HWND, hwndnewparent: Option<HWND>) -> HWND {
     unsafe { SetParent(hwndchild, hwndnewparent.unwrap_or(core::mem::zeroed()) as _) }
 }
 #[inline]
+pub unsafe fn SaveDC(hdc: HDC) -> i32 {
+    windows_core::link!("gdi32.dll" "system" fn SaveDC(hdc : HDC) -> i32);
+    unsafe { SaveDC(hdc) }
+}
+#[inline]
+pub unsafe fn RestoreDC(hdc: HDC, nsaveddc: i32) -> windows_core::BOOL {
+    windows_core::link!("gdi32.dll" "system" fn RestoreDC(hdc : HDC, nsaveddc : i32) -> windows_core::BOOL);
+    unsafe { RestoreDC(hdc, nsaveddc) }
+}
+#[inline]
+pub unsafe fn IntersectClipRect(hdc: HDC, left: i32, top: i32, right: i32, bottom: i32) -> i32 {
+    windows_core::link!("gdi32.dll" "system" fn IntersectClipRect(hdc : HDC, left : i32, top : i32, right : i32, bottom : i32) -> i32);
+    unsafe { IntersectClipRect(hdc, left, top, right, bottom) }
+}
+#[inline]
 pub unsafe fn SetStretchBltMode(hdc: HDC, mode: i32) -> i32 {
     windows_core::link!("gdi32.dll" "system" fn SetStretchBltMode(hdc : HDC, mode : i32) -> i32);
     unsafe { SetStretchBltMode(hdc, mode) }

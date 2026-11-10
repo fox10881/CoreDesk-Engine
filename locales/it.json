@@ -764,5 +764,7 @@
   "启用节能模式": "Attiva risparmio",
   "隐藏": "Nascondi",
   "完成": "Fatto",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Mantiene sfondi video, effetti meteo/particelle e visualizzatore audio attivi — limita i fotogrammi a 30 FPS e riduce il costo degli effetti senza cambiare la risoluzione di rendering"
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Mantiene sfondi video, effetti meteo/particelle e visualizzatore audio attivi — limita i fotogrammi a 30 FPS e riduce il costo degli effetti senza cambiare la risoluzione di rendering",
+  "偏移目标显示器": "Schermo di destinazione dell'offset",
+  "选择应用偏移量的显示器，其余显示器保持不动": "Scegli a quale schermo applicare l'offset; gli altri restano fermi"
 }

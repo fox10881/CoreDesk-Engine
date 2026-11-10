@@ -764,5 +764,7 @@
   "启用节能模式": "Ativar economia",
   "隐藏": "Ocultar",
   "完成": "Concluído",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Mantém papéis de parede em vídeo, efeitos de clima/partículas e o visualizador de áudio ativos — limita a taxa de quadros a 30 FPS e reduz o custo dos efeitos sem alterar a resolução de renderização"
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Mantém papéis de parede em vídeo, efeitos de clima/partículas e o visualizador de áudio ativos — limita a taxa de quadros a 30 FPS e reduz o custo dos efeitos sem alterar a resolução de renderização",
+  "偏移目标显示器": "Tela de destino do deslocamento",
+  "选择应用偏移量的显示器，其余显示器保持不动": "Escolha em qual tela os deslocamentos são aplicados; as demais permanecem fixas"
 }

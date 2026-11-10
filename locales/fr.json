@@ -764,5 +764,7 @@
   "启用节能模式": "Activer l'économie",
   "隐藏": "Masquer",
   "完成": "Terminé",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Conserve les fonds vidéo, les effets météo/particules et le visualiseur audio actifs — limite la fréquence à 30 FPS et réduit le coût des effets sans changer la résolution de rendu"
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Conserve les fonds vidéo, les effets météo/particules et le visualiseur audio actifs — limite la fréquence à 30 FPS et réduit le coût des effets sans changer la résolution de rendu",
+  "偏移目标显示器": "Écran cible du décalage",
+  "选择应用偏移量的显示器，其余显示器保持不动": "Choisissez l'écran auquel le décalage s'applique ; les autres restent fixes"
 }

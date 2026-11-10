@@ -324,6 +324,12 @@ pub struct Settings {
     /// in `"span"` wallpaper mode to compensate for physical bezel alignment.
     #[serde(default)]
     pub secondary_offset_y: i32,
+    /// Which monitor the `"span"` offsets slide: an index into the
+    /// primary-first monitor order shown in Advanced Display Settings
+    /// (0 = screen 1). Only that monitor's slice of the spanned wallpaper
+    /// is translated, so bezel alignment moves one display — not both.
+    #[serde(default = "secondary_offset_target_default")]
+    pub secondary_offset_target: i32,
     /// Eco Mode: keeps video wallpapers, live weather/particle effects (`le_rain`
     /// etc.), and the audio visualizer running, while capping their frame rates
     /// at ~30 FPS and trimming effect cost to cut GPU/VRAM load. It never
@@ -838,7 +844,8 @@ impl WidgetParams {
     /// outside `WIDGET_ELEMENT_IDS` drop out; kept entries clamp per field.
     pub fn sanitize(&mut self) {
         for b in [&mut self.bounds, &mut self.viz_bounds] {
-            if b.is_some_and(|[_, _, w, h]| !(16..=8192).contains(&w) || !(16..=8192).contains(&h)) {
+            if b.is_some_and(|[_, _, w, h]| !(16..=8192).contains(&w) || !(16..=8192).contains(&h))
+            {
                 *b = None;
             }
         }
@@ -1002,6 +1009,7 @@ impl Default for Settings {
             wallpaper_res_cap: wallpaper_res_cap_default(),
             secondary_offset_x: 0,
             secondary_offset_y: 0,
+            secondary_offset_target: secondary_offset_target_default(),
             eco_mode: false,
             eco_banner_dismissed: false,
         }
@@ -1014,6 +1022,12 @@ fn wallpaper_display_mode_default() -> String {
 
 fn wallpaper_res_cap_default() -> String {
     "4k".to_string()
+}
+
+// Screen 2 (index 1) is the display people actually nudge for bezel
+// alignment; the primary stays the anchor a span is measured from.
+fn secondary_offset_target_default() -> i32 {
+    1
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2730,6 +2744,9 @@ impl Config {
             s.wallpaper_res_cap = wallpaper_res_cap_default();
         }
         s.secondary_offset_x = s.secondary_offset_x.clamp(-500, 500);
+        // The monitor selector only offers indices a real display owns;
+        // clamp stale values to a sane window rather than trusting them.
+        s.secondary_offset_target = s.secondary_offset_target.clamp(0, 15);
         s.secondary_offset_y = s.secondary_offset_y.clamp(-500, 500);
         if !looks_like_rgba(&s.fe_light_rgba) {
             s.fe_light_rgba = fe_light_rgba_default();

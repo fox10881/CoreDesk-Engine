@@ -753,11 +753,13 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       <select data-bind="wallpaperDisplayMode" data-str id="advDisplayModeSel"><option value="duplicate">重复 (Duplicate)</option><option value="span">连续延展 (Span)</option></select></div>
     <div class="card"><div class="l"><span class="ic">&#xE7F4;</span><div><div class="t">内部渲染分辨率上限</div><div class="s">先把壁纸内部交换链/纹理缓冲降低渲染，再放大到物理屏幕，不改变系统分辨率即可节省 CPU/GPU 资源</div></div></div>
       <select data-bind="wallpaperResCap" data-str id="advResCapSel"><option value="4k">Native 4K (3840×2160)</option><option value="2k">2K QHD (2560×1440)</option><option value="1080p">Full HD 1080p (1920×1080)</option></select></div>
+    <div class="card"><div class="l"><span class="ic">&#xEC4A;</span><div><div class="t">节能模式 (Eco Mode)</div><div class="s">保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="ecoMode" aria-label="节能模式 (Eco Mode)"></div></div>
+    <div class="card" id="advOffsetTargetCard"><div class="l"><span class="ic">&#xE7F4;</span><div><div class="t">偏移目标显示器</div><div class="s">选择应用偏移量的显示器，其余显示器保持不动</div></div></div>
+      <select data-bind="secondaryOffsetTarget" id="advOffsetTarget"></select></div>
     <div class="card"><div class="l"><span class="ic">&#xE759;</span><div><div class="t">副屏水平偏移 (Offset X)</div><div class="s">水平移动跨屏壁纸，补偿物理边框错位</div></div></div>
       <div class="sliderctl"><input type="range" id="advOffsetX" min="-500" max="500" step="1"><span class="sliderval" id="advOffsetXVal">0 px</span></div></div>
     <div class="card"><div class="l"><span class="ic">&#xE759;</span><div><div class="t">副屏垂直偏移 (Offset Y)</div><div class="s">垂直移动跨屏壁纸，修正显示器之间的高度差</div></div></div>
       <div class="sliderctl"><input type="range" id="advOffsetY" min="-500" max="500" step="1"><span class="sliderval" id="advOffsetYVal">0 px</span></div></div>
-    <div class="card"><div class="l"><span class="ic">&#xEC4A;</span><div><div class="t">节能模式 (Eco Mode)</div><div class="s">保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率</div></div></div><div class="toggle" role="switch" tabindex="0" data-bind="ecoMode" aria-label="节能模式 (Eco Mode)"></div></div>
     <div class="modal-actions" style="margin-top:12px">
       <button class="accent" type="button" id="advDisplayClose">完成</button>
     </div>
@@ -926,7 +928,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
         el.value = String(cur);
         // data-str opts out of numeric coercion - the Start Menu catalog has
         // ids like "21996" that must reach the backend as strings.
-        el.onchange = () => { const v = el.value; set(root, p, el.hasAttribute('data-str') || isNaN(v) || v === '' ? v : Number(v)); commit(path); if (path === 'wallpaperDisplayMode') renderAdvMinimap(); };
+        el.onchange = () => { const v = el.value; set(root, p, el.hasAttribute('data-str') || isNaN(v) || v === '' ? v : Number(v)); commit(path); if (path === 'wallpaperDisplayMode' || path === 'secondaryOffsetTarget') renderAdvMinimap(); };
       } else if (el.type === 'number') {
         if (document.activeElement !== el) el.value = cur ?? '';
         el.onchange = () => {
@@ -1786,28 +1788,17 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     const rawMons = (state.monitors && state.monitors.length)
       ? state.monitors
       : [{ id: 'primary', label: '1 (3840×2160)', x: 0, y: 0, w: 3840, h: 2160, primary: true }];
-    // When only 1 physical monitor is connected, also preview a virtual secondary monitor ghost
-    // so the user can visualize Span vs Duplicate and Offset X/Y alignment immediately.
-    const mons = rawMons.length >= 2 ? rawMons : [
-      rawMons[0],
-      {
-        id: 'secondary-preview',
-        label: '2 (Preview)',
-        x: (rawMons[0].x || 0) + (rawMons[0].w || 1920),
-        y: rawMons[0].y || 0,
-        w: rawMons[0].w || 1920,
-        h: rawMons[0].h || 1080,
-        primary: false,
-        ghost: true,
-      }
-    ];
+    // Real connected displays only — no synthetic "ghost" preview monitor.
+    const mons = rawMons;
     const ox = Number(state.settings.secondaryOffsetX || 0);
     const oy = Number(state.settings.secondaryOffsetY || 0);
+    // The offset slides only the display chosen in the selector.
+    const tgt = Math.min(Math.max(0, Number(state.settings.secondaryOffsetTarget ?? 1)), mons.length - 1);
     const isSpan = (state.settings.wallpaperDisplayMode || 'duplicate') === 'span';
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     mons.forEach((m, idx) => {
-      const mx = (m.x || 0) + (idx > 0 ? ox : 0);
-      const my = (m.y || 0) + (idx > 0 ? oy : 0);
+      const mx = (m.x || 0) + (idx === tgt ? ox : 0);
+      const my = (m.y || 0) + (idx === tgt ? oy : 0);
       const mw = m.w || 1920, mh = m.h || 1080;
       if (mx < minX) minX = mx;
       if (my < minY) minY = my;
@@ -1820,8 +1811,8 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     const startX = (W - totW * scale) / 2, startY = (H - totH * scale) / 2;
 
     mons.forEach((m, idx) => {
-      const mx = (m.x || 0) + (idx > 0 ? ox : 0);
-      const my = (m.y || 0) + (idx > 0 ? oy : 0);
+      const mx = (m.x || 0) + (idx === tgt ? ox : 0);
+      const my = (m.y || 0) + (idx === tgt ? oy : 0);
       const rx = startX + (mx - minX) * scale;
       const ry = startY + (my - minY) * scale;
       const rw = (m.w || 1920) * scale;
@@ -1858,16 +1849,17 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       ctx.stroke();
       ctx.restore();
 
-      ctx.strokeStyle = m.ghost ? 'rgba(148, 163, 184, 0.55)' : '#60cdff';
-      ctx.lineWidth = m.ghost ? 1.5 : 2;
-      if (m.ghost) ctx.setLineDash([4, 4]); else ctx.setLineDash([]);
+      // The offset-target monitor gets the accent border; the rest stay neutral.
+      ctx.strokeStyle = idx === tgt ? '#ffd666' : '#60cdff';
+      ctx.lineWidth = idx === tgt ? 2.5 : 2;
+      ctx.setLineDash([]);
       ctx.strokeRect(rx, ry, rw, rh);
 
       ctx.fillStyle = '#f8fafc';
       ctx.font = '600 11px "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(
-        `${idx + 1}: ${m.w || 1920}×${m.h || 1080}${idx > 0 && (ox || oy) ? ` (${ox >= 0 ? '+' : ''}${ox}, ${oy >= 0 ? '+' : ''}${oy})` : ''}`,
+        `${idx + 1}: ${m.w || 1920}×${m.h || 1080}${idx === tgt && (ox || oy) ? ` (${ox >= 0 ? '+' : ''}${ox}, ${oy >= 0 ? '+' : ''}${oy})` : ''}`,
         rx + rw / 2,
         ry + rh / 2 + 4
       );
@@ -1879,6 +1871,20 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     const banner = document.getElementById('ecoBannerCard');
     if (banner) {
       banner.hidden = !(!state.settings.ecoMode && !state.settings.ecoBannerDismissed && state.ecoRecommended);
+    }
+    // Offset-target selector: one option per real display, hidden entirely
+    // when a single monitor gives the choice nothing to pick between.
+    const tgtCard = document.getElementById('advOffsetTargetCard');
+    const tgtSel = document.getElementById('advOffsetTarget');
+    const mons = state.monitors || [];
+    if (tgtCard && tgtSel) {
+      const multi = mons.length >= 2;
+      tgtCard.hidden = !multi;
+      tgtSel.innerHTML = mons
+        .map((m, i) => `<option value="${i}">${m.label || (i + 1)}</option>`)
+        .join('');
+      const cur = Math.round(state.settings.secondaryOffsetTarget ?? 1);
+      tgtSel.value = String(Math.min(Math.max(0, cur), Math.max(0, mons.length - 1)));
     }
     const oxEl = document.getElementById('advOffsetX'), oxVal = document.getElementById('advOffsetXVal');
     const oyEl = document.getElementById('advOffsetY'), oyVal = document.getElementById('advOffsetYVal');

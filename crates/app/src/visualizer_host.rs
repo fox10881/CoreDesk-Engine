@@ -324,7 +324,11 @@ impl VisualizerHost {
     /// The runtime's own `IsVisible` flag — `vizDiag` telemetry correlates
     /// page-reported stalls against what the controller believes.
     pub fn comp_visible(&self) -> Option<bool> {
-        self.state.borrow().comp.as_ref().and_then(|c| c.is_visible())
+        self.state
+            .borrow()
+            .comp
+            .as_ref()
+            .and_then(|c| c.is_visible())
     }
 
     /// A fresh page announced itself (`vizReady`): re-arm the paused edge so

@@ -764,5 +764,7 @@
   "启用节能模式": "Enable Eco Mode",
   "隐藏": "Dismiss",
   "完成": "Done",
-  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Keeps video wallpapers, weather/particle effects and the audio visualizer running — caps the frame rate at 30 FPS and trims effect cost without changing render resolution"
+  "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Keeps video wallpapers, weather/particle effects and the audio visualizer running — caps the frame rate at 30 FPS and trims effect cost without changing render resolution",
+  "偏移目标显示器": "Offset target display",
+  "选择应用偏移量的显示器，其余显示器保持不动": "Choose which display the offsets slide — the others stay put"
 }
