@@ -565,6 +565,33 @@ pub fn window_above(hwnd: HWND) -> HWND {
     unsafe { GetWindow(hwnd, GW_HWNDPREV as u32) }
 }
 
+/// Live `Chrome_WidgetWin_1` windows glued to `rect` (±4 px per edge).
+/// A WebView2 composition host's pixels live in a separate top-level
+/// companion window owned by the browser process; composition-band
+/// churn can hide it or park it at Chromium's off-screen point
+/// (~-10667) while the host stays alive and clickable — the widget
+/// looks gone though it isn't.
+///
+/// The caller compares this count to the number of visible hosts
+/// wanting a companion on that rect: stacked widgets can't tell their
+/// companions apart, but each still needs one.
+pub fn webview_companions_at(rect: RECT) -> usize {
+    top_level_windows()
+        .into_iter()
+        .filter(|&w| {
+            is_visible(w) && class_name(w) == "Chrome_WidgetWin_1" && {
+                let mut r = RECT::default();
+                // SAFETY: enumerator-supplied HWND, sized output rect.
+                (unsafe { GetWindowRect(w, &mut r).as_bool() })
+                    && (r.left - rect.left).abs() <= 4
+                    && (r.top - rect.top).abs() <= 4
+                    && (r.right - rect.right).abs() <= 4
+                    && (r.bottom - rect.bottom).abs() <= 4
+            }
+        })
+        .count()
+}
+
 /// Inserts `hwnd` directly below `reference` in the z-order.
 pub fn insert_after(hwnd: HWND, reference: HWND) -> Result<()> {
     // SAFETY: plain FFI call.

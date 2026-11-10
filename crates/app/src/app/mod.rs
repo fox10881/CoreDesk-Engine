@@ -306,6 +306,11 @@ pub struct App {
     /// fed `vizSpectrum` frames by its own `WM_TIMER` reading the engine's
     /// shared spectrum.
     visualizer_host: Option<crate::visualizer_host::VisualizerHost>,
+    /// Probe ticks where a widget's WebView companion window was lost while
+    /// the host showed; sustained loss means `revive_surface` can't re-pin
+    /// it and the widget gets a soft restart (see `check_widget_surfaces`).
+    clock_surface_misses: u8,
+    viz_surface_misses: u8,
     /// Signature of the last `feState` pushed to the glass editor — repeat
     /// pushes are skipped so its unsaved draft is never clobbered (empty
     /// forces a push: fresh page, or after close).
@@ -796,6 +801,7 @@ impl App {
                                     if let Ok(mut guard) = cell.try_borrow_mut()
                                         && let Some(app) = guard.as_mut()
                                     {
+                                        app.check_widget_surfaces();
                                         app.probe_clock_backdrop();
                                     }
                                 }
@@ -803,6 +809,7 @@ impl App {
                                     if let Ok(mut guard) = cell.try_borrow_mut()
                                         && let Some(app) = guard.as_mut()
                                     {
+                                        app.check_widget_surfaces();
                                         app.probe_viz_backdrop();
                                     }
                                 }
@@ -1389,6 +1396,8 @@ impl App {
             )),
             visualizer: None,
             visualizer_host: None,
+            clock_surface_misses: 0,
+            viz_surface_misses: 0,
             fe_glass_pushed: RefCell::new(String::new()),
             settings_focus_fence: None,
             feedback: Default::default(),

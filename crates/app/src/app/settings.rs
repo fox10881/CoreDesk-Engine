@@ -44,6 +44,30 @@ fn viz_style_json(style: &str) -> String {
     serde_json::json!({ "t": "vizStyle", "style": style }).to_string()
 }
 
+/// Every edge equal within ±4 px — the slack a companion's
+/// position-notify can lag by mid-drag.
+fn rect_near(a: RECT, b: RECT) -> bool {
+    (a.left - b.left).abs() <= 4
+        && (a.top - b.top).abs() <= 4
+        && (a.right - b.right).abs() <= 4
+        && (a.bottom - b.bottom).abs() <= 4
+}
+
+/// `true` when a visible widget host lacks a live WebView companion at
+/// its rect. Widgets stacked on one spot get companions at the same
+/// rect — they can't be told apart — so every visible host on a rect
+/// needs its own live companion counted there.
+fn widget_surface_lost(host: HWND, other: Option<HWND>) -> bool {
+    if !desktop::is_visible(host) || desktop::is_iconic(host) {
+        return false;
+    }
+    let r = window::window_rect(host);
+    let need = 1 + usize::from(other.is_some_and(|o| {
+        desktop::is_visible(o) && !desktop::is_iconic(o) && rect_near(window::window_rect(o), r)
+    }));
+    desktop::webview_companions_at(r) < need
+}
+
 /// Overlay sidecar-on-disk authored deltas under `s`'s in-memory dicts,
 /// run before resolving/applying so a hand-edit made while the app ran is
 /// honored without a restart.
@@ -915,6 +939,48 @@ impl App {
         self.apply_clock_style(&style);
     }
 
+    /// Runs on every 2.5 s probe tick beside `probe_*_backdrop`: a widget's
+    /// WebView companion window can be hidden or parked off-screen by
+    /// desktop composition-band churn while its host stays alive and
+    /// clickable — the widget looks gone yet right-click refresh still
+    /// works. Re-pin it in place; only when several revives in a row fail
+    /// does the widget get the same soft restart the menu would run (the
+    /// live rect is preserved either way).
+    pub(super) fn check_widget_surfaces(&mut self) {
+        let mut restart_viz = false;
+        let mut restart_clock = false;
+        if let Some(h) = &self.visualizer_host {
+            let host = h.hwnd();
+            let other = self.clock.as_ref().map(|c| c.hwnd());
+            if widget_surface_lost(host, other) {
+                h.revive_surface();
+                self.viz_surface_misses += 1;
+                restart_viz = self.viz_surface_misses >= 4;
+            } else {
+                self.viz_surface_misses = 0;
+            }
+        }
+        if let Some(h) = &self.clock {
+            let host = h.hwnd();
+            let other = self.visualizer_host.as_ref().map(|v| v.hwnd());
+            if widget_surface_lost(host, other) {
+                h.revive_surface();
+                self.clock_surface_misses += 1;
+                restart_clock = self.clock_surface_misses >= 4;
+            } else {
+                self.clock_surface_misses = 0;
+            }
+        }
+        if restart_viz {
+            tracing::warn!("visualizer companion window unrecoverable — restarting widget");
+            self.soft_restart_visualizer();
+        }
+        if restart_clock {
+            tracing::warn!("clock companion window unrecoverable — restarting widget");
+            self.soft_restart_clock();
+        }
+    }
+
     /// Native desktop particle/weather overlay. `"none"` tears the overlay
     /// down to zero resources; a real effect opens (or rebuilds) it and joins
     /// the anchor's desktop-surface band — directly above the icon host (and
@@ -1471,12 +1537,17 @@ impl App {
                 }
                 self.probe_clock_backdrop();
             }
-            // Drag/resize ended — persist the widget's new bounds.
+            // Drag/resize ended — persist the widget's new bounds, then
+            // re-pin the WebView companion: the modal move can strand it
+            // before the next probe tick would revive it.
             Some("clockMoved") => {
                 let get = |k: &str| v.get(k).and_then(|n| n.as_i64()).unwrap_or(0) as i32;
                 self.state.config.settings.clock_bounds =
                     Some([get("x"), get("y"), get("w"), get("h")]);
                 self.schedule_save();
+                if let Some(h) = &self.clock {
+                    h.revive_surface();
+                }
                 self.probe_clock_backdrop();
             }
             // The visualizer page is live: arm its design, then reveal.
@@ -1505,6 +1576,9 @@ impl App {
                         .or_default()
                         .bounds = Some([get("x"), get("y"), get("w"), get("h")]);
                     self.schedule_save();
+                    if let Some(h) = &self.visualizer_host {
+                        h.revive_surface();
+                    }
                     self.probe_viz_backdrop();
                 }
             }

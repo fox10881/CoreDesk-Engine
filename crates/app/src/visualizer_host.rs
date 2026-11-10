@@ -19,7 +19,7 @@ use crate::widget_doc;
 use coredesk_platform::window::{
     self, ClassOptions, MessageHandler, Window, WindowBuilder, WindowClass, style,
 };
-use coredesk_platform::{HWND, RECT, frameless, monitors, msg, tray};
+use coredesk_platform::{HWND, RECT, desktop, frameless, monitors, msg, tray};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
@@ -317,6 +317,18 @@ impl VisualizerHost {
                 self.window.client_size(),
             );
         }
+    }
+
+    /// Re-pins a lost companion without a respawn: uncloaks the host,
+    /// then re-attaches the DComp visual and re-notifies the position —
+    /// the notify resurrects a parked companion where a plain show does
+    /// not.
+    pub fn revive_surface(&self) {
+        let hwnd = self.window.hwnd();
+        if desktop::is_cloaked(hwnd) {
+            let _ = desktop::set_cloak(hwnd, false);
+        }
+        self.rearm_transparency();
     }
 
     /// Closes the browser and destroys the window.
