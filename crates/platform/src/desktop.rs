@@ -592,6 +592,57 @@ pub fn webview_companions_at(rect: RECT) -> usize {
         .count()
 }
 
+/// Marks `hwnd` and every descendant `WS_EX_TRANSPARENT` — hit-testing
+/// skips them, so clicks pass through to whatever lies beneath instead of
+/// landing on them. Idempotent; returns how many windows needed the flag.
+pub fn make_input_transparent(hwnd: HWND) -> usize {
+    let mut fixed = 0;
+    // SAFETY: additive style write on a live HWND.
+    if (unsafe { GetWindowLongW(hwnd, GWL_EXSTYLE) } & WS_EX_TRANSPARENT) == 0 {
+        unsafe {
+            let _ = SetWindowLongW(
+                hwnd,
+                GWL_EXSTYLE,
+                GetWindowLongW(hwnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT,
+            );
+        }
+        fixed += 1;
+    }
+    for (child, _, _, _) in child_windows(hwnd) {
+        fixed += make_input_transparent(child);
+    }
+    fixed
+}
+
+/// Applies [`make_input_transparent`] to every `Chrome_WidgetWin_1`
+/// companion glued to `rect` (±4 px). The composition model wants the
+/// widget's own host to be the only click target — it forwards mouse
+/// input to the WebView via `SendMouseInput` — but the companion spawns
+/// hittable, and when the runtime stops reposting unhandled input to the
+/// host every click dies in the browser process. Marking the companion
+/// transparent restores host-directed input durably and silently (no
+/// hide/show, no z-order churn). Returns windows fixed — log churn.
+pub fn heal_webview_companion_input(rect: RECT) -> usize {
+    let mut fixed = 0;
+    for w in top_level_windows() {
+        if !(is_visible(w) && class_name(w) == "Chrome_WidgetWin_1") {
+            continue;
+        }
+        let mut r = RECT::default();
+        // SAFETY: enumerator-supplied HWND, sized output rect.
+        if !(unsafe { GetWindowRect(w, &mut r).as_bool() })
+            || (r.left - rect.left).abs() > 4
+            || (r.top - rect.top).abs() > 4
+            || (r.right - rect.right).abs() > 4
+            || (r.bottom - rect.bottom).abs() > 4
+        {
+            continue;
+        }
+        fixed += make_input_transparent(w);
+    }
+    fixed
+}
+
 /// `true` when a Chromium companion window glued to `host`'s rect is
 /// hittable at a sampled interior point. While healthy the WebView input
 /// twin stays transparent to hit-testing and `WindowFromPoint` falls
@@ -619,17 +670,15 @@ pub fn webview_input_capturing(host: HWND, rect: RECT) -> bool {
         let twin = cls == "Chrome_WidgetWin_1"
             || cls == "Chrome_RenderWidgetHostHWND"
             || cls == "Intermediate D3D Window";
-        if !twin {
-            continue;
-        }
         let mut r = RECT::default();
         // SAFETY: HWND from WindowFromPoint, sized output rect.
-        if (unsafe { GetWindowRect(hit, &mut r).as_bool() })
+        let glued = (unsafe { GetWindowRect(hit, &mut r).as_bool() })
             && (r.left - rect.left).abs() <= 4
             && (r.top - rect.top).abs() <= 4
             && (r.right - rect.right).abs() <= 4
-            && (r.bottom - rect.bottom).abs() <= 4
-        {
+            && (r.bottom - rect.bottom).abs() <= 4;
+        tracing::debug!(x, y, hwnd = ?hit.0, %cls, ?r, glued, "input-capture sample");
+        if twin && glued {
             return true;
         }
     }

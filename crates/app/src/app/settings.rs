@@ -53,12 +53,13 @@ fn rect_near(a: RECT, b: RECT) -> bool {
         && (a.bottom - b.bottom).abs() <= 4
 }
 
-/// `true` when a visible widget host's surface is effectively dead:
-/// either no live WebView companion is glued to its rect, or the input
-/// twin has gone hittable and is swallowing the clicks the host's own
-/// drag/context-menu codes should see. Widgets stacked on one spot get
-/// companions at the same rect — they can't be told apart — so every
-/// visible host on a rect needs its own live companion counted there.
+/// `true` when a visible widget host lacks a live WebView companion glued
+/// to its rect — the widget then looks gone while staying clickable.
+/// Widgets stacked on one spot get companions at the same rect — they
+/// can't be told apart — so every visible host on a rect needs its own
+/// live companion counted there. A hittable input twin is *not* a lost
+/// surface: `heal_webview_companion_input` re-marks it transparent
+/// silently each tick, no revive needed.
 fn widget_surface_lost(host: HWND, other: Option<HWND>) -> bool {
     if !desktop::is_visible(host) || desktop::is_iconic(host) {
         return false;
@@ -67,7 +68,16 @@ fn widget_surface_lost(host: HWND, other: Option<HWND>) -> bool {
     let need = 1 + usize::from(other.is_some_and(|o| {
         desktop::is_visible(o) && !desktop::is_iconic(o) && rect_near(window::window_rect(o), r)
     }));
-    desktop::webview_companions_at(r) < need || desktop::webview_input_capturing(host, r)
+    let found = desktop::webview_companions_at(r);
+    let missing = found < need;
+    let capturing = !missing && desktop::webview_input_capturing(host, r);
+    if missing || capturing {
+        tracing::info!(
+            hwnd = ?host.0, ?r, need, found, missing, capturing,
+            "widget surface probe"
+        );
+    }
+    missing
 }
 
 /// Overlay sidecar-on-disk authored deltas under `s`'s in-memory dicts,
@@ -914,6 +924,7 @@ impl App {
         merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
         self.unregister_widget(h.hwnd());
         h.close();
+        tracing::info!("visualizer widget respawned");
         let style = self.state.config.settings.visualizer_style.clone();
         self.apply_visualizer_style(&style);
     }
@@ -937,6 +948,7 @@ impl App {
         merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
         self.unregister_widget(h.hwnd());
         h.close();
+        tracing::info!("clock widget respawned");
         let style = self.state.config.settings.clock_style.clone();
         self.apply_clock_style(&style);
     }
@@ -945,9 +957,11 @@ impl App {
     /// WebView companion window can be hidden or parked off-screen by
     /// desktop composition-band churn while its host stays alive and
     /// clickable — the widget looks gone yet right-click refresh still
-    /// works. Re-pin it in place; only when several revives in a row fail
-    /// does the widget get the same soft restart the menu would run (the
-    /// live rect is preserved either way).
+    /// works — and its input twin can go hittable and swallow every click.
+    /// Re-pin in place on a slow cadence; only when the surface stays lost
+    /// through a long settle grace does the widget get the same soft
+    /// restart the menu would run, capped so a never-settling surface
+    /// can't churn forever (the live rect is preserved either way).
     pub(super) fn check_widget_surfaces(&mut self) {
         // Occluded → exposed edge (returned to the desktop from another
         // window): the runtime can leave a companion's input link and the
@@ -963,36 +977,97 @@ impl App {
             }
         }
         self.widgets_occluded = occluded;
+        // A companion spawns hittable — until its transparent flag is
+        // (re-)armed, clicks die in the browser process and the widget's
+        // own drag/menu handling never runs. Re-marking is silent and
+        // idempotent, so do it every tick on both widgets' rects: it
+        // self-heals the dead-input state within one probe interval
+        // instead of the user needing Win+D, without a single revive.
+        if let Some(h) = &self.visualizer_host {
+            let n = desktop::heal_webview_companion_input(window::window_rect(h.hwnd()));
+            if n > 0 {
+                tracing::info!(n, "re-armed visualizer companion input transparency");
+            }
+        }
+        if let Some(h) = &self.clock {
+            let n = desktop::heal_webview_companion_input(window::window_rect(h.hwnd()));
+            if n > 0 {
+                tracing::info!(n, "re-armed clock companion input transparency");
+            }
+        }
+        // A fresh widget's companion can take a moment to appear and may
+        // park again on churn — revive on the first miss, then at a slow
+        // cadence (an every-tick revive hides+shows the surface and reads
+        // as flicker), restart only after a long grace, and cap
+        // consecutive auto-restarts — the right-click refresh remains the
+        // manual escape.
+        const REVIVE_EVERY: u8 = 4; // ≈10 s between revives while lost
+        const RESTART_AT: u8 = 12; // ≈30 s settle grace before a restart
+        const RESTART_MAX: u8 = 3; // then stop; manual refresh still works
         let mut restart_viz = false;
         let mut restart_clock = false;
         if let Some(h) = &self.visualizer_host {
             let host = h.hwnd();
             let other = self.clock.as_ref().map(|c| c.hwnd());
             if widget_surface_lost(host, other) {
-                h.revive_surface();
-                self.viz_surface_misses += 1;
-                restart_viz = self.viz_surface_misses >= 4;
+                let misses = self.viz_surface_misses.saturating_add(1);
+                self.viz_surface_misses = misses;
+                if misses == 1 || misses % REVIVE_EVERY == 0 {
+                    h.revive_surface();
+                }
+                restart_viz = misses >= RESTART_AT && self.viz_restarts < RESTART_MAX;
             } else {
+                if self.viz_surface_misses > 0 || self.viz_restarts > 0 {
+                    tracing::info!(
+                        misses = self.viz_surface_misses,
+                        restarts = self.viz_restarts,
+                        "visualizer surface healthy again"
+                    );
+                }
                 self.viz_surface_misses = 0;
+                self.viz_restarts = 0;
             }
         }
         if let Some(h) = &self.clock {
             let host = h.hwnd();
             let other = self.visualizer_host.as_ref().map(|v| v.hwnd());
             if widget_surface_lost(host, other) {
-                h.revive_surface();
-                self.clock_surface_misses += 1;
-                restart_clock = self.clock_surface_misses >= 4;
+                let misses = self.clock_surface_misses.saturating_add(1);
+                self.clock_surface_misses = misses;
+                if misses == 1 || misses % REVIVE_EVERY == 0 {
+                    h.revive_surface();
+                }
+                restart_clock = misses >= RESTART_AT && self.clock_restarts < RESTART_MAX;
             } else {
+                if self.clock_surface_misses > 0 || self.clock_restarts > 0 {
+                    tracing::info!(
+                        misses = self.clock_surface_misses,
+                        restarts = self.clock_restarts,
+                        "clock surface healthy again"
+                    );
+                }
                 self.clock_surface_misses = 0;
+                self.clock_restarts = 0;
             }
         }
         if restart_viz {
-            tracing::warn!("visualizer companion window unrecoverable — restarting widget");
+            self.viz_surface_misses = 0;
+            self.viz_restarts += 1;
+            tracing::warn!(
+                attempt = self.viz_restarts,
+                last = self.viz_restarts >= RESTART_MAX,
+                "visualizer companion window unrecoverable — restarting widget"
+            );
             self.soft_restart_visualizer();
         }
         if restart_clock {
-            tracing::warn!("clock companion window unrecoverable — restarting widget");
+            self.clock_surface_misses = 0;
+            self.clock_restarts += 1;
+            tracing::warn!(
+                attempt = self.clock_restarts,
+                last = self.clock_restarts >= RESTART_MAX,
+                "clock companion window unrecoverable — restarting widget"
+            );
             self.soft_restart_clock();
         }
     }

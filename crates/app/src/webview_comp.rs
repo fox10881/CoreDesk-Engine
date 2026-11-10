@@ -1203,15 +1203,14 @@ impl CompWebview {
     /// transparent background, the visual → target attach, a bounds/dpi
     /// re-sync, and a `Commit` so a detached tree re-binds. Idempotent.
     ///
-    /// The `IsVisible` pulse additionally re-marks the page visible: host
+    /// `put_IsVisible(true)` additionally re-marks the page visible: host
     /// visibility churn can leave the runtime thinking the page is hidden,
     /// which freezes `requestAnimationFrame` (canvas widgets render nothing
-    /// after a resize clears them) and drops unhandled-input forwarding to
-    /// the host. Cycling the flag re-fires page visibility and rebuilds
-    /// the input link without a reload.
+    /// after a resize clears them). It stays one-directional — cycling the
+    /// flag off hides the companion and visibly flickers the widget, and
+    /// the re-show re-arms the input twin's capture.
     pub fn rearm_transparency(&self, dpi: u32, client: (i32, i32)) {
         unsafe {
-            let _ = self.ctl3.put_IsVisible(false);
             let _ = self.ctl3.put_IsVisible(true);
             let _ = self.ctl3.put_DefaultBackgroundColor(TRANSPARENT);
             let _ = self.target.SetRoot(&self._visual);

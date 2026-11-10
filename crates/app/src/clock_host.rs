@@ -302,6 +302,7 @@ impl ClockHost {
     /// where a plain show does not.
     pub fn revive_surface(&self) {
         let hwnd = self.window.hwnd();
+        tracing::info!(hwnd = ?hwnd.0, "clock revive_surface");
         if desktop::is_cloaked(hwnd) {
             let _ = desktop::set_cloak(hwnd, false);
         }
@@ -309,6 +310,12 @@ impl ClockHost {
         let _ = desktop::set_topmost(hwnd, false);
         let _ = desktop::raise_in_band(hwnd);
         self.rearm_transparency();
+        // A churned companion re-spawns hittable and swallows clicks —
+        // re-arm its input transparency so the host stays the target.
+        let n = desktop::heal_webview_companion_input(window::window_rect(hwnd));
+        if n > 0 {
+            tracing::debug!(n, "clock companion input transparency re-armed");
+        }
     }
 
     /// Language switched while the widget is up: push a fresh

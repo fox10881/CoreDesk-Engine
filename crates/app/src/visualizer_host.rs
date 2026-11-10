@@ -328,6 +328,7 @@ impl VisualizerHost {
     /// where a plain show does not.
     pub fn revive_surface(&self) {
         let hwnd = self.window.hwnd();
+        tracing::info!(hwnd = ?hwnd.0, "viz revive_surface");
         if desktop::is_cloaked(hwnd) {
             let _ = desktop::set_cloak(hwnd, false);
         }
@@ -335,6 +336,12 @@ impl VisualizerHost {
         let _ = desktop::set_topmost(hwnd, false);
         let _ = desktop::raise_in_band(hwnd);
         self.rearm_transparency();
+        // A churned companion re-spawns hittable and swallows clicks —
+        // re-arm its input transparency so the host stays the target.
+        let n = desktop::heal_webview_companion_input(window::window_rect(hwnd));
+        if n > 0 {
+            tracing::debug!(n, "viz companion input transparency re-armed");
+        }
     }
 
     /// Closes the browser and destroys the window.

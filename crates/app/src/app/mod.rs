@@ -311,6 +311,10 @@ pub struct App {
     /// it and the widget gets a soft restart (see `check_widget_surfaces`).
     clock_surface_misses: u8,
     viz_surface_misses: u8,
+    /// Consecutive auto-restarts already spent on each widget — capped so a
+    /// persistently-lost surface can't churn the widget forever.
+    clock_restarts: u8,
+    viz_restarts: u8,
     /// Last probe tick's desktop-occlusion state — the occlusion→exposed
     /// edge revives both widget surfaces (the runtime parks the page's
     /// visibility and the companion's input link while covered).
@@ -1402,6 +1406,8 @@ impl App {
             visualizer_host: None,
             clock_surface_misses: 0,
             viz_surface_misses: 0,
+            clock_restarts: 0,
+            viz_restarts: 0,
             widgets_occluded: false,
             fe_glass_pushed: RefCell::new(String::new()),
             settings_focus_fence: None,
