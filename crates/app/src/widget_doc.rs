@@ -30,7 +30,19 @@ const WIDGET_CSP_META: &str = "<meta http-equiv=\"Content-Security-Policy\" cont
 /// callback stalled >250 ms and runs it synchronously, so the paint loop
 /// re-arms itself and the canvas repaints even while Chromium still believes
 /// the surface should stay idle.
-const VIZ_RAF_SHIM: &str = "<script>(()=>{const realRaf=window.requestAnimationFrame.bind(window),realCancel=window.cancelAnimationFrame.bind(window),pending=new Map();window.requestAnimationFrame=cb=>{let id=0;const run=now=>{pending.delete(id);cb(now);};id=realRaf(run);pending.set(id,{run:run,at:performance.now()});return id;};window.cancelAnimationFrame=id=>{pending.delete(id);realCancel(id);};setInterval(()=>{if(!pending.size)return;const now=performance.now();for(const[id,p]of pending){if(now-p.at>250){pending.delete(id);realCancel(id);try{p.run(now);}catch(_){}}}},125);})();</script>";
+const VIZ_RAF_SHIM: &str = "<script>(()=>{const realRaf=window.requestAnimationFrame.bind(window),realCancel=window.cancelAnimationFrame.bind(window),pending=new Map();let wv=null,stalled=false;const attach=()=>{try{const w=window.chrome&&window.chrome.webview;if(w&&w!==wv)wv=w;}catch(_){wv=null;}setTimeout(attach,wv?1000:50);};attach();const report=ev=>{try{if(wv)wv.postMessage({type:'vizDiag',ev:ev,vs:document.visibilityState,pending:pending.size});}catch(_){}};window.requestAnimationFrame=cb=>{let id=0;const run=now=>{pending.delete(id);cb(now);};id=realRaf(run);pending.set(id,{run:run,at:performance.now()});return id;};window.cancelAnimationFrame=id=>{pending.delete(id);realCancel(id);};setInterval(()=>{if(!pending.size){if(stalled){stalled=false;report('raf-ok');}return;}const now=performance.now();let drove=false;for(const[id,p]of pending){if(now-p.at>250){pending.delete(id);realCancel(id);try{p.run(now);drove=true;}catch(_){}}}if(drove&&!stalled){stalled=true;report('raf-stall');}},125);})();</script>";
+
+/// Resize-safety shim injected into Visualizer widget documents (registered
+/// before the page's own `resize` listener because the shim lands in `<head>`,
+/// so it always sees the last painted frame): a paused visualizer — audio
+/// slumber or an occluded desktop — intentionally stops its rAF loop, and the
+/// page's `resize` handler clears the canvas backing store with no repaint
+/// until the feed resumes: the widget stays blank through the whole pause.
+/// This listener snapshots the pre-clear frame and, once the page's handler
+/// ran (deferred one task), probes a tiny downsample — if the canvas is still
+/// transparent the saved frame is painted back stretched over the new size.
+/// A live page repaints itself so the probe finds pixels and does nothing.
+const VIZ_RESIZE_SHIM: &str = "<script>(()=>{let off=null;addEventListener('resize',()=>{const c=document.querySelector('canvas');if(!c||!c.width||!c.height)return;try{if(!off)off=document.createElement('canvas');off.width=c.width;off.height=c.height;off.getContext('2d').drawImage(c,0,0);}catch(_){return;}setTimeout(()=>{try{const p=document.createElement('canvas');p.width=8;p.height=8;const px=p.getContext('2d');px.drawImage(c,0,0,8,8);const d=px.getImageData(0,0,8,8).data;let painted=false;for(let i=3;i<d.length;i+=4){if(d[i]>0){painted=true;break;}}if(painted)return;const x=c.getContext('2d');x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,c.width,c.height);x.drawImage(off,0,0,c.width,c.height);}catch(_){}},0);});})();</script>";
 
 /// Eco-mode 30 FPS `requestAnimationFrame` throttle injected into Visualizer
 /// widget documents: when `vizTheme` carries `"eco": true`, `requestAnimationFrame`
@@ -40,7 +52,7 @@ const VIZ_ECO_SHIM: &str = "<script>(()=>{const origRaf=window.requestAnimationF
 
 fn inject_csp(doc: String, is_visualizer: bool) -> String {
     let extra = if is_visualizer {
-        format!("{WIDGET_CSP_META}{VIZ_RAF_SHIM}{VIZ_ECO_SHIM}")
+        format!("{WIDGET_CSP_META}{VIZ_RAF_SHIM}{VIZ_RESIZE_SHIM}{VIZ_ECO_SHIM}")
     } else {
         WIDGET_CSP_META.to_string()
     };

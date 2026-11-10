@@ -1662,6 +1662,17 @@ impl App {
                 }
                 self.probe_viz_backdrop();
             }
+            // The injected rAF watchdog reports when it starts driving a
+            // stalled frame loop (`raf-stall`) and when scheduling recovered
+            // (`raf-ok`) — correlates blank-canvas reports with the runtime's
+            // own IsVisible flag and the page's visibilityState.
+            Some("vizDiag") => {
+                let vis = self
+                    .visualizer_host
+                    .as_ref()
+                    .and_then(|h| h.comp_visible());
+                tracing::info!(msg = %v, ctl_visible = ?vis, "visualizer page diagnostic");
+            }
             // Drag/resize ended — the bounds are per design: the rect lands
             // on the active style's `widget_params` entry.
             Some("vizMoved") => {
@@ -2269,6 +2280,24 @@ impl App {
         if new.visualizer_style != old.visualizer_style {
             self.state.config.settings.visualizer_style = new.visualizer_style.clone();
             self.apply_visualizer_style(&new.visualizer_style);
+        } else {
+            // Same-style theme apply: the themed `widget_params` bounds move
+            // the live visualizer — mirrors the `clock_bounds` handling below
+            // (a theme with no entry restores the default centred strip).
+            let style = &new.visualizer_style;
+            if style != "none" {
+                let old_b = old.widget_params.get(style).and_then(|p| p.bounds);
+                let new_b = new.widget_params.get(style).and_then(|p| p.bounds);
+                if new_b != old_b {
+                    if let Some(h) = &self.visualizer_host {
+                        let (x, y, w, hh) = new_b
+                            .map(|[x, y, w, h]| (x, y, w, h))
+                            .unwrap_or_else(crate::visualizer_host::default_bounds);
+                        h.set_bounds([x, y, w, hh]);
+                        self.probe_viz_backdrop();
+                    }
+                }
+            }
         }
         if new.clock_bounds != old.clock_bounds {
             // A live widget is moved in place; a theme without bounds returns

@@ -196,6 +196,13 @@ windows_core::imp::define_interface!(
 );
 windows_core::imp::interface_hierarchy!(IWv2Controller3, windows_core::IUnknown);
 impl IWv2Controller3 {
+    pub unsafe fn get_IsVisible(&self) -> Result<bool> {
+        let mut v = 0i32;
+        unsafe {
+            (Interface::vtable(self).get_IsVisible)(Interface::as_raw(self), &mut v).ok()?;
+        }
+        Ok(v != 0)
+    }
     pub unsafe fn put_IsVisible(&self, visible: bool) -> Result<()> {
         unsafe {
             (Interface::vtable(self).put_IsVisible)(Interface::as_raw(self), visible as i32).ok()
@@ -269,7 +276,7 @@ pub struct RECT {
 pub struct IWv2Controller3_Vtbl {
     pub base__: IUnknown_Vtbl,
     // ICoreWebView2Controller
-    get_IsVisible: usize,
+    get_IsVisible: unsafe extern "system" fn(CF, *mut i32) -> HRESULT,
     put_IsVisible: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_Bounds: usize,
     put_Bounds: unsafe extern "system" fn(CF, RECT) -> HRESULT,
@@ -1222,6 +1229,22 @@ impl CompWebview {
             self.notify_parent_window_position_changed();
             let _ = self.device.Commit();
         }
+    }
+
+    /// One-directional visibility assert — the runtime can flip its own
+    /// `IsVisible` tracking off mid-churn (modal resize, band rebuild),
+    /// which freezes the page's `requestAnimationFrame` and leaves a just-
+    /// resized canvas blank. Re-asserting `true` is idempotent and never
+    /// flickers (the off-half of a toggle is what hides the companion).
+    pub fn assert_visible(&self) {
+        unsafe {
+            let _ = self.ctl3.put_IsVisible(true);
+        }
+    }
+
+    /// The runtime's own visibility flag — diagnostics only.
+    pub fn is_visible(&self) -> Option<bool> {
+        unsafe { self.ctl3.get_IsVisible().ok() }
     }
 
     /// `WM_SETFOCUS` — hands the keyboard to the WebView2 input site; without

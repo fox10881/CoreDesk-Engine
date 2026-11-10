@@ -111,6 +111,11 @@ impl VisualizerHost {
                             if let Some(c) = state.borrow().comp.as_ref() {
                                 c.set_bounds(w, h);
                                 c.notify_parent_window_position_changed();
+                                // Modal-resize churn can flip the runtime's
+                                // own IsVisible tracking off — a hidden page
+                                // loses requestAnimationFrame and the canvas
+                                // the page just cleared stays blank. Idempotent.
+                                c.assert_visible();
                             }
                             Some(0)
                         }
@@ -245,7 +250,7 @@ impl VisualizerHost {
                 (cw, ch),
                 &document,
                 move |json| {
-                    if widget_doc::widget_message_allowed(&json, &["vizReady"]) {
+                    if widget_doc::widget_message_allowed(&json, &["vizReady", "vizDiag"]) {
                         queue.push(Command::SettingsMessage(json));
                     }
                 },
@@ -290,6 +295,12 @@ impl VisualizerHost {
         if let Some(c) = self.state.borrow().comp.as_ref() {
             c.post_json(json);
         }
+    }
+
+    /// The runtime's own `IsVisible` flag — `vizDiag` telemetry correlates
+    /// page-reported stalls against what the controller believes.
+    pub fn comp_visible(&self) -> Option<bool> {
+        self.state.borrow().comp.as_ref().and_then(|c| c.is_visible())
     }
 
     /// A fresh page announced itself (`vizReady`): re-arm the paused edge so
