@@ -791,9 +791,17 @@ impl WidgetElementParams {
 pub struct WidgetParams {
     /// Window rect `[x, y, w, h]` physical pixels for this design —
     /// remembered per design, so each style keeps its own spot on the
-    /// desktop. `None` = follow the live/default placement.
+    /// desktop. `None` = follow the live/default placement. This is the
+    /// CLOCK role's rect: `resolve_widget_params` mirrors it onto
+    /// `clock_bounds` for the active design.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounds: Option<[i32; 4]>,
+    /// Same rect for the VISUALIZER role. One style id can be the active
+    /// clock design *and* the active visualizer design at once — both read
+    /// the same `widget_params` entry — so each role keeps its own rect or
+    /// the two widgets collapse onto whichever bounds were written last.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viz_bounds: Option<[i32; 4]>,
     /// Adaptive light/dark contrast for this design; `None` = follow the
     /// live `clockAdaptiveColor` flag.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -813,6 +821,13 @@ impl WidgetParams {
     pub fn from_runtime(s: &Settings) -> Self {
         Self {
             bounds: s.clock_bounds,
+            // Clock-role mirror — preserve the visualizer role's rect when
+            // one style id is active in both roles, or a clock-style switch
+            // would stomp the viz widget's remembered spot.
+            viz_bounds: s
+                .widget_params
+                .get(&s.clock_style)
+                .and_then(|p| p.viz_bounds),
             adaptive_color: Some(s.clock_adaptive_color),
             elements: BTreeMap::new(),
         }
@@ -822,11 +837,10 @@ impl WidgetParams {
     /// x/y go negative legitimately on multi-monitor setups. Element keys
     /// outside `WIDGET_ELEMENT_IDS` drop out; kept entries clamp per field.
     pub fn sanitize(&mut self) {
-        if self
-            .bounds
-            .is_some_and(|[_, _, w, h]| !(16..=8192).contains(&w) || !(16..=8192).contains(&h))
-        {
-            self.bounds = None;
+        for b in [&mut self.bounds, &mut self.viz_bounds] {
+            if b.is_some_and(|[_, _, w, h]| !(16..=8192).contains(&w) || !(16..=8192).contains(&h)) {
+                *b = None;
+            }
         }
         self.elements.retain(|id, p| {
             let known = WIDGET_ELEMENT_IDS.contains(&id.as_str());
@@ -839,14 +853,17 @@ impl WidgetParams {
 
     /// Merge a sidecar-disk entry under apply-time semantics: authored
     /// knobs (`elements`) are file-owned — a populated disk field wins.
-    /// `bounds`/`adaptive_color` are live-mirrored fields: the in-memory
-    /// value wins when set, so a stale file can't snap the widget back
-    /// mid-drag (the file only fills them when memory is unset — e.g. an
-    /// unvisited design whose authored placement then resolves on
+    /// `bounds`/`viz_bounds`/`adaptive_color` are live-mirrored fields: the
+    /// in-memory value wins when set, so a stale file can't snap the widget
+    /// back mid-drag (the file only fills them when memory is unset — e.g.
+    /// an unvisited design whose authored placement then resolves on
     /// selection).
     pub fn merge_disk(&mut self, disk: &WidgetParams) {
         if self.bounds.is_none() {
             self.bounds = disk.bounds;
+        }
+        if self.viz_bounds.is_none() {
+            self.viz_bounds = disk.viz_bounds;
         }
         if self.adaptive_color.is_none() {
             self.adaptive_color = disk.adaptive_color;

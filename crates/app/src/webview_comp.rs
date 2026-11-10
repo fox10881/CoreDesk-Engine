@@ -1165,6 +1165,16 @@ impl CompWebview {
             comp.put_RootVisualTarget(windows::core::Interface::as_raw(&visual) as CF)?;
             ctl3.put_IsVisible(true)?;
             device.Commit().map_err(w62)?;
+            // Re-assert the raw-pixel bounds *after* the visual attach: the
+            // runtime can drop the pre-attach rect and keep rendering the
+            // page at a stale smaller size in the window's corner.
+            let (w, h) = client;
+            ctl3.put_Bounds(RECT {
+                left: 0,
+                top: 0,
+                right: w,
+                bottom: h,
+            })?;
         }
 
         // 6. Load the page.

@@ -241,6 +241,13 @@ impl ClockHost {
             )?
         };
         *state.borrow_mut().design_id.borrow_mut() = style_id.to_string();
+        // Same pump-window gap as the visualizer: a WM_SIZE dispatched while
+        // the composition controller was being created saw `comp == None`
+        // and vanished — re-push the settled client size before publishing.
+        let (cw, ch) = window.client_size();
+        comp.set_bounds(cw, ch);
+        comp.set_rasterization_scale(window::dpi_of(hwnd));
+        comp.notify_parent_window_position_changed();
         state.borrow_mut().comp = Some(comp);
         Ok(Self { window, state })
     }

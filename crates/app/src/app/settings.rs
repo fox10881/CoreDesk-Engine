@@ -44,6 +44,19 @@ fn viz_style_json(style: &str) -> String {
     serde_json::json!({ "t": "vizStyle", "style": style }).to_string()
 }
 
+/// The visualizer's remembered rect for `style`. `vizBounds` wins; the
+/// legacy `bounds` fallback only applies when the id is *not* shared with
+/// the clock role — in a shared entry `bounds` is the clock's rect, and
+/// inheriting it lands the widget exactly on top of the clock.
+fn viz_saved_bounds(s: &coredesk_core::Settings, style: &str) -> Option<[i32; 4]> {
+    let p = s.widget_params.get(style)?;
+    p.viz_bounds.or(if style == s.clock_style {
+        None
+    } else {
+        p.bounds
+    })
+}
+
 /// Every edge equal within ±4 px — the slack a companion's
 /// position-notify can lag by mid-drag.
 fn rect_near(a: RECT, b: RECT) -> bool {
@@ -158,12 +171,19 @@ fn merge_sidecar_deltas(s: &mut coredesk_core::Settings, store: &coredesk_core::
                 })
                 .unwrap_or_default();
             // `bounds`/`adaptiveColor` mirror the visible widget — the
-            // file can't snap the active design back mid-edit.
-            if *id == s.clock_style
+            // file can't snap the active design back mid-edit. The
+            // visualizer role gets the same shield when one style id is
+            // active in both roles.
+            if (*id == s.clock_style || *id == s.visualizer_style)
                 && let Some(old) = s.widget_params.get(id)
             {
-                params.bounds = old.bounds.or(params.bounds);
-                params.adaptive_color = old.adaptive_color.or(params.adaptive_color);
+                if *id == s.clock_style {
+                    params.bounds = old.bounds.or(params.bounds);
+                    params.adaptive_color = old.adaptive_color.or(params.adaptive_color);
+                }
+                if *id == s.visualizer_style {
+                    params.viz_bounds = old.viz_bounds.or(params.viz_bounds);
+                }
             }
             s.widget_params.insert(id.clone(), params);
         }
@@ -846,14 +866,7 @@ impl App {
                 );
             }
             h.post_json(&viz_style_json(s));
-            if let Some(b) = self
-                .state
-                .config
-                .settings
-                .widget_params
-                .get(s)
-                .and_then(|p| p.bounds)
-            {
+            if let Some(b) = viz_saved_bounds(&self.state.config.settings, s) {
                 h.set_bounds(b);
             }
             h.rearm_transparency();
@@ -872,13 +885,7 @@ impl App {
         let Some(web_env) = self.web_env.as_ref() else {
             return;
         };
-        let bounds = self
-            .state
-            .config
-            .settings
-            .widget_params
-            .get(s)
-            .and_then(|p| p.bounds);
+        let bounds = viz_saved_bounds(&self.state.config.settings, s);
         match crate::visualizer_host::VisualizerHost::open(
             &self.visualizer_class,
             web_env,
@@ -918,10 +925,14 @@ impl App {
                 .widget_params
                 .entry(style)
                 .or_default()
-                .bounds = Some(live);
+                .viz_bounds = Some(live);
         }
         // Right-click refresh is the modder's "pick up my edits" gesture.
         merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
+        // The live-rect write and any merged sidecar deltas mutate
+        // `config.settings` directly — without the dirty flag the deferred
+        // save sees nothing to flush and the bounds never reach disk.
+        self.settings_mutated();
         self.unregister_widget(h.hwnd());
         h.close();
         tracing::info!("visualizer widget respawned");
@@ -946,6 +957,7 @@ impl App {
         // Right-click refresh is the modder's "pick up my edits" gesture —
         // pull sidecar deltas authored while the app ran before rebuilding.
         merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
+        self.settings_mutated();
         self.unregister_widget(h.hwnd());
         h.close();
         tracing::info!("clock widget respawned");
@@ -1635,7 +1647,7 @@ impl App {
                 let get = |k: &str| v.get(k).and_then(|n| n.as_i64()).unwrap_or(0) as i32;
                 self.state.config.settings.clock_bounds =
                     Some([get("x"), get("y"), get("w"), get("h")]);
-                self.schedule_save();
+                self.settings_mutated();
                 if let Some(h) = &self.clock {
                     let host = h.hwnd();
                     let rect = window::window_rect(host);
@@ -1689,8 +1701,8 @@ impl App {
                         .widget_params
                         .entry(style)
                         .or_default()
-                        .bounds = Some([get("x"), get("y"), get("w"), get("h")]);
-                    self.schedule_save();
+                        .viz_bounds = Some([get("x"), get("y"), get("w"), get("h")]);
+                    self.settings_mutated();
                     // A clean resize needs no surface surgery — the heavy
                     // revive's topmost band flick churns the very WebView
                     // surface it heals and can blank the canvas. Run it only
@@ -2293,8 +2305,8 @@ impl App {
             // (a theme with no entry restores the default centred strip).
             let style = &new.visualizer_style;
             if style != "none" {
-                let old_b = old.widget_params.get(style).and_then(|p| p.bounds);
-                let new_b = new.widget_params.get(style).and_then(|p| p.bounds);
+                let old_b = viz_saved_bounds(&old, style);
+                let new_b = viz_saved_bounds(&new, style);
                 if new_b != old_b {
                     if let Some(h) = &self.visualizer_host {
                         let (x, y, w, hh) = new_b

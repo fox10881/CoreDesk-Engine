@@ -273,6 +273,14 @@ impl VisualizerHost {
             )?
         };
         *state.borrow_mut().design_id.borrow_mut() = style_id.to_string();
+        // Controller creation pumps the host's queue; a WM_SIZE arriving in
+        // that window ran the handler while `comp` was still None and was
+        // dropped — leaving the WebView at the create-time rect rendering in
+        // the corner. Re-push the settled client size before publishing.
+        let (cw, ch) = window.client_size();
+        comp.set_bounds(cw, ch);
+        comp.set_rasterization_scale(window::dpi_of(hwnd));
+        comp.notify_parent_window_position_changed();
         state.borrow_mut().comp = Some(comp);
         Ok(Self { window, state })
     }
