@@ -237,7 +237,10 @@ pub(crate) fn tap_injectable_path() -> Option<PathBuf> {
 /// `NoDiagDll` so a rebuilt image earns one fresh diagnostics trial on
 /// the same OS revision instead of staying banned.
 pub(crate) fn tap_image_tag() -> Option<String> {
-    let stem = tap_injectable_path()?.file_stem()?.to_string_lossy().into_owned();
+    let stem = tap_injectable_path()?
+        .file_stem()?
+        .to_string_lossy()
+        .into_owned();
     stem.rsplit('_').next().map(str::to_string)
 }
 

@@ -602,11 +602,7 @@ fn diag_disabled() -> bool {
     if os_build_ubr() != (b, u) {
         return false;
     }
-    match reg_sz(
-        HKEY_CURRENT_USER,
-        &subkey,
-        &wide_static("NoDiagDll"),
-    ) {
+    match reg_sz(HKEY_CURRENT_USER, &subkey, &wide_static("NoDiagDll")) {
         Some(banned) => own_dll_tag().is_none_or(|tag| tag == banned),
         None => true,
     }

@@ -508,7 +508,13 @@ fn os_build_tag() -> String {
     let name = widestr("UBR");
     let mut hkey: isize = 0;
     if unsafe {
-        RegOpenKeyExW(HKEY_LOCAL_MACHINE, PCWSTR(sub.as_ptr()), 0, KEY_READ, &mut hkey)
+        RegOpenKeyExW(
+            HKEY_LOCAL_MACHINE,
+            PCWSTR(sub.as_ptr()),
+            0,
+            KEY_READ,
+            &mut hkey,
+        )
     } == 0
     {
         let mut ubr: u32 = 0;

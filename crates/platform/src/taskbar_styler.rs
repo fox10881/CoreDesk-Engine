@@ -214,13 +214,12 @@ pub fn apply(id: &str) -> bool {
 // drag-time island churn (reproduced on build 26300.9818 — five clean
 // kills across armed instances vs. zero crashes with the session off or
 // absent; zero element writes needed). Once `TAP_BREAKER_STRIKES`
-/// exception-class explorer deaths are observed, the breaker writes the
-/// `NoDiag` kill-switch build-keyed and restarts the shell — the resident
-/// comes back inert (no diagnostics, no taskbar styling, stable shell).
-/// When the OS revision changes the keys mismatch and the resident's
-/// `diag_disabled()` re-arms on its own; `nodiag_clear_if_stale` sweeps the
-/// leftover values.
-
+// exception-class explorer deaths are observed, the breaker writes the
+// `NoDiag` kill-switch build-keyed and restarts the shell — the resident
+// comes back inert (no diagnostics, no taskbar styling, stable shell).
+// When the OS revision changes the keys mismatch and the resident's
+// `diag_disabled()` re-arms on its own; `nodiag_clear_if_stale` sweeps the
+// leftover values.
 const NODIAG_SUBKEY: &str = r"Software\CoreDeskEngine\Debug";
 /// Explorer deaths inside one armed run before the breaker trips.
 const TAP_BREAKER_STRIKES: u32 = 2;
@@ -518,8 +517,9 @@ fn shell_crash_watch(shell_pid: u32) {
         tracing::warn!(
             build = b,
             ubr = u,
-            "taskbar styler: NoDiag breaker tripped after {TAP_BREAKER_STRIKES} \
-             shell crashes — diagnostics stay off on this OS revision; restarting explorer"
+            strikes = TAP_BREAKER_STRIKES,
+            "taskbar styler: NoDiag breaker tripped — \
+             diagnostics stay off on this OS revision; restarting explorer"
         );
         std::thread::spawn(crate::tap::restart_explorer);
     }

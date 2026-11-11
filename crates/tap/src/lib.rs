@@ -123,10 +123,7 @@ static BOOTING: AtomicBool = AtomicBool::new(false);
 fn is_host_process() -> bool {
     static IS_HOST: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *IS_HOST.get_or_init(|| {
-        is_explorer_process()
-            || is_smeh_process()
-            || is_nch_process()
-            || is_searchhost_process()
+        is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process()
     })
 }
 
