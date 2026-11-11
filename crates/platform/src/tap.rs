@@ -161,7 +161,7 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(core::iter::once(0)).collect()
 }
 
-fn find_taskbar() -> Option<(HWND, u32)> {
+pub(crate) fn find_taskbar() -> Option<(HWND, u32)> {
     let hwnd = unsafe { FindWindowW(PCWSTR(wide("Shell_TrayWnd").as_ptr()), PCWSTR::null()) };
     if hwnd.0.is_null() {
         return None;
@@ -230,6 +230,15 @@ pub(crate) fn tap_injectable_path() -> Option<PathBuf> {
         Some(out)
     })
     .clone()
+}
+
+/// The deployed resident's file-hash tag — the `<hash>` in
+/// `coredesk_tap_v<ver>_<hash>.dll`. The crash breaker records it as
+/// `NoDiagDll` so a rebuilt image earns one fresh diagnostics trial on
+/// the same OS revision instead of staying banned.
+pub(crate) fn tap_image_tag() -> Option<String> {
+    let stem = tap_injectable_path()?.file_stem()?.to_string_lossy().into_owned();
+    stem.rsplit('_').next().map(str::to_string)
 }
 
 /// The same unique-per-build resident copy under `%LOCALAPPDATA%\CoreDeskEngine\residents`

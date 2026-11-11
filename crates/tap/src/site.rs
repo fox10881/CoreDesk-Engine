@@ -478,6 +478,140 @@ static SHELL_TRAY_HOST: AtomicBool = AtomicBool::new(false);
 /// thread pin and the mux-session block (the proven crash path). While it
 /// is `false` we re-check the live window tree; once it flips to `true` it
 /// can never flip back (the tray only leaves when the process dies).
+/// Reads a DWORD registry value — `None` on any miss/error.
+fn reg_dword(root: isize, sub: &[u16], name: &[u16]) -> Option<u32> {
+    const RRF_RT_REG_DWORD: u32 = 0x10;
+    let mut data = 0u32;
+    let mut size = 4u32;
+    let status = unsafe {
+        win32::RegGetValueW(
+            root,
+            windows_core::PCWSTR(sub.as_ptr()),
+            windows_core::PCWSTR(name.as_ptr()),
+            RRF_RT_REG_DWORD,
+            core::ptr::null_mut(),
+            (&mut data as *mut u32).cast(),
+            &mut size,
+        )
+    };
+    (status == 0).then_some(data)
+}
+
+/// `<build>.<UBR>` as the OS reports them (`CurrentBuild`/`UBR` under
+/// `HKLM\…\CurrentVersion`) — the same source the app-side breaker writes
+/// `NoDiagBuild`/`NoDiagUbr` from, so a Windows update mismatches the flag
+/// and the session re-arms on its own.
+fn os_build_ubr() -> (u32, u32) {
+    const HKEY_LOCAL_MACHINE: isize = -0x7FFF_FFFEisize; // 0xFFFFFFFF80000002
+    let sub: Vec<u16> = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+        .encode_utf16()
+        .chain(core::iter::once(0))
+        .collect();
+    let ubr = reg_dword(HKEY_LOCAL_MACHINE, &sub, &wide_static("UBR")).unwrap_or(0);
+    // `CurrentBuild` is REG_SZ digits, not a DWORD.
+    const RRF_RT_REG_SZ: u32 = 0x02;
+    let name = wide_static("CurrentBuild");
+    let mut buf = [0u16; 64];
+    let mut size = (buf.len() * 2) as u32;
+    let status = unsafe {
+        win32::RegGetValueW(
+            HKEY_LOCAL_MACHINE,
+            windows_core::PCWSTR(sub.as_ptr()),
+            windows_core::PCWSTR(name.as_ptr()),
+            RRF_RT_REG_SZ,
+            core::ptr::null_mut(),
+            buf.as_mut_ptr().cast(),
+            &mut size,
+        )
+    };
+    let build_num = if status == 0 {
+        let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        String::from_utf16_lossy(&buf[..len]).parse().unwrap_or(0)
+    } else {
+        0
+    };
+    (build_num, ubr)
+}
+
+fn wide_static(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(core::iter::once(0)).collect()
+}
+
+/// REG_SZ read via `RegGetValueW` — string sibling of `reg_dword`.
+fn reg_sz(root: isize, sub: &[u16], name: &[u16]) -> Option<String> {
+    const RRF_RT_REG_SZ: u32 = 0x02;
+    let mut buf = [0u16; 128];
+    let mut size = (buf.len() * 2) as u32;
+    let status = unsafe {
+        win32::RegGetValueW(
+            root,
+            windows_core::PCWSTR(sub.as_ptr()),
+            windows_core::PCWSTR(name.as_ptr()),
+            RRF_RT_REG_SZ,
+            core::ptr::null_mut(),
+            buf.as_mut_ptr().cast(),
+            &mut size,
+        )
+    };
+    if status != 0 {
+        return None;
+    }
+    let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    Some(String::from_utf16_lossy(&buf[..len]))
+}
+
+/// This resident's own file-hash tag — the `<hash>` in
+/// `coredesk_tap_v<ver>_<hash>.dll`, parsed from the loaded module's file
+/// name. `None` when the name doesn't carry the tag (unverifiable → the
+/// caller treats us as still-banned rather than gambling on a retry).
+fn own_dll_tag() -> Option<String> {
+    let mut buf = [0u16; 512];
+    let n = unsafe {
+        win32::GetModuleFileNameW(
+            crate::dll_instance(),
+            windows_core::PWSTR(buf.as_mut_ptr()),
+            512,
+        )
+    };
+    if n == 0 {
+        return None;
+    }
+    let path = String::from_utf16_lossy(&buf[..n as usize]);
+    let stem = path.rsplit(['\\', '/']).next()?.strip_suffix(".dll")?;
+    stem.rsplit('_').next().map(str::to_string)
+}
+
+/// `HKCU\Software\CoreDeskEngine\Debug\NoDiag` (DWORD) — the diagnostics
+/// kill-switch read at install time. `NoDiag` alone always applies; when
+/// the app-side breaker also writes `NoDiagBuild`/`NoDiagUbr`, the flag
+/// only applies while the OS still matches that revision — a Windows
+/// update mismatches the keys and the session re-arms automatically. A
+/// `NoDiagDll` hash narrows the ban to the resident build that crashed:
+/// a newer image mismatches it and earns one fresh diagnostics trial.
+fn diag_disabled() -> bool {
+    const HKEY_CURRENT_USER: isize = -0x7FFF_FFFFisize; // 0xFFFFFFFF80000001
+    let subkey = wide_static(r"Software\CoreDeskEngine\Debug");
+    if reg_dword(HKEY_CURRENT_USER, &subkey, &wide_static("NoDiag")) != Some(1) {
+        return false;
+    }
+    let want_build = reg_dword(HKEY_CURRENT_USER, &subkey, &wide_static("NoDiagBuild"));
+    let want_ubr = reg_dword(HKEY_CURRENT_USER, &subkey, &wide_static("NoDiagUbr"));
+    let (Some(b), Some(u)) = (want_build, want_ubr) else {
+        return true;
+    };
+    if os_build_ubr() != (b, u) {
+        return false;
+    }
+    match reg_sz(
+        HKEY_CURRENT_USER,
+        &subkey,
+        &wide_static("NoDiagDll"),
+    ) {
+        Some(banned) => own_dll_tag().is_none_or(|tag| tag == banned),
+        None => true,
+    }
+}
+
 pub fn is_shell_tray_host() -> bool {
     if SHELL_TRAY_HOST.load(Ordering::Acquire) {
         return true;
@@ -496,6 +630,19 @@ fn install_inner() {
     let shell_tray = owns_shell_tray();
     SHELL_TRAY_HOST.store(shell_tray, Ordering::Release);
     if !crate::is_smeh() && !crate::is_nch() && !crate::is_searchhost() && !shell_tray {
+        return;
+    }
+    // Crash-isolation gate — `HKCU\Software\CoreDeskEngine\Debug\NoDiag`=1
+    // keeps the resident fully alive (command window, pump, wires) but never
+    // initializes the XAML diagnostics pipeline in this process. On builds
+    // where the diagnostics marshal corrupts the shell heap during
+    // drag-time island churn (0xc0000374, ntdll+0x112fc5), the armed
+    // session itself is the trigger — styling becomes impossible there but
+    // the shell survives. Scoped to the shell-tray host: Start Menu,
+    // Notification Center and Search residents never host the draggable
+    // cabinet churn that kills explorer, so they keep styling.
+    if shell_tray && diag_disabled() {
+        crate::tap_log!("IXDEx skipped — NoDiag gate set (shell host)");
         return;
     }
     if !host_warm_enough() {
@@ -912,6 +1059,7 @@ fn on_visual_tree_change(
     // The mux session must never feed the shell pid — a straggler session
     // racing its teardown still gets its elements dropped at the door.
     if session == 2 && shell {
+        crate::styler::mux::drop_untracked(element.Handle.0, relation.Parent.0);
         return;
     }
     let tid = unsafe { win32::GetCurrentThreadId() };
@@ -923,6 +1071,10 @@ fn on_visual_tree_change(
                 PINNED_TID.store(tid, Ordering::Release);
             }
         } else if tid != pinned {
+            // Foreign-thread report — the pin drops the element, but the
+            // callback still owns the handles and a dropped Remove would
+            // leave a stale scope mark a recycled handle could inherit.
+            crate::styler::wux::drop_untracked(element.Handle.0, relation.Parent.0);
             return;
         }
     }

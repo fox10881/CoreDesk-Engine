@@ -2452,26 +2452,46 @@ impl App {
         if self.shell_respawns.len() < TRIP {
             return;
         }
+        // Per-path breakers that already inerted a surface mean the churn
+        // is not ours — wiping the user's styles there buys nothing and
+        // loses their config. Only a still-live suspect gets disarmed.
+        let diag_banned = coredesk_platform::taskbar_styler::nodiag_active();
+        let ebm_banned = coredesk_platform::file_explorer_styler::ebm_banned();
+        if diag_banned && ebm_banned {
+            tracing::warn!(
+                count = self.shell_respawns.len(),
+                "shell crash loop while every styler surface is already banned — not ours"
+            );
+            self.shell_respawns.clear();
+            return;
+        }
         let s = &mut self.state.config.settings;
-        if s.taskbar_style.is_empty()
-            && s.start_menu_style.is_empty()
-            && s.notification_center_style.is_empty()
-            && s.fe_effect.is_empty()
-        {
+        let wipe_xaml = !diag_banned
+            && (!s.taskbar_style.is_empty()
+                || !s.start_menu_style.is_empty()
+                || !s.notification_center_style.is_empty());
+        let wipe_fe = !ebm_banned && !s.fe_effect.is_empty();
+        if !wipe_xaml && !wipe_fe {
             return; // stylers already stock — this churn is not ours to fix
         }
         tracing::error!(
             count = self.shell_respawns.len(),
+            wipe_xaml,
+            wipe_fe,
             "shell crash loop detected — disarming XAML/File-Explorer styles"
         );
-        s.taskbar_style.clear();
-        s.start_menu_style.clear();
-        s.notification_center_style.clear();
-        s.fe_effect.clear();
-        coredesk_platform::taskbar_styler::reset();
-        coredesk_platform::start_menu::apply_start_menu_theme("");
-        coredesk_platform::notification_center::apply("");
-        coredesk_platform::file_explorer_styler::reset();
+        if wipe_xaml {
+            s.taskbar_style.clear();
+            s.start_menu_style.clear();
+            s.notification_center_style.clear();
+            coredesk_platform::taskbar_styler::reset();
+            coredesk_platform::start_menu::apply_start_menu_theme("");
+            coredesk_platform::notification_center::apply("");
+        }
+        if wipe_fe {
+            s.fe_effect.clear();
+            coredesk_platform::file_explorer_styler::reset();
+        }
         self.shell_respawns.clear();
         self.settings_mutated();
         self.settings_toast(coredesk_core::i18n::text(

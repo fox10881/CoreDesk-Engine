@@ -38,6 +38,7 @@ use windows_core::PCWSTR;
 windows_core::link!("user32.dll" "system" fn GetClassNameW(hwnd: crate::bindings::HWND, lpclassname: windows_core::PWSTR, nmaxcount: i32) -> i32);
 windows_core::link!("user32.dll" "system" fn GetForegroundWindow() -> crate::bindings::HWND);
 windows_core::link!("advapi32.dll" "system" fn RegOpenKeyExW(hkey: isize, subkey: PCWSTR, options: u32, sam: u32, result: *mut isize) -> i32);
+windows_core::link!("advapi32.dll" "system" fn RegQueryValueExW(hkey: isize, valuename: PCWSTR, reserved: *const u32, r#type: *mut u32, data: *mut u8, cbdata: *mut u32) -> i32);
 windows_core::link!("advapi32.dll" "system" fn RegCloseKey(hkey: isize) -> i32);
 windows_core::link!("kernel32.dll" "system" fn OpenProcess(dwdesiredaccess: u32, binherithandle: windows_core::BOOL, dwprocessid: u32) -> *mut core::ffi::c_void);
 windows_core::link!("kernel32.dll" "system" fn CloseHandle(hobject: *mut core::ffi::c_void) -> windows_core::BOOL);
@@ -134,6 +135,13 @@ struct Fe {
     strikes: u32,
     /// Circuit breaker: no more `EBML` this session (unloads still flow).
     halted: bool,
+    /// `CabinetWClass` hwnds the safe DWM fallback touched — restored to
+    /// `DWMSBT_AUTO` when EBM re-arms or the material resets. Pruned to
+    /// live cabinet hwnds on every fallback pass.
+    fallback_hwnds: std::collections::HashSet<usize>,
+    /// The backdrop value the fallback last wrote — a banned effect
+    /// change (mica→micaalt) reapplies every live hwnd.
+    fallback_kind: i32,
 }
 
 static FE: Mutex<Option<Fe>> = Mutex::new(None);
@@ -421,29 +429,45 @@ fn cabinet_anchors() -> Vec<(u32, crate::bindings::HWND)> {
 /// is still constructing. Just-injected cabinet processes are exactly where
 /// the Switcher/taskbar APPCRASHes were reported.
 const EBM_PID_WARMUP: Duration = Duration::from_secs(3);
-/// A delivered pid dying within this window counts as a suspected EBM crash.
-const EBM_CRASH_WINDOW: Duration = Duration::from_secs(90);
+/// A delivered pid dying within this window counts as a suspected EBM
+/// crash. EBM's heap corruption detonates on USER interaction (window
+/// drag, snap) which lags delivery — 90 s missed exactly that path; 5 min
+/// still bounds the attribution (a healthy shell does not die that often).
+const EBM_CRASH_WINDOW: Duration = Duration::from_secs(300);
 /// Suspected crashes before `EBML` stops for the session.
 const EBM_MAX_STRIKES: u32 = 2;
 /// How long `deliver_all` waits after the last ini change before issuing
 /// an `EBMU`+`EBML` reload — collapses slider bursts into one reload.
 const EBM_RELOAD_SETTLE: Duration = Duration::from_millis(400);
-/// A persisted breaker older than this expires — enough time for the
-/// crashing contract (or a Windows update) to be worth retrying fresh.
-const BREAKER_TTL_SECS: u64 = 24 * 60 * 60;
+/// A persisted breaker older than this expires — a long grace so a Windows
+/// build that kills this engine is not retried daily; the `build`/`dll`
+/// keys still retry instantly when either side changes.
+const BREAKER_TTL_SECS: u64 = 30 * 24 * 60 * 60;
 
-/// `residents/ebm-breaker.json` — `{"effect": "...", "at": <unix secs>}`.
+/// `residents/ebm-breaker.json` — `{"effect","build","dll","at"}`.
 /// Persists the crash breaker across app restarts: without it every launch
 /// re-arms EBM and the crash loop resumes exactly as before.
 fn breaker_path() -> Option<PathBuf> {
     Some(residents_dir()?.join("ebm-breaker.json"))
 }
 
-/// Reads the persisted breaker record: `(effect, unix_secs)` when present.
-fn breaker_record() -> Option<(String, u64)> {
+/// The persisted ban record. `build` is `<build>.<UBR>` (EBM's detours
+/// broke on a UBR bump — same base build, new offsets); `dll` is the
+/// fnv tag of the deployed engine bytes so a shipped fix un-bans itself.
+struct BreakerRecord {
+    effect: String,
+    build: String,
+    dll: String,
+    at: u64,
+}
+
+/// Reads the persisted breaker record — missing `build`/`dll` keys (an
+/// older format's record) parse as empty, and empty keys MATCH anything:
+/// a pre-upgrade ban must keep its pid-killing power on the first run.
+fn breaker_record() -> Option<BreakerRecord> {
     let text = std::fs::read_to_string(breaker_path()?).ok()?;
-    // Tiny hand-parse — the record is two fields and `effect` is one of the
-    // fixed ASCII ids (`blur`/`acrylic`/...), so no escapes can appear.
+    // Tiny hand-parse — the values are fixed ASCII ids/digits, so no
+    // escapes can appear.
     let find = |key: &str| -> Option<String> {
         let pat = format!("\"{key}\":");
         let rest = text.split(&pat).nth(1)?.trim_start();
@@ -451,14 +475,19 @@ fn breaker_record() -> Option<(String, u64)> {
             Some(rest.trim_start_matches('"').split('"').next()?.to_owned())
         } else {
             Some(
-                rest.trim_end_matches(['}', ' ', '\n', '\r', '\t'])
+                rest.trim_end_matches(['}', ' ', '\n', '\r', '\t', ','])
                     .to_owned(),
             )
         }
     };
-    let effect = find("effect")?;
+    let effect = find("effect").unwrap_or_default();
     let at = find("at")?.parse().ok()?;
-    Some((effect, at))
+    Some(BreakerRecord {
+        effect,
+        build: find("build").unwrap_or_default(),
+        dll: find("dll").unwrap_or_default(),
+        at,
+    })
 }
 
 fn unix_now() -> u64 {
@@ -468,21 +497,93 @@ fn unix_now() -> u64 {
         .unwrap_or(0)
 }
 
-/// `true` when the persisted breaker names this exact effect contract and
-/// is still fresh — a different effect is a new contract the user opted in
-/// to, so it retries cleanly.
-fn breaker_marked_for(effect: &str) -> bool {
+/// `<build>.<UBR>` — UBR distinguishes monthly revisions inside one build
+/// number; the 26100.9711→26100.9818 bump is exactly where the vendored
+/// engine's offsets went stale.
+fn os_build_tag() -> String {
+    let mut tag = crate::desktop::os_build().to_string();
+    const HKEY_LOCAL_MACHINE: isize = 0x8000_0002u32 as i32 as isize;
+    const KEY_READ: u32 = 0x2_0019;
+    let sub = widestr("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
+    let name = widestr("UBR");
+    let mut hkey: isize = 0;
+    if unsafe {
+        RegOpenKeyExW(HKEY_LOCAL_MACHINE, PCWSTR(sub.as_ptr()), 0, KEY_READ, &mut hkey)
+    } == 0
+    {
+        let mut ubr: u32 = 0;
+        let mut size = std::mem::size_of::<u32>() as u32;
+        let _ = unsafe {
+            RegQueryValueExW(
+                hkey,
+                PCWSTR(name.as_ptr()),
+                core::ptr::null(),
+                core::ptr::null_mut(),
+                &mut ubr as *mut u32 as *mut u8,
+                &mut size,
+            )
+        };
+        unsafe {
+            let _ = RegCloseKey(hkey);
+        }
+        if ubr != 0 {
+            tag = format!("{tag}.{ubr}");
+        }
+    }
+    tag
+}
+
+/// `true` while the persisted record names THIS Windows revision AND THIS
+/// engine binary. The ban is keyed to `(build, dll)`, not the effect —
+/// EBM's `DllMain` detours install whatever material the ini asks for, so
+/// a build that kills `mica` will kill `blur` too. A Windows update or a
+/// shipped engine fix flips one key and the contract retries fresh.
+/// `true` while the persisted record covers THIS Windows revision AND the
+/// currently deployed engine binary — i.e. the File Explorer effect
+/// surface is inert and explorer churn cannot be attributed to it.
+pub fn ebm_banned() -> bool {
+    breaker_banned(&ebm_dll_tag())
+}
+
+fn breaker_banned(dll_tag: &str) -> bool {
     match breaker_record() {
-        Some((eff, at)) => eff == effect && unix_now().saturating_sub(at) < BREAKER_TTL_SECS,
+        Some(r) => {
+            let banned = (r.build.is_empty() || r.build == os_build_tag())
+                && (r.dll.is_empty() || r.dll == dll_tag)
+                && unix_now().saturating_sub(r.at) < BREAKER_TTL_SECS;
+            if banned {
+                tracing::debug!(
+                    crashed_effect = %r.effect,
+                    build = %r.build,
+                    "EBM breaker record matched — engine stays banned"
+                );
+            }
+            banned
+        }
         None => false,
     }
 }
 
-fn breaker_save(effect: &str) {
+/// A record exists but does NOT cover this `(build, dll)` — a Windows
+/// update or engine swap makes it stale; clearing it is what "the app
+/// heals itself when the world changes" looks like on disk.
+fn breaker_drop_if_stale(dll_tag: &str) {
+    if let Some(r) = breaker_record() {
+        if r.build != os_build_tag() || r.dll != dll_tag {
+            breaker_clear();
+        }
+    }
+}
+
+fn breaker_save(effect: &str, dll_tag: &str) {
     let Some(path) = breaker_path() else { return };
     let _ = std::fs::write(
         path,
-        format!("{{\"effect\":\"{effect}\",\"at\":{}}}", unix_now()),
+        format!(
+            "{{\"effect\":\"{effect}\",\"build\":\"{}\",\"dll\":\"{dll_tag}\",\"at\":{}}}",
+            os_build_tag(),
+            unix_now()
+        ),
     );
 }
 
@@ -752,7 +853,7 @@ fn deliver_all() {
             .as_ref()
             .map(|fe| fe.effect.clone())
             .unwrap_or_default();
-        breaker_save(&effect);
+        breaker_save(&effect, &ebm_dll_tag());
         tracing::warn!(
             effect = %effect,
             "EBM halted after repeated explorer crashes — material disarmed until the effect changes"
@@ -788,7 +889,110 @@ fn deliver_all() {
             );
         }
     }
+    // Self-heal: while the breaker holds EBM off, the pure-DWM fallback
+    // still delivers a material — `mica`/`micaalt`/`acrylic` are one
+    // attribute each and need no injected code. Runs every tick while
+    // halted so freshly-opened cabinets are covered; restores stock when
+    // the engine re-arms.
+    let halted_effect = lock().as_ref().and_then(|fe| {
+        if fe.halted && !fe.effect.is_empty() {
+            Some(fe.effect.clone())
+        } else {
+            None
+        }
+    });
+    match halted_effect {
+        Some(effect) => fallback_apply(&effect),
+        None => fallback_restore(),
+    }
     crate::tap::prune_extra_residents(&live_pids);
+}
+
+// -------------------------------------------------- safe DWM fallback ----
+
+/// fnv tag of the engine bytes — keys the breaker record so a shipped
+/// `ExplorerBlurMica` fix clears the ban without user action.
+fn ebm_dll_tag() -> String {
+    ebm_source_bytes()
+        .map(|b| format!("{:016x}", fnv1a64(&b)))
+        .unwrap_or_default()
+}
+
+/// EBM effect → `DWMWA_SYSTEMBACKDROP_TYPE` value reachable WITHOUT any
+/// injected code — verified working cross-process on `CabinetWClass`.
+/// The blur family has no DWM equivalent; it degrades to the system's own
+/// acrylic backdrop rather than leaving the window bare.
+fn fallback_backdrop(effect: &str) -> Option<crate::dwm::SystemBackdrop> {
+    use crate::dwm::SystemBackdrop as B;
+    Some(match effect {
+        "mica" => B::MainWindow,
+        "acrylic" | "blur" | "blurclear" => B::TransientWindow,
+        "micaalt" => B::TabbedWindow,
+        _ => return None,
+    })
+}
+
+/// Applies the DWM-only material to every `CabinetWClass` — the breaker
+/// fallback. Idempotent and per-hwnd tracked; a changed `want` reapplies
+/// all live frames.
+fn fallback_apply(effect: &str) {
+    let Some(want) = fallback_backdrop(effect) else {
+        return;
+    };
+    let cabinets = cabinet_windows();
+    let mut guard = lock();
+    let Some(fe) = guard.as_mut() else { return };
+    let kind = match want {
+        crate::dwm::SystemBackdrop::MainWindow => 2,
+        crate::dwm::SystemBackdrop::TransientWindow => 3,
+        crate::dwm::SystemBackdrop::TabbedWindow => 4,
+        _ => 0,
+    };
+    let kind_changed = fe.fallback_kind != kind;
+    fe.fallback_hwnds
+        .retain(|h| cabinets.iter().any(|c| c.0 as usize == *h));
+    let before = fe.fallback_hwnds.len();
+    for hwnd in cabinets {
+        let key = hwnd.0 as usize;
+        if !kind_changed && fe.fallback_hwnds.contains(&key) {
+            continue;
+        }
+        if crate::dwm::set_system_backdrop(hwnd, want).is_ok() {
+            fe.fallback_hwnds.insert(key);
+        }
+    }
+    fe.fallback_kind = kind;
+    if kind_changed || fe.fallback_hwnds.len() != before {
+        tracing::debug!(
+            effect,
+            hwnds = fe.fallback_hwnds.len(),
+            "EBM fallback: DWM backdrop applied (engine banned on this build)"
+        );
+    }
+}
+
+/// Restores `DWMSBT_AUTO` on every hwnd the fallback touched — hwnds are
+/// class-checked first so a recycled handle never gets a stray write.
+fn fallback_restore() {
+    let taken = {
+        let mut guard = lock();
+        match guard.as_mut() {
+            Some(fe) if !fe.fallback_hwnds.is_empty() => {
+                fe.fallback_kind = 0;
+                std::mem::take(&mut fe.fallback_hwnds)
+            }
+            _ => return,
+        }
+    };
+    for key in taken {
+        let hwnd = crate::bindings::HWND(key as *mut core::ffi::c_void);
+        let mut cls = [0u16; 64];
+        let n = unsafe { GetClassNameW(hwnd, windows_core::PWSTR(cls.as_mut_ptr()), 64) };
+        if n <= 0 || String::from_utf16_lossy(&cls[..n as usize]) != "CabinetWClass" {
+            continue;
+        }
+        let _ = crate::dwm::set_system_backdrop(hwnd, crate::dwm::SystemBackdrop::Auto);
+    }
 }
 
 /// One-shot disarm for legacy residents: an older app build may have
@@ -925,10 +1129,13 @@ pub fn apply_effect(cfg: &FeGlassConfig) -> bool {
         fe.strikes = 0;
         fe.halted = false;
     }
-    // The persisted breaker outranks the fresh-contract reset: a contract
-    // that already crashed Explorer twice stays disarmed until the user
-    // actually changes the effect — an app restart alone is not a retry.
-    if breaker_marked_for(cfg.effect) {
+    // The persisted breaker outranks the fresh-contract reset: on THIS
+    // Windows revision with THIS engine binary, EBM stays disarmed no
+    // matter which effect is applied — the DllMain detours are the crash
+    // surface and they install for every material. The DWM fallback still
+    // delivers a usable backdrop while banned.
+    let dll_tag = ebm_dll_tag();
+    if breaker_banned(&dll_tag) {
         if let Some(fe) = lock().as_mut() {
             fe.halted = true;
             fe.delivered.clear();
@@ -938,12 +1145,14 @@ pub fn apply_effect(cfg: &FeGlassConfig) -> bool {
         finish();
         tracing::warn!(
             effect = cfg.effect,
-            "EBM apply honored but kept disarmed — persisted crash breaker"
+            build = %os_build_tag(),
+            "EBM apply honored but kept disarmed — engine banned on this Windows build (DWM fallback active)"
         );
         return true;
     }
-    // Unmarked contract — drop any stale record for a different effect.
-    breaker_clear();
+    // No ban — a record for an older build or engine is stale self-heal
+    // bait; dropping it is the "world changed" retry.
+    breaker_drop_if_stale(&dll_tag);
     ARMED.store(true, Ordering::Release);
     finish();
     tracing::info!(
@@ -962,6 +1171,7 @@ fn reset_ebm() -> bool {
     broadcast_ebm_unload();
     disarm_legacy();
     disarm_xaml();
+    fallback_restore();
     if let Some(fe) = lock().as_mut() {
         fe.effect.clear();
         fe.delivered.clear();
@@ -1017,6 +1227,18 @@ mod tests {
         assert_eq!(effect_id("micaalt"), Some(4));
         assert_eq!(effect_id(""), None);
         assert_eq!(effect_id("bogus"), None);
+    }
+
+    #[test]
+    fn fallback_maps_every_effect() {
+        use crate::dwm::SystemBackdrop as B;
+        assert_eq!(fallback_backdrop("mica"), Some(B::MainWindow));
+        assert_eq!(fallback_backdrop("micaalt"), Some(B::TabbedWindow));
+        assert_eq!(fallback_backdrop("acrylic"), Some(B::TransientWindow));
+        assert_eq!(fallback_backdrop("blur"), Some(B::TransientWindow));
+        assert_eq!(fallback_backdrop("blurclear"), Some(B::TransientWindow));
+        assert_eq!(fallback_backdrop(""), None);
+        assert_eq!(fallback_backdrop("bogus"), None);
     }
 
     #[test]
