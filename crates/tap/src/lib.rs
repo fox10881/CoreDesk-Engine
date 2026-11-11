@@ -111,6 +111,25 @@ static DLL_INSTANCE: AtomicPtr<core::ffi::c_void> = AtomicPtr::new(core::ptr::nu
 /// `command::run`/`site::install`.
 static BOOTING: AtomicBool = AtomicBool::new(false);
 
+/// `true` only in processes where the resident is allowed to run — the
+/// shell hosts DllMain boots on. The exported hook/winevent procs call
+/// `ensure_boot` unconditionally, and the app itself `LoadLibrary`s this
+/// image for `SetWindowsHookExW`/`SetWinEventHook`: without this gate a
+/// proc firing in `coredesk.exe` (a hook landing on our own thread, or an
+/// in-context win-event) would spawn `command::run`/`site::install`
+/// inside the app — which never self-pins, so the app's `FreeLibrary`
+/// unmaps the image out from under the live threads (`0xc0000005` at a
+/// `coredesk_tap_*_unloaded` address — the observed app crash).
+fn is_host_process() -> bool {
+    static IS_HOST: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *IS_HOST.get_or_init(|| {
+        is_explorer_process()
+            || is_smeh_process()
+            || is_nch_process()
+            || is_searchhost_process()
+    })
+}
+
 /// Bootstrap retry bounded by host liveness. The exported hook procs run
 /// inside the target only while it pumps messages, which is exactly when a
 /// resident whose `bootstrap` starved mid-attach (PLM suspension racing
@@ -120,7 +139,8 @@ static BOOTING: AtomicBool = AtomicBool::new(false);
 /// funnels through it too so first-attach and revive share the dedup; an
 /// inert (unloaded) resident never re-boots.
 fn ensure_boot() {
-    if crate::command::is_unloaded()
+    if !is_host_process()
+        || crate::command::is_unloaded()
         || crate::command::pump_running()
         || BOOTING.swap(true, Ordering::AcqRel)
     {
@@ -149,8 +169,7 @@ pub unsafe extern "system" fn DllMain(
         unsafe {
             let _ = win32::DisableThreadLibraryCalls(hinstance);
         }
-        if is_explorer_process() || is_smeh_process() || is_nch_process() || is_searchhost_process()
-        {
+        if is_host_process() {
             // Self-pin: the host unhooks right after our command window
             // appears, and `InitializeXamlDiagnosticsEx` only pins us later,
             // inside `SetSite`. Without our own pin the gap between
