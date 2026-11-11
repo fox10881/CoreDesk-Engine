@@ -52,6 +52,14 @@ pub mod wux {
             .ok()
     }
 
+    /// The callback thread's own dispatcher — wux callbacks arrive on the
+    /// element's UI thread, so `Window::Current().Dispatcher` IS the
+    /// island's queue without materializing anything. Lets a muted or
+    /// replaying tree still feed the pending theme apply.
+    fn thread_dispatcher() -> Option<XDispatcher> {
+        elem_dispatcher(&xb::Window::Current().ok()?)
+    }
+
     fn post_ui(
         d: &XDispatcher,
         p: Prio,
@@ -142,6 +150,12 @@ pub mod mux {
             .ok()?
             .DispatcherQueue()
             .ok()
+    }
+
+    /// mux callbacks may arrive on a non-UI thread — `GetForCurrentThread`
+    /// just fails there and `elem_dispatcher` covers it later.
+    fn thread_dispatcher() -> Option<XDispatcher> {
+        xb::DispatcherQueue::GetForCurrentThread().ok()
     }
 
     fn post_ui(

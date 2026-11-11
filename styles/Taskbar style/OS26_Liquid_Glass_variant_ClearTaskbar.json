@@ -172,7 +172,7 @@
         "StrokeThickness=5",
         "RadiusX=14",
         "RadiusY=14",
-        "Fill:=<<WindhawkBlur BlurAmount=\"8\" TintColor=\"#30ffffff\"/>"
+        "Fill:=<WindhawkBlur BlurAmount=\"8\" TintColor=\"#30ffffff\"/>"
       ]
     },
     {

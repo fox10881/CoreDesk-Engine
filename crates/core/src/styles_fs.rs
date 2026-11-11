@@ -154,6 +154,7 @@ matching Settings dropdown automatically. No restart, no registration.
   12. Widget .html contract
   13. .cde theme archives
   14. Failure behavior + testing workflow
+  15. Live host trees — verified namespace map (UWPSpy)
 
 
 1. The six folders
@@ -290,6 +291,19 @@ Every entry in \"styles\" is one line:
 Rules apply in file order; later rules win. Properties that don't
 resolve on the element are skipped, not fatal.
 
+Attached-property note — Grid.Column / Grid.Row: plain XAML ignores a
+column index on a Grid that never declared ColumnDefinitions (every
+child stacks in one implicit cell — HorizontalAlignment is the only
+lever left; the stock Windows 11 taskbar root works exactly like this).
+Inside the taskbar scope (Taskbar.*, SystemTray.*, SearchUx.*) CoreDesk
+repairs it for you: a Grid.Column=N write on a column-deficient parent
+extends that Grid to N+2 columns — columns a child claims become Auto,
+the rest become Star — so [*, auto, auto, *] yields a centered,
+edge-connected dock (this is what OS26 Dark Mac Dock relies on). The
+extension is reference-counted and the original columns come back on
+unapply. Outside the taskbar scope Grid.Column behaves like plain XAML
+— it does nothing without real ColumnDefinitions on the parent.
+
 
 6. styleConstants — $name substitution
 --------------------------------------
@@ -341,6 +355,11 @@ The catalog-tested set:
       WinUI3 islands it degrades to a translucent solid (in-app
       acrylic can't see the desktop there) — still looks right because
       the DWM accent already blurs behind the window.
+      WARNING — the tag must start with exactly one '<'.
+      Fill:=<<WindhawkBlur …/> (a doubled '<<' typo seen in the wild)
+      fails blur parsing AND XamlReader.Load, killing the WHOLE
+      ruleset the value sits in — the tap log shows it only as a
+      lazy-resolve failure for the element, easy to miss.
 
   <AcrylicBrush TintColor=\"#0A0C10\" TintOpacity=\"0.95\"
                 TintLuminosityOpacity=\"0.6\" />
@@ -398,6 +417,21 @@ render pass — that exception can't be caught and kills the shell
   ! Don't put object markup (:=brushes/transforms) on overly broad
     selectors (ContentPresenter, Border, Grid alone) — each match is a
     new render-path experiment; narrow with #Name or a parent chain.
+
+  ! Grid.Column=N re-flows EVERY sibling sharing that Grid — the
+    taskbar root is safe (two children, engine auto-extends it, see
+    section 5), but writing a column index into a production Grid full
+    of children can scramble a whole region. Check the parent Grid's
+    real children first (UWPSpy tree, or the frame_diag/kids= lines in
+    the tap log) before assigning columns.
+
+  ! Taskbar.TaskbarCollapsibleLayout (the MUX layout hosting task
+    buttons) collapses icons to ~30px slots whenever the frame measures
+    narrow — and the collapse is STICKY (hysteresis): one narrow
+    transient during apply/churn keeps buttons crushed until a wider
+    arrange un-sticks them. Themes that auto-size Taskbar.TaskbarFrame
+    need a MinWidth floor above items*55 + start button (~500 covers a
+    typical row) or the per-icon bubbles render squashed.
 
   ! No file:// paths into random dirs, no .. — assets only beside the
     style (rule above exists exactly so this stays true).
@@ -478,6 +512,12 @@ A .cde is a ZIP with a strict contract:
 - The tap resident logs every apply to %TEMP%\\coredesk_tap.log —
   \"resolving N rulesets\", \"resolve failed for 'Type'\", \"styled …
   props=N\" — read it when a rule doesn't land.
+  \"resolve failed for 'Type'\" means the leaf TYPE didn't resolve in
+  THAT host — the ruleset is skipped safely, not a crash. Type names
+  resolve PER PROCESS: a rule for a type whose assembly isn't loaded
+  in the host (e.g. a Cortana.UI.* rule running inside another shell
+  host) logs this and does nothing. Dual-target generations instead of
+  one name — see section 15.
 - Test workflow for a NEW taskbar style:
     1) apply it, watch the taskbar ~10 s;
     2) a flash/TaskbarCreated respawn means one of your rules is
@@ -485,6 +525,75 @@ A .cde is a ZIP with a strict contract:
        narrow until the guilty entry is alone;
     3) most killers are object markup on sprite-drawn internals —
        swap the brush for a solid color and retest.
+
+
+15. Live host trees — verified namespace map
+--------------------------------------------
+Real element namespaces captured with UWPSpy inside the running
+hosts. Write targets against THESE names; a mismatched type name
+silently dead-rules that ruleset.
+
+  Taskbar (explorer.exe)
+    Windows.UI.Xaml.Hosting.DesktopWindowXamlSource → PopupRoot /
+    RootScrollViewer → ScrollContentPresenter → Border → Grid →
+    Taskbar.TaskbarFrame#TaskbarFrame → Grid#RootGrid,
+    Taskbar.TaskbarBackground#BackgroundControl (Rectangle
+    BackgroundFill / BackgroundStroke),
+    Microsoft.UI.Xaml.Controls.ItemsRepeater (MUX layout that owns
+    the app buttons) → Taskbar.ExperienceToggleButton /
+    Taskbar.TaskListButtonPanel → Border#BackgroundElement,
+    AnimatedVisualPlayer, SpriteVisual, ContainerVisual.
+
+  Start menu (StartMenuExperienceHost.exe)
+    Windows.UI.Xaml.Window \"Start\" → PopupRoot / FullWindowMediaRoot /
+    RootScrollViewer → ScrollContentPresenter → Border →
+    StartMenu.StartBlendedFlexFrame → Grid#FrameRoot →
+    Grid#AnimationRoot → { Rectangle#MaxHeightEnforcer,
+    Border#StartDropShadow, Border#DropShadowDismiss,
+    Grid#MainMenu → { Border#AcrylicBorder, Grid#MainContent →
+    StartMenu.SearchBoxToggleButton → { Border#BorderElement,
+    Grid#UnderlineContainer, Border#BorderUnderline } } }
+
+  Quick settings + Notification Center (ShellHost.exe — BOTH Win+A
+  and Win+N surfaces live here on modern builds)
+    DesktopWindowXamlSource → PopupRoot / RootScrollViewer →
+    ScrollContentPresenter → Border →
+    ControlCenter.ControlCenterPage → Grid#RootGrid →
+    Grid#RootContent → Grid#ControlCenterRegion →
+    ControlCenter.ControlCenterView / MediaTransportControls /
+    PaginatedToggleButton / AsyncSlider / PaginatedGridView.
+
+  Search (SearchHost.exe)
+    Windows.UI.Xaml.Window \"Search\" → PopupRoot / FullWindowMediaRoot /
+    RootScrollViewer → ScrollContentPresenter → Border →
+    Cortana.UI.Views.TaskbarSearchPage → Grid#RootGrid →
+    Grid#OuterBorderGrid → Grid#BorderGrid → { Border#AppBorder,
+    AccentAppBorder, LayerBorder, AccentLayerBorder, dropshadow,
+    TaskbarMargin, TaskbarSearchBackground,
+    Cortana.UI.Views.RichSearchBoxControl → CortanaRichSearchBox }.
+
+  Legacy generation: ActionCenter.* (NotificationCenterPage,
+  FlexibleItemView, FlexibleToastView, NotificationListViewItem,
+  FocusSessionControl, ClockCalendarView) targets the OLD
+  notification surface. On current builds these log \"resolve failed\"
+  — write BOTH ControlCenter.* and ActionCenter.* rules if the style
+  must cover both generations; the dead half skips harmlessly.
+
+Inspecting yourself with UWPSpy (what actually works):
+  1) UWPSpy.exe → pick the host row → Spy button. The injected
+     helper builds its \"UWPSpy - PID: <pid>\" tree window LAZILY —
+     only while a live XAML surface is open (Start menu / Win+A·Win+N
+     panel / Search box). Open the surface first, then read the tree.
+  2) The tree window lives on the shell's immersive desktop:
+     EnumWindows / FindWindowEx / UI Automation CANNOT see it —
+     screenshot it; any click on it closes the surface (and the
+     window). Read-only inspection is the practical mode.
+  3) ShellExperienceHost refuses the injection outright (host-level
+     restriction) — modern shells route the same surfaces through
+     ShellHost, which does accept it.
+  4) Cross-check with %TEMP%\\coredesk_tap.log: \"matched N rulesets\" /
+     \"styled … props=N\" proves application; \"resolve failed for 'T'\"
+     proves a dead ruleset (wrong generation or wrong host).
 ";
 
 /// Scaffolds the user layer so the folder explains itself the moment a

@@ -122,7 +122,11 @@ struct State {
     /// A re-advise replay is in flight — its element burst is legitimate
     /// work (the whole tree re-reported once), so the vtw storm counter
     /// ignores traffic until the replay settles.
-    readvising: bool,
+    /// Lives OUTSIDE this mutex (`READVISING`) — `churn_recently_hot` and
+    /// `storm_limited` read it from paths that may already hold `state()`,
+    /// and `std::sync::Mutex` is not reentrant: a nested lock on the UI
+    /// thread is a permanent self-deadlock (the AppHang that froze the
+    /// taskbar).
     /// The theme's WebView2 CSS (`W` wire section) — armed for injection.
     web_css: Option<String>,
     /// Injected WebView2 handle -> what `inject` left behind (script id /
@@ -155,7 +159,6 @@ fn state() -> std::sync::MutexGuard<'static, State> {
         wire_rules: None,
         rules_gen: 0,
         to_release: Vec::new(),
-        readvising: false,
         web_css: None,
         web_injected: BTreeMap::new(),
         web_pending: std::collections::BTreeMap::new(),
@@ -213,6 +216,8 @@ fn is_immersive(handle: u64, parent: u64, reported_type: &str) -> bool {
     {
         crate::tap_log!("styler: excluded subtree root={reported_type}");
         set.insert(handle);
+        foreign_alive().insert(handle);
+        *foreign_last() = Some(std::time::Instant::now());
         return true;
     }
     if set.contains(&parent) {
@@ -222,13 +227,56 @@ fn is_immersive(handle: u64, parent: u64, reported_type: &str) -> bool {
     false
 }
 
+/// Roots of live foreign islands (SnapLayout / Experiences subtrees). While
+/// any root is alive the whole write surface is quenched: a burst-rate gate
+/// alone lets writes slip between the island's construction chunks on the
+/// shared UI thread — interleaved `SetValue` there is what the drag later
+/// reports as `0xc0000005`/`0xc0000374` deep inside `Experiences.Switcher`.
+fn foreign_alive() -> std::sync::MutexGuard<'static, std::collections::BTreeSet<u64>> {
+    static M: Mutex<std::collections::BTreeSet<u64>> = Mutex::new(std::collections::BTreeSet::new());
+    M.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// Last moment a foreign root reported or was removed — a 500 ms teardown
+/// grace after the last root dies covers stragglers.
+fn foreign_last() -> std::sync::MutexGuard<'static, Option<std::time::Instant>> {
+    static M: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+    M.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// `true` while any foreign island is alive or died within the grace
+/// window — the write-quench predicate.
+fn foreign_island_active() -> bool {
+    if !foreign_alive().is_empty() {
+        return true;
+    }
+    foreign_last()
+        .is_some_and(|t| t.elapsed().as_millis() < 500)
+}
+
+/// A foreign root vanished (Remove or pin-drop) — drop the alive mark and
+/// stamp the grace window so teardown stragglers stay quenched.
+fn foreign_root_gone(handle: u64) {
+    if foreign_alive().remove(&handle) {
+        *foreign_last() = Some(std::time::Instant::now());
+    }
+}
+
 /// Shell-pid write scope — the whitelist inverse of `immersive()`. In the
 /// shell explorer the WUX session sees every island in the process (taskbar,
 /// SnapLayout's drag flyout, overflow flyouts, tooltips); the isolated
 /// `nowrite` test proved OUR writes into foreign islands seed the heap
-/// corruption the drag later detects. Only handles rooted at a `Taskbar.`
-/// element may be written; children inherit scope via the parent mark.
+/// corruption the drag later detects. Only handles rooted at taskbar-chrome
+/// types may be written; children inherit scope via the parent mark.
+///
+/// `Taskbar.` alone is NOT enough: `SystemTray` and `SearchUx` are sibling
+/// XAML islands inside the same taskbar chrome — their root elements report
+/// parent handles that never surface in this session (the island bridge is
+/// invisible to the diagnostics feed), so `relation.Parent` propagation can
+/// never mark them. The verified drop log (`SCOPE drop type=SystemTray.*`)
+/// starved every tray element — clock, icons, overflow — of styling.
 const TASKBAR_PREFIX: &str = "Taskbar.";
+const TASKBAR_SCOPE_ROOTS: [&str; 3] = ["Taskbar.", "SystemTray.", "SearchUx."];
 
 /// Handles inside the taskbar subtree — same propagation shape as
 /// `immersive()`: a `Taskbar.*` type marks a scope root and `relation.Parent`
@@ -240,13 +288,17 @@ fn taskbar_scope() -> std::sync::MutexGuard<'static, std::collections::BTreeSet<
 }
 
 /// `true` when `handle` belongs to the taskbar subtree — its reported type
-/// starts with `TASKBAR_PREFIX`, it was already marked, or its parent was.
+/// is a taskbar-chrome root, it was already marked, or its parent was.
 fn in_taskbar_scope(handle: u64, parent: u64, reported_type: &str) -> bool {
     let mut set = taskbar_scope();
     if set.contains(&handle) {
         return true;
     }
-    if reported_type.starts_with(TASKBAR_PREFIX) || set.contains(&parent) {
+    if TASKBAR_SCOPE_ROOTS
+        .iter()
+        .any(|p| reported_type.starts_with(p))
+        || set.contains(&parent)
+    {
         set.insert(handle);
         return true;
     }
@@ -256,6 +308,12 @@ fn in_taskbar_scope(handle: u64, parent: u64, reported_type: &str) -> bool {
 /// `g_elementPropertyModifying` — set while we write a property so the
 /// re-apply callback skips our own writes.
 static MODIFYING: AtomicBool = AtomicBool::new(false);
+
+/// Re-advise replay in flight (see `State`'s removed `readvising` field —
+/// it must be lock-free: `churn_recently_hot`/`storm_limited` read it from
+/// contexts that can already hold `state()`, and a nested `state()` lock on
+/// the same thread deadlocks permanently).
+static READVISING: AtomicBool = AtomicBool::new(false);
 
 /// Hard mute for the element path during a foreign-island burst. SnapLayout's
 /// drag flyout spins up ~hundreds of visual-tree events in <200ms inside the
@@ -269,14 +327,15 @@ const MUTE_EVENTS_PER_WINDOW: u32 = 25;
 const MUTE_WINDOW_MS: u128 = 100;
 const MUTE_QUIET_MS: u128 = 400;
 
+static CHURN: Mutex<(Vec<std::time::Instant>, Option<std::time::Instant>)> =
+    Mutex::new((Vec::new(), None));
+
 fn churn_muted() -> bool {
-    static S: Mutex<(Vec<std::time::Instant>, Option<std::time::Instant>)> =
-        Mutex::new((Vec::new(), None));
-    if state().readvising {
+    if READVISING.load(Ordering::Acquire) {
         return false;
     }
     let now = std::time::Instant::now();
-    let mut s = S.lock().unwrap_or_else(|p| p.into_inner());
+    let mut s = CHURN.lock().unwrap_or_else(|p| p.into_inner());
     // Inside a muted period: stay muted until quiet for MUTE_QUIET_MS.
     if let Some(since) = s.1 {
         if now.duration_since(since).as_millis() < MUTE_QUIET_MS {
@@ -297,6 +356,31 @@ fn churn_muted() -> bool {
     false
 }
 
+/// Read-only companion to `churn_muted` (which mutates the counter): `true`
+/// while the element path saw a burst recently — muted, or events still
+/// inside the rolling window. Service calls (`unregister` in
+/// `drain_releases`) must wait out a foreign island's teardown burst rather
+/// than reenter its dying apartment mid-callback.
+fn churn_recently_hot() -> bool {
+    // A live foreign island outranks the re-advise exemption: `READVISING`
+    // exists so the replay's own burst isn't mistaken for host churn, but a
+    // SnapLayout/Switcher island mid-construction must mute writes even
+    // while a replay is in flight — that window was the drag crash.
+    if foreign_island_active() {
+        return true;
+    }
+    if READVISING.load(Ordering::Acquire) {
+        return false;
+    }
+    let s = CHURN.lock().unwrap_or_else(|p| p.into_inner());
+    let now = std::time::Instant::now();
+    if let Some(last) = s.1 {
+        return now.duration_since(last).as_millis() < MUTE_QUIET_MS;
+    }
+    s.0.last()
+        .is_some_and(|t| now.duration_since(*t).as_millis() < MUTE_WINDOW_MS)
+}
+
 /// Visual-tree events per second that mean the host is in a layout loop
 /// (a vertically docked taskbar's XAML never converges — every churned
 /// element re-enters `on_element` and our writes feed the cycle). Above
@@ -311,7 +395,7 @@ const STORM_QUIET_PER_SEC: u32 = 60;
 /// the intended apply path, and it is bounded by the tree's size.
 fn storm_limited() -> bool {
     static S: Mutex<Option<(std::time::Instant, u32, bool)>> = Mutex::new(None);
-    if state().readvising {
+    if READVISING.load(Ordering::Acquire) {
         return false;
     }
     let mut g = S.lock().unwrap_or_else(|p| p.into_inner());
@@ -1251,6 +1335,140 @@ fn identity_key(d: &DependencyObject) -> Option<usize> {
     Interface::cast::<windows_core::IUnknown>(d)
         .ok()
         .map(|u| Interface::as_raw(&u) as usize)
+}
+
+// ============================================================================
+// `Grid.Column` auto-extension — the taskbar root Grid on this build ships
+// zero `ColumnDefinitions`, so a theme's `Grid.Column=N` write lands nowhere
+// and `HorizontalAlignment` alone decides position (Left = screen edge).
+// Rebuild the columns the theme expects: every column claimed by a child
+// becomes `Auto`, unclaimed columns become `Star` — flanking stars center
+// the claimed block and hug the tray against the centered taskbar pill.
+// ============================================================================
+
+struct GridColsState {
+    grid: windows_core::Weak<DependencyObject>,
+    /// The grid's column widths before our first extension (empty = none).
+    orig: Vec<xb::GridLength>,
+    /// Styled elements currently relying on the extended layout.
+    claims: usize,
+}
+
+fn grid_cols() -> std::sync::MutexGuard<'static, HashMap<usize, GridColsState>> {
+    static M: std::sync::OnceLock<Mutex<HashMap<usize, GridColsState>>> =
+        std::sync::OnceLock::new();
+    M.get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+}
+
+/// Runs right after a successful `Grid.Column` write on a taskbar-scope
+/// element. Returns the grid's `identity_key` when the element holds a
+/// claim on an extended layout.
+fn ensure_grid_columns(el: &DependencyObject) -> Option<usize> {
+    let parent = VisualTreeHelper::GetParent(el).ok()?;
+    let grid: xb::Grid = Interface::cast(&parent).ok()?;
+    let col_dp = xb::Grid::ColumnProperty().ok()?;
+    let gk = identity_key(&parent)?;
+    let cols: windows_collections::IVector<xb::ColumnDefinition> =
+        Interface::cast(&grid.ColumnDefinitions().ok()?).ok()?;
+    // Columns claimed across the grid's children — `el`'s just-applied
+    // value is included.
+    let mut claimed: BTreeSet<i32> = BTreeSet::new();
+    if let Ok(nkids) = VisualTreeHelper::GetChildrenCount(&parent) {
+        for k in 0..nkids.min(32) {
+            if let Ok(c) = VisualTreeHelper::GetChild(&parent, k)
+                && let Ok(v) = c.GetValue(&col_dp)
+                && let Some(i) = unbox(&v).and_then(|u| u.as_num())
+                && i > 0.0
+            {
+                claimed.insert(i as i32);
+            }
+        }
+    }
+    let &max_col = claimed.iter().next_back()?;
+    let need = (max_col + 2) as u32;
+    let have = cols.Size().unwrap_or(0);
+    {
+        let mut map = grid_cols();
+        match map.get_mut(&gk) {
+            Some(e) => e.claims += 1,
+            None => {
+                if have >= need {
+                    // Enough real columns — nothing of ours to restore.
+                    return None;
+                }
+                let mut orig = Vec::new();
+                for i in 0..have.min(16) {
+                    if let Ok(cd) = cols.GetAt(i)
+                        && let Ok(w) = cd.Width()
+                    {
+                        orig.push(w);
+                    }
+                }
+                map.insert(
+                    gk,
+                    GridColsState {
+                        grid: parent.downgrade().ok()?,
+                        orig,
+                        claims: 1,
+                    },
+                );
+            }
+        }
+    }
+    if have >= need {
+        return Some(gk);
+    }
+    let _ = cols.Clear();
+    for i in 0..need {
+        let Ok(cd) = xb::ColumnDefinition::new() else { break };
+        let _ = cd.SetWidth(xb::GridLength {
+            Value: 1.0,
+            GridUnitType: if claimed.contains(&(i as i32)) {
+                xb::GridUnitType::Auto
+            } else {
+                xb::GridUnitType::Star
+            },
+        });
+        let _ = cols.Append(&cd);
+    }
+    crate::tap_log!("grid_cols {gk}: extended {have}->{need} claimed={claimed:?}");
+    Some(gk)
+}
+
+/// `cleanup_element`/`restore_element` counterpart — the last claim out
+/// rebuilds the grid's original columns.
+fn release_grid_columns(gk: usize) {
+    let (grid, orig) = {
+        let mut map = grid_cols();
+        let Some(e) = map.get_mut(&gk) else { return };
+        e.claims = e.claims.saturating_sub(1);
+        if e.claims > 0 {
+            return;
+        }
+        let Some(e) = map.remove(&gk) else { return };
+        (e.grid.upgrade(), e.orig)
+    };
+    let Some(grid_d) = grid else { return };
+    let Ok(grid) = Interface::cast::<xb::Grid>(&grid_d) else {
+        return;
+    };
+    let Ok(cds) = grid.ColumnDefinitions() else {
+        return;
+    };
+    let Ok(cols) =
+        Interface::cast::<windows_collections::IVector<xb::ColumnDefinition>>(&cds)
+    else {
+        return;
+    };
+    let _ = cols.Clear();
+    for w in orig {
+        if let Ok(cd) = xb::ColumnDefinition::new() {
+            let _ = cd.SetWidth(w);
+            let _ = cols.Append(&cd);
+        }
+    }
 }
 
 /// The diagnostics-reported `element.Type`, keyed by `identity_key` — leaf
@@ -2380,6 +2598,13 @@ fn set_or_clear(
     val: &StyleVal,
     initial_apply: bool,
 ) -> Option<IInspectable> {
+    // Write quench: during a foreign-island burst the shared UI thread is
+    // mid-construction on someone else's tree — a SetValue interleaved
+    // there is the planted corruption the drag later reports. The mute
+    // only stops intake; this stops the queued write itself.
+    if churn_recently_hot() {
+        return None;
+    }
     let value: Option<IInspectable> = match val {
         StyleVal::Ready(v) => v.clone(),
         StyleVal::Blur(p) => {
@@ -2557,6 +2782,10 @@ struct ElemState {
     size_revoker: Option<windows_core::EventRevoker>,
     /// The element's spine node — built lazily on first use.
     tree_node: Option<Rc<TreeNode>>,
+    /// Parent-grid `identity_key` when a `Grid.Column` write claimed an
+    /// auto-extended `ColumnDefinitions` layout (`Cell` — released by both
+    /// `cleanup_element` and `restore_element`, idempotent).
+    grid_cols: core::cell::Cell<Option<usize>>,
 }
 
 impl ElemState {
@@ -2981,6 +3210,9 @@ fn register_reapply(handle: u64, el: &DependencyObject, dp: &DependencyProperty)
 /// The host wrote the property itself — adopt the external value as the new
 /// original, then put our `customValue` back.
 fn reapply_dp(handle: u64, dp: &DependencyProperty) {
+    if churn_recently_hot() {
+        return;
+    }
     let dp_raw = Interface::as_raw(dp) as usize;
     let (el, vsg_name, dp_c, name, custom) = {
         let eng = state();
@@ -3020,6 +3252,9 @@ fn reapply_dp(handle: u64, dp: &DependencyProperty) {
 /// `SetStyleVariableIfChangedAndPropagate` — re-read the capture, compare
 /// against its own previous value, notify dependents on change.
 fn capture_changed(handle: u64, var: &str, dp: &DependencyProperty) {
+    if churn_recently_hot() {
+        return;
+    }
     let (el, scope) = {
         let mut eng = state();
         let Some(es) = eng.elements.get_mut(&handle) else {
@@ -3207,6 +3442,9 @@ fn propagate_core(var: &str, changed_owner: Option<u64>, scope: usize) {
 /// had a rule, else unapplies. Dynamic picks re-resolve (with skip/unapply);
 /// static picks drop the dynamic bookkeeping first.
 fn on_vsg_state_changed(handle: u64, vsg_name: String, old_state: String, new_state: String) {
+    if churn_recently_hot() {
+        return;
+    }
     MODIFYING.store(true, Ordering::Relaxed);
     // Collect (dp_raw, action) under lock.
     let jobs: Vec<(usize, StyleVal)> = {
@@ -3328,6 +3566,11 @@ fn apply_element(
     matched: &[(usize, Vec<Option<FrameworkElement>>)],
     eng_rules: &[ResolvedRuleSet],
 ) {
+    // Callback registrations are element writes too — quench them with the
+    // rest of the write surface during a foreign-island burst.
+    if churn_recently_hot() {
+        return;
+    }
     // Phase A — gather buckets keyed by (vsg name, owning element). The mod's
     // `overridesPerVSG` is keyed by the resolved VisualStateGroup object:
     // the last `@vsg` write wins during matching, i.e. the FARTHEST
@@ -3417,6 +3660,7 @@ fn apply_element(
         vsg_subs: Vec::new(),
         size_revoker: None,
         tree_node: node_for(&dobj),
+        grid_cols: core::cell::Cell::new(None),
     };
     let el_type = class_name_el(el);
     let scope = scope_of(es.tree_node.as_ref());
@@ -3497,6 +3741,26 @@ fn apply_element(
                     slot.original = read_local(&dobj, dp, name);
                     slot.custom = Some(v.clone());
                     slot.last_applied = set_or_clear(&dobj, dp, name, &v, true);
+                    if crate::site::is_shell_tray_host() {
+                        let rb = dobj
+                            .GetValue(dp)
+                            .ok()
+                            .and_then(|v| unbox(&v).map(|u| u.to_text()))
+                            .unwrap_or_else(|| "<complex>".into());
+                        crate::tap_log!(
+                            "apply {fallback_type}.{name}: wrote={} readback={rb}",
+                            slot.last_applied.is_some()
+                        );
+                    }
+                    if slot.last_applied.is_some()
+                        && name.as_str() == "Grid.Column"
+                        && TASKBAR_SCOPE_ROOTS
+                            .iter()
+                            .any(|p| fallback_type.starts_with(p))
+                        && let Some(gk) = ensure_grid_columns(&dobj)
+                    {
+                        es.grid_cols.set(Some(gk));
+                    }
                 }
             }
             // The re-apply callback registers for every slotted property —
@@ -3970,9 +4234,15 @@ fn queue_release(handle: u64) {
     // dispatcher. Running them ON a dispatcher can therefore self-deadlock
     // the island's UI pump (mux replay also holds `state()` while parked on
     // the pump). A short-delay worker keeps the batching semantics without
-    // ever touching a UI queue.
+    // ever touching a UI queue. And during a foreign-island teardown burst
+    // (SnapLayout's drag storm) the marshaled `unregister` reenters a dying
+    // apartment — wait for quiet before draining rather than feeding calls
+    // into the teardown.
     std::thread::spawn(|| {
         unsafe { crate::win32::Sleep(150) };
+        while churn_recently_hot() {
+            unsafe { crate::win32::Sleep(200) };
+        }
         DRAIN_ARMED.store(false, Ordering::SeqCst);
         drain_releases();
     });
@@ -4023,6 +4293,10 @@ fn drain_releases() {
 /// captures (propagating each removal), unregister reapply callbacks + drop
 /// consumer entries, restore originals, drop the element state.
 fn cleanup_element(handle: u64, es: &ElemState) {
+    if let Some(gk) = es.grid_cols.get() {
+        es.grid_cols.set(None);
+        release_grid_columns(gk);
+    }
     // Unregisters must never be skipped (a skipped unregister leaves a
     // live callback pointing at freed state). The weakref resolves to
     // `None` on dead elements, so dead-element paths stay untouched.
@@ -4106,6 +4380,10 @@ fn cleanup_element(handle: u64, es: &ElemState) {
 
 /// One element's undo pass — unregister callbacks + restore originals.
 fn restore_element(es: &ElemState) {
+    if let Some(gk) = es.grid_cols.get() {
+        es.grid_cols.set(None);
+        release_grid_columns(gk);
+    }
     let Some(el) = es.upgrade_el() else {
         return;
     };
@@ -4152,6 +4430,11 @@ fn restore_element(es: &ElemState) {
 /// resvar removal (used on theme switch/reset; propagation is pointless once
 /// the whole registry is going away, so this skips it).
 fn restore_all() {
+    // Deferred past a burst — the sweep's unregisters/restores must not
+    // interleave with a foreign island's construction on this thread.
+    if churn_recently_hot() {
+        return;
+    }
     let elements: Vec<ElemState> = {
         let mut eng = state();
         eng.variables.clear();
@@ -4481,7 +4764,7 @@ pub fn session_reset() {
         eng.variables.clear();
         eng.consumers.clear();
         eng.dispatcher = None;
-        eng.readvising = false;
+        READVISING.store(false, Ordering::Release);
         // The old island's webviews died with it — their handles and
         // document-scripts are gone; the armed CSS re-injects as the new
         // tree re-reports.
@@ -4493,6 +4776,11 @@ pub fn session_reset() {
     drop(old_elements);
     known().clear();
     reported_types().clear();
+    // Scope/immersive marks are handle-keyed too — a recycled handle must
+    // never carry a dead island's admission into the new session.
+    taskbar_scope().clear();
+    immersive().clear();
+    foreign_alive().clear();
 }
 
 /// dispatcher; without one the pending theme sits until the first element.
@@ -4521,6 +4809,23 @@ pub(crate) fn dispatch_apply() {
 
 /// The apply sweep — UI thread.
 fn apply_theme_ui() {
+    // A foreign island bursting on this thread owns the pump right now —
+    // re-queue the sweep for the first quiet gap instead of interleaving
+    // our unregister/SetValue storm with its construction. A waiting worker
+    // holds the retry off the dispatcher entirely.
+    if churn_recently_hot() {
+        {
+            let mut eng = state();
+            eng.apply_queued = false;
+        }
+        std::thread::spawn(|| {
+            while churn_recently_hot() {
+                unsafe { crate::win32::Sleep(200) };
+            }
+            dispatch_apply();
+        });
+        return;
+    }
     let (kind, theme, use_classic) = {
         let mut eng = state();
         eng.apply_queued = false;
@@ -4560,7 +4865,7 @@ fn apply_theme_ui() {
     let pair = mod_service_watcher();
     match pair {
         Some((service, watcher)) => {
-            state().readvising = true;
+            READVISING.store(true, Ordering::Release);
             // Agile proxies — same justification as `start_advise`'s move.
             struct SendPair(
                 crate::bindings::IVisualTreeService3,
@@ -4585,7 +4890,7 @@ fn apply_theme_ui() {
                     "styler: re-advise done — {} elements styled",
                     state().elements.len()
                 );
-                state().readvising = false;
+                READVISING.store(false, Ordering::Release);
             });
         }
         None => {
@@ -4638,30 +4943,7 @@ fn retry_failed_rules(type_name: &str) {
 
 /// Tests an element against every ruleset (reverse file order → later rules
 /// win); applies on match. `fallback_type` = the reported `element.Type`.
-/// Diagnostic kill-switch: `%LOCALAPPDATA%\CoreDeskEngine\nowrite.flag`
-/// existing skips the whole write phase — the watcher stays advised, the
-/// marshal still fires, matchers still run, but no `SetValue`/`ClearValue`/
-/// callback-registration ever touches a host element. A clean drag with the
-/// flag present means OUR writes seed the heap corruption; a crash means the
-/// diagnostics service's own marshal is the corruptor. Resolved once — the
-/// flag is set before the resident injects.
-fn writes_disabled() -> bool {
-    static DISABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *DISABLED.get_or_init(|| {
-        let Ok(local) = std::env::var("LOCALAPPDATA") else {
-            return false;
-        };
-        std::path::Path::new(&local)
-            .join("CoreDeskEngine")
-            .join("nowrite.flag")
-            .exists()
-    })
-}
-
 fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _parent: u64) -> bool {
-    if writes_disabled() {
-        return false;
-    }
     // The corruption seed: the drag is likely only the DETECTOR (SnapLayout's
     // alloc storm walks the heap), while a write landing on an element that
     // died between capture and apply is the planter — task buttons churn
@@ -4676,7 +4958,11 @@ fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _paren
     let attached = Interface::cast::<DependencyObject>(el)
         .ok()
         .is_some_and(|d| VisualTreeHelper::GetParent(&d).is_ok());
-    if !attached && !fallback_type.starts_with(TASKBAR_PREFIX) {
+    if !attached
+        && !TASKBAR_SCOPE_ROOTS
+            .iter()
+            .any(|p| fallback_type.starts_with(p))
+    {
         return false;
     }
     let prev = state().elements.remove(&handle);
@@ -4710,6 +4996,111 @@ fn style_element(handle: u64, el: &FrameworkElement, fallback_type: &str, _paren
     if matched.is_empty() {
         return false;
     }
+    let el_name = el.Name().map(|n| n.to_string_lossy()).unwrap_or_default();
+    let detail: Vec<String> = matched
+        .iter()
+        .map(|(ri, _)| {
+            let r = &eng_rules[*ri];
+            format!(
+                "{}#{}(rules={},failed={})",
+                r.matcher.type_name, ri, r.rules.len(), r.failed
+            )
+        })
+        .collect();
+    crate::tap_log!("style_element {fallback_type} name={el_name:?} matched {} rulesets: {}", matched.len(), detail.join(","));
+    if fallback_type == "Taskbar.TaskbarFrame" || fallback_type == "SystemTray.SystemTrayFrame" {
+        let fd = el.FlowDirection().map(|f| f.0).unwrap_or(-1);
+        let mut chain = String::new();
+        let mut grid_spec = String::new();
+        let mut cur = Interface::cast::<DependencyObject>(el).ok();
+        for i in 0..8 {
+            let Some(d) = cur else { break };
+            let Ok(p) = VisualTreeHelper::GetParent(&d) else { break };
+            let tn = class_name_el(&p);
+            let nm = Interface::cast::<FrameworkElement>(&p)
+                .ok()
+                .and_then(|f| f.Name().ok())
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default();
+            if !chain.is_empty() {
+                chain.push_str(" <- ");
+            }
+            chain.push_str(&format!("{tn}#{nm}"));
+            if i == 0 {
+                if let Ok(nkids) = VisualTreeHelper::GetChildrenCount(&p) {
+                    let mut kids = String::from("kids=[");
+                    for k in 0..nkids.min(10) {
+                        if let Ok(c) = VisualTreeHelper::GetChild(&p, k) {
+                            let ct = class_name_el(&c);
+                            let (cn, cw, cha, ccol) =
+                                match Interface::cast::<FrameworkElement>(&c) {
+                                    Ok(f) => {
+                                        let cdp = Interface::cast::<DependencyObject>(&c).ok();
+                                        let col = cdp
+                                            .and_then(|d| {
+                                                xb::Grid::ColumnProperty()
+                                                    .ok()
+                                                    .and_then(|dp| d.GetValue(&dp).ok())
+                                            })
+                                            .and_then(|v| {
+                                                Interface::cast::<XamlPropertyValue>(&v)
+                                                    .ok()
+                                                    .and_then(|pv| pv.GetInt32().ok())
+                                            })
+                                            .unwrap_or(-99);
+                                        (
+                                            f.Name()
+                                                .map(|n| n.to_string_lossy())
+                                                .unwrap_or_default(),
+                                            f.ActualWidth().unwrap_or(-1.0),
+                                            f.HorizontalAlignment()
+                                                .map(|h| h.0)
+                                                .unwrap_or(-9),
+                                            col,
+                                        )
+                                    }
+                                    Err(_) => (String::new(), -1.0, -9, -99),
+                                };
+                            kids.push_str(&format!("{ct}#{cn}(w={cw},ha={cha},col={ccol}) "));
+                        }
+                    }
+                    kids.push(']');
+                    chain.push_str(&format!(" {kids}"));
+                }
+                if let Ok(g) = Interface::cast::<xb::Grid>(&p) {
+                    let aw = Interface::cast::<FrameworkElement>(&p)
+                        .ok()
+                        .and_then(|f| f.ActualWidth().ok())
+                        .unwrap_or(-1.0);
+                    if let Ok(cds) = g.ColumnDefinitions() {
+                        if let Ok(cols) = Interface::cast::<
+                            windows_collections::IVector<xb::ColumnDefinition>,
+                        >(&cds)
+                        {
+                            let n = cols.Size().unwrap_or(0);
+                            grid_spec = format!("grid_cols={n} grid_aw={aw} [");
+                            for ci in 0..n.min(12) {
+                                if let Ok(cd) = cols.GetAt(ci) {
+                                    if let Ok(w) = cd.Width() {
+                                        let tag = match w.GridUnitType.0 {
+                                            0 => "auto",
+                                            1 => "px",
+                                            _ => "*",
+                                        };
+                                        grid_spec
+                                            .push_str(&format!("{ci}:{}{} ", w.Value, tag));
+                                    }
+                                }
+                            }
+                            grid_spec.push(']');
+                        }
+                    }
+                }
+            }
+            cur = Some(p);
+        }
+        crate::tap_log!("frame_diag {fallback_type} handle={handle} flowdir={fd} {grid_spec} chain={chain}");
+    }
     apply_element(handle, el, fallback_type, &matched, &eng_rules);
     true
 }
@@ -4729,6 +5120,28 @@ pub fn on_element(
     if crate::command::is_unloaded() {
         return;
     }
+    // Capture the callback thread's dispatcher before ANY gate — every
+    // early-return below (mute, immersive, scope) would otherwise starve a
+    // pending theme apply: the replay/mute bursts that drop elements also
+    // block the only `elem_dispatcher` capture path, leaving `pending`
+    // set forever. `GetForCurrentThread` is free and needs no element.
+    if state().dispatcher.is_none()
+        && let Some(dq) = thread_dispatcher()
+    {
+        state().dispatcher = Some(dq);
+    }
+    // A pending theme can dispatch on this pump even when the element
+    // itself is muted/dropped — the report alone proves a live UI thread.
+    if !churn_recently_hot() {
+        let ready = {
+            let eng = state();
+            eng.pending.is_some() && eng.dispatcher.is_some()
+        };
+        if ready {
+            dispatch_apply();
+            return;
+        }
+    }
     // No drag gate: writes on live taskbar elements are safe now that the
     // real corruptors are closed (BSTR double-free, mux session marshal of
     // SnapLayout's WinUI3 island, stale-handle writes, foreign-thread
@@ -4745,6 +5158,9 @@ pub fn on_element(
         // matcher, dispatcher or write work. Immersive churn also stays
         // out of the storm counter so a Task View open can never pause
         // taskbar styling.
+        if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
+            crate::tap_log!("styler: IMMERSIVE drop handle={} type={reported_type} parent={parent}", element.Handle.0);
+        }
         queue_release(element.Handle.0);
         queue_release(parent);
         return;
@@ -4756,6 +5172,9 @@ pub fn on_element(
     if crate::site::is_shell_tray_host()
         && !in_taskbar_scope(element.Handle.0, parent, reported_type)
     {
+        if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
+            crate::tap_log!("styler: SCOPE drop handle={} type={reported_type} parent={parent}", element.Handle.0);
+        }
         queue_release(element.Handle.0);
         queue_release(parent);
         return;
@@ -4765,8 +5184,9 @@ pub fn on_element(
     queue_release(parent);
     // WebView2 CSS (`W` section) — retry elements whose `CoreWebView2`
     // wasn't initialized yet, then check the reported element itself.
-    // `maybe_inject` early-outs when no CSS is armed.
-    if !state().web_pending.is_empty() {
+    // `maybe_inject` early-outs when no CSS is armed. Cross-apartment
+    // probing waits out a burst like every other write-side op.
+    if !churn_recently_hot() && !state().web_pending.is_empty() {
         let retry: Vec<u64> = state().web_pending.keys().copied().collect();
         for h in retry {
             webview_maybe_inject(diagnostics, h);
@@ -4774,11 +5194,17 @@ pub fn on_element(
     }
     // `*.WebView2` elements resolve directly; `HostedWebView2Control` wraps
     // the real `WebView2Standalone.Controls.WebView2` in a subtree the
-    // session never reports — `resolve` walks it.
-    if reported_type.ends_with("WebView2") || reported_type.ends_with("HostedWebView2Control") {
+    // session never reports — `resolve` walks it. Deferred while hot:
+    // CoreWebView2 probing marshals into another apartment mid-burst.
+    if !churn_recently_hot()
+        && (reported_type.ends_with("WebView2") || reported_type.ends_with("HostedWebView2Control"))
+    {
         webview_maybe_inject(diagnostics, element.Handle.0);
     }
     if storm_limited() {
+        if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
+            crate::tap_log!("styler: STORM drop handle={} type={reported_type}", element.Handle.0);
+        }
         return;
     }
     // Snapshot engine state first — `GetIInspectableFromHandle` and
@@ -4794,8 +5220,14 @@ pub fn on_element(
             eng.applied.is_some(),
         )
     };
-    // A theme landed after the dispatcher was captured — apply it now.
-    if has_pending && !need_dispatcher {
+    // The hot check rides ahead of EVERY dispatch/write decision in this
+    // function — `TryEnqueue` from inside the callback during a foreign
+    // island's construction is the reentrancy the whole quench exists for.
+    let island_hot = churn_recently_hot();
+    // A theme landed after the dispatcher was captured — apply it now,
+    // unless a foreign island owns the pump: the pending theme survives
+    // and the first quiet element applies it.
+    if has_pending && !need_dispatcher && !island_hot {
         dispatch_apply();
         return;
     }
@@ -4803,7 +5235,13 @@ pub fn on_element(
     if !has_applied && !need_dispatcher && !has_pending {
         return;
     }
+    // (Quarantine lifted for re-test after the 26H2 → 26100.9278 Switcher
+    // update: the styled-element surface runs again; if the Switcher crash
+    // reproduces this is where it returns.)
     let Ok(obj) = (unsafe { diagnostics.GetIInspectableFromHandle(element.Handle) }) else {
+        if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
+            crate::tap_log!("styler: INSPECTABLE fail handle={} type={reported_type}", element.Handle.0);
+        }
         return;
     };
     let Ok(el) = Interface::cast::<FrameworkElement>(&obj) else {
@@ -4830,7 +5268,11 @@ pub fn on_element(
             eng.dispatcher = el_disp.clone();
         }
         // A theme landed before the dispatcher existed — apply it now.
-        if eng.pending.is_some() && eng.dispatcher.is_some() {
+        // But never `TryEnqueue` from inside the callback while a foreign
+        // island is hot: the reentrant queue mutation is the reentrancy the
+        // whole write quench exists to avoid. The pending theme applies on
+        // the first quiet element.
+        if eng.pending.is_some() && eng.dispatcher.is_some() && !island_hot {
             drop(eng);
             // `resolve_ruleset` materializes values (XamlReader.Load, brushes)
             // which are dispatcher-affine — it must run on the UI thread, so
@@ -4855,6 +5297,12 @@ pub fn on_element(
         state().dispatcher.clone()
     };
     if let Some(d) = d {
+        // No `TryEnqueue` (and no weakref) from inside the callback while a
+        // foreign island owns the thread — the deferred element restyles on
+        // its next report.
+        if churn_recently_hot() {
+            return;
+        }
         let Ok(el_weak) = el.downgrade() else {
             drop(el);
             drop(obj);
@@ -4866,6 +5314,9 @@ pub fn on_element(
         let ty = reported_type.to_string();
         let payload = UiBound(el_weak);
         post_ui(&d, Prio::Normal, move || {
+            if churn_recently_hot() {
+                return Ok(());
+            }
             if !known().contains_key(&handle) || state().applied.is_none() {
                 return Ok(());
             }
@@ -4885,7 +5336,9 @@ pub fn on_element(
         });
         return;
     }
-    let _ = style_element(element.Handle.0, &el, reported_type, parent);
+    if !churn_recently_hot() {
+        let _ = style_element(element.Handle.0, &el, reported_type, parent);
+    }
 }
 
 /// `OnVisualTreeChange` (Remove) — `CleanupCustomizations`: drop state,
@@ -4899,6 +5352,7 @@ pub fn on_element_removed(handle: u64) {
     immersive().remove(&handle);
     taskbar_scope().remove(&handle);
     known().remove(&handle);
+    foreign_root_gone(handle);
     queue_release(handle);
     {
         // A dead WebView must not keep its injected/pending marks — the
@@ -4924,16 +5378,52 @@ pub fn on_element_removed(handle: u64) {
             state().dispatcher.clone()
         };
         if let Some(d) = d {
-            let payload = UiBound(es);
+            if churn_recently_hot() {
+                // The element is dying inside a foreign-island teardown that
+                // is itself holding XAML's tree lock while reporting this
+                // Remove. Any element COM — unregisters, `GetParent`, weak
+                // resolves, even `EventRevoker` drops — waits on that lock:
+                // the reentrant wait is the AppHang that froze the taskbar.
+                // The element is dead regardless, so cleanup is moot — leak
+                // the state rather than drop its revokers on this thread.
+                std::mem::forget(es);
+                return;
+            }
+            // `ManuallyDrop`: a revoker drop on a teardown-locked thread is
+            // the same deadlock class as inline cleanup — if this item runs
+            // inside a foreign island's teardown we leak the state instead.
+            let payload = UiBound(std::mem::ManuallyDrop::new(es));
             post_ui(&d, Prio::Normal, move || {
+                if churn_recently_hot() {
+                    return Ok(());
+                }
                 let p = &payload;
-                cleanup_element(handle, &p.0);
+                // SAFETY: `ManuallyDrop` never drops the source, so reading
+                // the bits out transfers ownership cleanly — the revokers
+                // then drop with `es` at this item's end, on a quiet pump.
+                let es = unsafe { std::ptr::read(&*p.0) };
+                cleanup_element(handle, &es);
                 Ok(())
             });
             return;
         }
         cleanup_element(handle, &es);
     }
+}
+
+/// Pin/session-drop cleanup for callbacks rejected before any bookkeeping
+/// (foreign-thread reports in the shell pid, stray mux callbacks). The
+/// diagnostics contract still hands ownership of the reported handles, and
+/// a recycled handle may carry a stale scope/immersive/known mark from a
+/// dead taskbar element — scrub the marks and release both handles so a
+/// dropped Remove can never leave admission behind for a foreign island.
+pub fn drop_untracked(handle: u64, parent: u64) {
+    immersive().remove(&handle);
+    taskbar_scope().remove(&handle);
+    known().remove(&handle);
+    foreign_root_gone(handle);
+    queue_release(handle);
+    queue_release(parent);
 }
 
 /// Whether a theme is currently armed — platform keeps the DLL resident
@@ -4996,6 +5486,8 @@ pub fn shutdown() {
     drop(old_elements);
     known().clear();
     immersive().clear();
+    taskbar_scope().clear();
+    foreign_alive().clear();
     reported_types().clear();
     TL_RULES.with(|t| *t.borrow_mut() = (0, Rc::new(Vec::new())));
     TREE_NODES.with(|p| p.borrow_mut().clear());
