@@ -1,18 +1,11 @@
 # Builds the product site and uploads it to the Cloudflare Pages project "coredesk"
-# (direct upload, no Git integration). Requires two repository secrets:
+# (direct upload, no Git integration). MANUAL ONLY: the fork carries no
+# Cloudflare secrets — restore the push trigger once these exist:
 #   CLOUDFLARE_API_TOKEN   token with "Cloudflare Pages: Edit" on the account
 #   CLOUDFLARE_ACCOUNT_ID  the account id shown by `wrangler whoami`
 name: Website
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'site/**'
-      - 'scripts/build-site.py'
-      - 'scripts/manual_i18n.py'
-      - 'docs/assets/hero-*.png'
-      - '.github/workflows/website.yml'
   workflow_dispatch:
 
 permissions:
