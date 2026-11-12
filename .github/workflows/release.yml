@@ -60,5 +60,10 @@ jobs:
           foreach ($asset in $assets) {
             if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) { throw "Missing release asset: $asset" }
           }
-          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --generate-notes --title "CoreDesk $env:GITHUB_REF_NAME"
+          gh release view $env:GITHUB_REF_NAME --repo $env:GH_REPO *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME @assets --repo $env:GH_REPO --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME @assets --repo $env:GH_REPO --verify-tag --generate-notes --title "CoreDesk $env:GITHUB_REF_NAME"
+          }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
