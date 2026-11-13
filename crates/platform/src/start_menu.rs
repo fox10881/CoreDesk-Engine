@@ -398,8 +398,7 @@ pub fn apply_start_menu_theme(id: &str) -> bool {
     let wire = if id.is_empty() {
         String::new() // empty wire → CDS_RESET
     } else {
-        match coredesk_core::start_menu_themes::theme_wire(id, fit.is_finite().then_some(fit))
-        {
+        match coredesk_core::start_menu_themes::theme_wire(id, fit.is_finite().then_some(fit)) {
             Some(w) => w,
             None => return false,
         }
