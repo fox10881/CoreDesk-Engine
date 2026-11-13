@@ -2576,6 +2576,16 @@ impl App {
         if !path.is_file() || self.video_transcode.is_some() {
             return false;
         }
+        // `video-*`/`master-*` cache names ARE optimized artifacts already —
+        // spawning a pass for one just re-finds the same file and holds the
+        // swap off another poll cycle.
+        if path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.starts_with("video-") || n.starts_with("master-"))
+        {
+            return false;
+        }
         let Some(dir) = self
             .state
             .config_path()
@@ -2859,6 +2869,9 @@ impl App {
                                 Some(variant.unwrap_or(master).to_string_lossy().into_owned());
                         }
                         self.settings_mutated();
+                        // The path just moved — drive the swap NOW instead of
+                        // letting the player wait for the next poll tick.
+                        self.sync_video_wallpaper();
                         if t.toast {
                             self.pending_video_toast = true;
                         }
@@ -2920,7 +2933,16 @@ impl App {
         {
             return;
         }
-        if self.wmf_player.as_ref().is_some_and(|p| p.is_alive()) {
+        // A live player on the wanted file+config is the healed state — done.
+        // One on a stale path (config flipped to a transcode variant, a theme
+        // import re-pointed it) must still reach the swap below: nothing else
+        // re-drives the start — `sync_video_wallpaper` yielded to the transcode
+        // and `settings_mutated` never calls it back.
+        if self
+            .wmf_player
+            .as_ref()
+            .is_some_and(|p| p.is_alive() && p.path() == path && p.config() == config)
+        {
             return;
         }
         // Shell down (GetShellWindow is a live query) — attach would just fail;
@@ -4860,15 +4882,80 @@ impl App {
             path.to_path_buf()
         };
         cfg.settings.active_theme_path = Some(active_path.to_string_lossy().into_owned());
+        // Two paths: applying a LIBRARY card whose fence ids match the user's
+        // runs exactly as it always did — the theme's stored arrangement,
+        // fence settings and widget bounds all land verbatim. A NEW `.cde`
+        // import — or any theme whose fence ids are all foreign — instead
+        // keeps the user's fences untouched: layouts, memberships and every
+        // fence-owned setting stay, and both widgets (clock + visualizer)
+        // drop back to the default centred spot since foreign pixel coords
+        // are meaningless here.
+        cfg.settings.desktop_path = self.state.config.settings.desktop_path.clone();
+        let current_fence_ids: std::collections::HashSet<_> = self
+            .state
+            .config
+            .layouts
+            .iter()
+            .flat_map(|l| l.fences.iter().map(|f| f.id))
+            .collect();
+        let theme_fence_ids: std::collections::HashSet<_> = cfg
+            .layouts
+            .iter()
+            .flat_map(|l| l.fences.iter().map(|f| f.id))
+            .collect();
+        // A theme sharing no fence ids cannot "restore" an arrangement it
+        // never saw — foreign. A fence-less theme applied over real fences is
+        // foreign too (it would otherwise delete them); two empty sides are
+        // just not comparable, not foreign.
+        let foreign_theme = theme_fence_ids.is_disjoint(&current_fence_ids)
+            && !(theme_fence_ids.is_empty() && current_fence_ids.is_empty());
+        let inherit_user_fences =
+            !current_fence_ids.is_empty() && (save_to_library || foreign_theme);
+        if inherit_user_fences {
+            cfg.layouts = self.state.config.layouts.clone();
+            cfg.items = self.state.config.items.clone();
+            let old = &self.state.config.settings;
+            let s = &mut cfg.settings;
+            s.label_color = old.label_color;
+            s.title_align = old.title_align;
+            s.tab_bar = old.tab_bar;
+            s.icon_size = old.icon_size;
+            s.quick_hide = old.quick_hide.clone();
+            s.roll_up = old.roll_up.clone();
+            s.show_desktop = old.show_desktop;
+            s.hide_real_icons = old.hide_real_icons;
+            s.hide_inbox_when_icons_shown = old.hide_inbox_when_icons_shown;
+            s.offer_new_fence = old.offer_new_fence;
+            s.show_real_icons_when_fences_hidden = old.show_real_icons_when_fences_hidden;
+            s.snapping = old.snapping.clone();
+            s.zorder = old.zorder;
+            s.peek = old.peek.clone();
+            s.icons = old.icons.clone();
+        }
+        if save_to_library || foreign_theme {
+            cfg.settings.clock_bounds = None;
+            for p in cfg.settings.widget_params.values_mut() {
+                p.bounds = None;
+                p.viz_bounds = None;
+            }
+        }
         remap_theme_monitors(&mut cfg, &self.state.work_areas);
         // Adaptive engine: canvas coordinates ride `theme.json`; when present they re-place
         // fences onto the fitted asset and scale the grid by the DPI ratio. Legacy archives
         // have no metadata and keep the remapped geometry untouched. The canvas is also kept
         // for the contain/cover toggle re-fit (a legacy theme clears any stale one).
         self.last_theme_meta = extracted.meta.clone();
+        // Canvas placement writes `fence.geometry` — discard them when the
+        // user's own layout was inherited; only the asset dims (wallpaper fit)
+        // are wanted. Library applies and first-run imports keep the authored
+        // placement verbatim.
+        let user_layouts = inherit_user_fences.then(|| cfg.layouts.clone());
         let adaptive_asset = self.last_theme_meta.clone().and_then(|m| {
             self.apply_adaptive_layout(&mut cfg, &m, persisted_bg.as_deref(), is_video)
         });
+        if let Some(l) = user_layouts {
+            cfg.layouts = l;
+        }
         self.adopt_config(cfg, ConfigSource::Theme);
 
         if let Some(bg) = persisted_bg {
