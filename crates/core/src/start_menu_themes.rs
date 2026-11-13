@@ -52,13 +52,49 @@ pub fn theme(id: &str) -> Option<serde_json::Value> {
 ///
 /// `$constant` substitution is done here (longest-name-first, the mod's own
 /// ordering), so the DLL only ever sees expanded style strings.
-pub fn theme_wire(id: &str) -> Option<String> {
-    Some(wire_from_payload(&theme(id)?))
+///
+/// `fit_h` caps numeric `Height`/`MaxHeight` rules at the DIP space the menu
+/// can actually occupy (work area minus margin, computed by the platform
+/// layer): XAML sizes are device-independent, so a theme authored on a
+/// high-DIP desktop overflows a scaled-down screen — its bottom chrome
+/// (`UserTileView`, `PowerOptionsView`) renders past the clipped window.
+/// `None` disables the cap.
+pub fn theme_wire(id: &str, fit_h: Option<f64>) -> Option<String> {
+    Some(wire_from_payload(&theme(id)?, fit_h))
+}
+
+/// `Height`/`MaxHeight` setters whose numeric value exceeds `fit` are
+/// rewritten down to it — anything taller than the available DIP space is
+/// clipped chrome, not styling. Non-numeric values (`Auto`, markup) and
+/// heights that already fit pass through verbatim; `:=` and `=` spellings
+/// are preserved.
+fn clamp_height_rule(style: &str, fit: Option<f64>) -> String {
+    let Some(fit) = fit else {
+        return style.to_string();
+    };
+    let Some(eq) = style.find('=') else {
+        return style.to_string();
+    };
+    // `Prop:=Value` — the `:` rides along with the operator.
+    let (prop, op) = match style[..eq].strip_suffix(':') {
+        Some(p) => (p, ":="),
+        None => (style[..eq].as_ref(), "="),
+    };
+    let prop = prop.trim();
+    let value = style[eq + 1..].trim();
+    let bare = prop.split('@').next().unwrap_or(prop).trim();
+    let Ok(n) = value.parse::<f64>() else {
+        return style.to_string();
+    };
+    if !(bare == "Height" || bare == "MaxHeight") || n <= fit || fit <= 0.0 {
+        return style.to_string();
+    }
+    format!("{prop}{op}{}", fit.floor() as i64)
 }
 
 /// The wire serializer against an already-loaded payload — kept separate
 /// from file resolution so unit tests need no filesystem.
-fn wire_from_payload(theme: &serde_json::Value) -> String {
+fn wire_from_payload(theme: &serde_json::Value, fit_h: Option<f64>) -> String {
     let mut out = String::with_capacity(64 * 1024);
     out.push_str("CDES-SMS1\n");
     let layout = theme["startMenuLayout"]
@@ -117,6 +153,7 @@ fn wire_from_payload(theme: &serde_json::Value) -> String {
                         emitted_target = true;
                     }
                     let style = styles_fs::expand_constants(style, &constants);
+                    let style = clamp_height_rule(&style, fit_h);
                     out.push_str("S ");
                     out.push_str(&style.replace(['\t', '\n'], " "));
                     out.push('\n');
@@ -227,7 +264,7 @@ mod tests {
 
     #[test]
     fn theme_wire_serializes_rules_resources_and_layout() {
-        let wire = wire_from_payload(&fixture());
+        let wire = wire_from_payload(&fixture(), None);
         assert!(wire.starts_with("CDES-SMS1\n"));
         assert!(wire.ends_with("E\n"));
         assert!(wire.contains("L windowsDefault\n"));
@@ -240,6 +277,25 @@ mod tests {
     }
 
     #[test]
+    fn theme_wire_clamps_heights_to_fit() {
+        let mut doc = fixture();
+        doc["targetStyles"] = serde_json::json!([
+            { "target": "Grid#MainMenu", "styles": ["Height=740", "Width=470"] },
+            { "target": "StartDocked.StartMenuCompanion#RightCompanion", "styles": ["Height:=700"] },
+            { "target": "Grid#UndockedRoot", "styles": ["MaxHeight:=340", "Height=Auto"] }
+        ]);
+        let wire = wire_from_payload(&doc, Some(672.0));
+        assert!(wire.contains("S Height=672\n"));
+        assert!(wire.contains("S Width=470\n")); // non-height rules untouched
+        assert!(wire.contains("S Height:=672\n")); // `:=` spelling preserved
+        assert!(wire.contains("S MaxHeight:=340\n")); // already fits
+        assert!(wire.contains("S Height=Auto\n")); // non-numeric untouched
+        // No cap → verbatim.
+        let wire = wire_from_payload(&doc, None);
+        assert!(wire.contains("S Height=740\n"));
+    }
+
+    #[test]
     fn theme_wire_serializes_webcontent_styles() {
         let mut doc = fixture();
         doc["webContentStyles"] = serde_json::json!([
@@ -247,7 +303,7 @@ mod tests {
             { "target": "//comment", "styles": ["ignored: yes"] },
             { "target": ".suggContainer", "styles": ["background-color: rgba(0,0,0,.5) !important"] }
         ]);
-        let wire = wire_from_payload(&doc);
+        let wire = wire_from_payload(&doc, None);
         assert!(
             wire.contains("W html{background: transparent !important;border: none !important}\n")
         );
@@ -268,7 +324,7 @@ mod tests {
             "TranslucentStartMenu",
         )
         .expect("shipped TranslucentStartMenu");
-        let wire = wire_from_payload(&doc);
+        let wire = wire_from_payload(&doc, None);
         assert!(wire.starts_with("CDES-SMS1\n"));
         assert!(wire.contains("T Border#AcrylicBorder\n"));
         assert!(wire.contains("\nC\n"));

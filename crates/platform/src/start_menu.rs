@@ -123,6 +123,9 @@ struct Sms {
     /// The theme serialized for transport — cached so a re-inject after a
     /// host restart doesn't rebuild it.
     wire: String,
+    /// The DIP height cap `wire` was serialized with — a display-scale or
+    /// work-area change drifts it and `ensure()` re-serializes.
+    fit: f64,
     /// `[SMEH, SearchHost]` — both spawned lazily by the shell.
     hosts: [Host; 2],
 }
@@ -356,6 +359,34 @@ fn deliver_locked(host: &mut Host, wire: &str) -> bool {
     send_copydata(host.cmd_hwnd, CDS_THEME, wire.as_bytes())
 }
 
+/// DIP headroom the Start menu can occupy: each monitor's work-area height
+/// in device-independent units (physical px ÷ scale), the smallest wins —
+/// SMEH can surface on any of them. XAML sizes don't scale with DPI, so a
+/// theme authored on a high-DIP desktop overflows a scaled-down screen and
+/// its bottom chrome (user tile, power) clips out of view; `theme_wire`
+/// rewrites oversized `Height`/`MaxHeight` rules down to this cap.
+///
+/// The reserve covers what sits *below* `Grid#MainMenu`: the navigation
+/// strip (`NavigationPaneView` — user tile + power, ~56 DIP plus the
+/// translate themes give it) is a sibling, not a child, so it stacks onto
+/// the frame's total height — and a small margin keeps the menu off the
+/// work-area edge. `f64::INFINITY` = unknown.
+fn start_fit_height() -> f64 {
+    const EDGE_MARGIN_DIP: f64 = 16.0;
+    const BOTTOM_CHROME_DIP: f64 = 72.0;
+    crate::monitors::enumerate()
+        .iter()
+        .filter_map(|m| {
+            let scale = m.scale() as f64;
+            (scale > 0.0).then(|| {
+                (m.work_area.bottom - m.work_area.top) as f64 / scale
+                    - EDGE_MARGIN_DIP
+                    - BOTTOM_CHROME_DIP
+            })
+        })
+        .fold(f64::INFINITY, f64::min)
+}
+
 /// Applies the selected Start Menu style.
 ///
 /// `id` is a catalog id (`""` = Windows Default). Returns `false` only when
@@ -363,10 +394,12 @@ fn deliver_locked(host: &mut Host, wire: &str) -> bool {
 /// all the selection is stored and applied on its next launch, so the call
 /// still reports success (same UX as the old Windhawk write).
 pub fn apply_start_menu_theme(id: &str) -> bool {
+    let fit = start_fit_height();
     let wire = if id.is_empty() {
         String::new() // empty wire → CDS_RESET
     } else {
-        match coredesk_core::start_menu_themes::theme_wire(id) {
+        match coredesk_core::start_menu_themes::theme_wire(id, fit.is_finite().then_some(fit))
+        {
             Some(w) => w,
             None => return false,
         }
@@ -375,6 +408,7 @@ pub fn apply_start_menu_theme(id: &str) -> bool {
     let sms = guard.get_or_insert_with(|| Sms {
         style: String::new(),
         wire: String::new(),
+        fit: f64::INFINITY,
         hosts: [
             Host::new("startmenuexperiencehost.exe", false),
             Host::new("searchhost.exe", true),
@@ -382,6 +416,7 @@ pub fn apply_start_menu_theme(id: &str) -> bool {
     });
     sms.style = id.to_string();
     sms.wire = wire;
+    sms.fit = fit;
     let mut ok = true;
     for host in &mut sms.hosts {
         let Some(pid) = find_pid(host.exe) else {
@@ -444,7 +479,10 @@ pub fn ensure() {
         };
         any_stale |= stale;
     }
-    if !any_stale {
+    // A scale/work-area change drifts the baked height cap even while the
+    // hosts stay healthy — re-serialize so the menu refits the new DIP space.
+    let fit_drifted = (start_fit_height() - sms.fit).abs() > 0.5;
+    if !any_stale && !fit_drifted {
         return;
     }
     let style = sms.style.clone();
