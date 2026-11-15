@@ -388,15 +388,22 @@ pub fn query() -> Result<WallpaperSnapshot> {
         let count = dw.GetMonitorDevicePathCount()?;
         let mut monitors = Vec::with_capacity(count as usize);
         for i in 0..count {
-            let id = take_string(dw.GetMonitorDevicePathAt(i)?);
+            // Explorer retains disconnected outputs: one stale entry must not fail
+            // the whole snapshot — skip it and keep the live monitors.
+            let Ok(dev_path) = dw.GetMonitorDevicePathAt(i) else {
+                continue;
+            };
+            let id = take_string(dev_path);
             let id_w = to_wide(&id);
-            // Explorer retains disconnected outputs and returns E_FAIL for their rectangle.
-            // They are not part of the visible wallpaper and must not fail the whole read.
+            // GetMonitorRECT returns E_FAIL for those retained entries.
             let rect = dw.GetMonitorRECT(PCWSTR(id_w.as_ptr())).unwrap_or_default();
             // A failed query on a live monitor is not a solid-colour wallpaper. Preserve
             // that distinction so a switch-in-progress cannot replace good pixels with black.
             let path = if rect.right > rect.left && rect.bottom > rect.top {
-                let path = take_string(dw.GetWallpaper(PCWSTR(id_w.as_ptr()))?);
+                let Ok(raw) = dw.GetWallpaper(PCWSTR(id_w.as_ptr())) else {
+                    continue;
+                };
+                let path = take_string(raw);
                 (!path.is_empty()).then(|| {
                     let path = PathBuf::from(path);
                     if path.is_file() {

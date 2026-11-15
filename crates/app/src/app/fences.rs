@@ -988,9 +988,10 @@ impl App {
         if !self.state.config.settings.roll_up.auto_fold {
             return;
         }
-        if window::key_down(msg::VK_LBUTTON) {
-            return;
-        }
+        // No VK_LBUTTON early-out: OLE drags hold the button the whole time, and the
+        // peek handlers already guard against local gestures (in_size_move, pressed,
+        // drag, marquee, tab/scroll drags), so a file dragged into a fence's zone
+        // still opens it.
         let pt = window::cursor_pos();
         let hit = desktop::window_from_point(pt.x, pt.y);
         let root = desktop::root_ancestor(hit);

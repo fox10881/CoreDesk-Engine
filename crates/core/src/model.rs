@@ -167,6 +167,14 @@ pub struct Settings {
     /// configured path itself is the best asset known (pre-field configs).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub video_master_path: Option<String>,
+    /// The image file CoreDesk last applied as the static desktop wallpaper —
+    /// the persisted `imported_wallpapers/theme-background-*` asset for themes,
+    /// the picked file otherwise. Machine-local, so `.cde` exports clear it
+    /// (the image itself travels as `background.<ext>`); at save time it is the
+    /// last-resort background source when OS wallpaper queries (`SPI` and
+    /// `IDesktopWallpaper`) report nothing packable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallpaper_path: Option<String>,
     /// The Start Menu style applied through Windhawk's
     /// `windows-11-start-menu-styler` mod — a [`crate::start_menu_themes`]
     /// catalog id, `""` = Windows Default (the mod's `theme` setting cleared).
@@ -980,6 +988,7 @@ impl Default for Settings {
             desktop_path: None,
             video_wallpaper_path: None,
             video_master_path: None,
+            wallpaper_path: None,
             start_menu_style: String::new(),
             taskbar_style: String::new(),
             notification_center_style: String::new(),
@@ -3119,6 +3128,24 @@ mod tests {
         assert_eq!(json["wallpaperPath"], r"C:\Wallpapers\a.jpg");
         let back: Snapshot = serde_json::from_value(json).unwrap();
         assert_eq!(back.wallpaper_path.as_deref(), Some(r"C:\Wallpapers\a.jpg"));
+    }
+
+    #[test]
+    fn settings_wallpaper_path_defaults_none_and_round_trips() {
+        // Configs predating the field carry no `wallpaperPath`; `None` stays omitted.
+        let mut s = Settings::default();
+        assert_eq!(s.wallpaper_path, None);
+        let mut json = serde_json::to_value(&s).unwrap();
+        assert!(json.get("wallpaperPath").is_none());
+        json.as_object_mut().unwrap().remove("wallpaperPath");
+        let legacy: Settings = serde_json::from_value(json).unwrap();
+        assert_eq!(legacy.wallpaper_path, None);
+
+        s.wallpaper_path = Some(r"C:\Wallpapers\b.png".into());
+        let json = serde_json::to_value(&s).unwrap();
+        assert_eq!(json["wallpaperPath"], r"C:\Wallpapers\b.png");
+        let back: Settings = serde_json::from_value(json).unwrap();
+        assert_eq!(back.wallpaper_path.as_deref(), Some(r"C:\Wallpapers\b.png"));
     }
 
     fn geo() -> NormGeometry {

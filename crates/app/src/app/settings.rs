@@ -560,11 +560,12 @@ impl App {
         // hand edit — normalize before anything diffs/applies it, or the
         // shell surfaces get fed values this build can't honour.
         cfg.sanitize_external();
-        if cfg.settings.desktop_effect != "none"
-            && crate::effects_engine::Effect::from_id(&cfg.settings.desktop_effect).is_none()
-        {
-            cfg.settings.desktop_effect = "none".into();
-        }
+        // `desktop_effect` may name a `Styles\Live Effects\<id>.json` preset, not just a
+        // compiled id — `Effect::from_id` does not resolve presets, so this must NOT be a
+        // from_id gate (it wiped preset effects on every theme apply/import/restore).
+        // `sanitize_external` already charset-validates the id; an unresolvable one simply
+        // draws no overlay until its preset file arrives — same contract as every other
+        // file-catalog style id.
         let old_settings = self.state.config.settings.clone();
         self.state.replace_config(cfg);
         if let Some(desk) = shell::user_desktop() {
@@ -3026,6 +3027,10 @@ impl App {
         {
             self.settings_mutated();
         }
+        // Record the file we just applied: exports fall back to it when OS
+        // wallpaper queries report nothing (no extra `settings_mutated` — the
+        // machine-local path rides whatever save is already scheduled).
+        self.state.config.settings.wallpaper_path = Some(path.to_string());
         coredesk_platform::sysparams::set_desktop_wallpaper(path)
     }
 
@@ -3123,6 +3128,10 @@ impl App {
         self.static_under_video = None;
         self.state.config.settings.video_wallpaper_path = None;
         self.state.config.settings.video_master_path = None;
+        // The externally applied image is the current static wallpaper — record
+        // it so exports keep tracking the real background.
+        self.state.config.settings.wallpaper_path =
+            now.as_ref().map(|(p, _)| p.to_string_lossy().into_owned());
         // `settings_mutated` — not bare `schedule_save` — or the cleared path never
         // reaches disk (`save_if_dirty` writes only flagged state) and the next
         // launch resurrects the video.
@@ -3395,10 +3404,23 @@ impl App {
             .as_ref()
             .map(|s| s.path.clone())
             .filter(|p| p.is_file());
+        // Last-resort fallbacks: the files the app itself applied. OS queries can
+        // legitimately come up empty (per-monitor `IDesktopWallpaper` writes leave
+        // `SPI_GETDESKWALLPAPER` blank on some builds; a single bad monitor fails
+        // the whole `wallpaper::query()` snapshot) — without the recorded paths a
+        // `.cde` save drops `background.<ext>` even though the theme applied fine.
+        let configured =
+            |p: &Option<String>| p.as_deref().map(PathBuf::from).filter(|p| p.is_file());
+        let video_cfg = configured(&self.state.config.settings.video_wallpaper_path);
+        let static_cfg = configured(&self.state.config.settings.wallpaper_path);
         let chosen = if player_alive && player_file {
             player_path.clone()
         } else {
-            swap_path.clone().or(static_src.clone())
+            swap_path
+                .clone()
+                .or(static_src.clone())
+                .or_else(|| video_cfg.clone())
+                .or_else(|| static_cfg.clone())
         };
         tracing::info!(
             player_present = player.is_some(),
@@ -3410,6 +3432,7 @@ impl App {
             idw_wallpaper = ?idw.as_ref().map(|o| o.as_ref().map(|p| p.display().to_string())),
             static_under_video = ?self.static_under_video,
             configured_video = ?self.state.config.settings.video_wallpaper_path,
+            configured_static = ?self.state.config.settings.wallpaper_path,
             chosen = ?chosen,
             "background source evaluated"
         );
@@ -3438,6 +3461,10 @@ impl App {
     > {
         let mut cfg = cfg.clone();
         cfg.make_theme_portable();
+        // `wallpaper_path` is machine-local like `video_master_path`: the image
+        // itself travels as `background.<ext>` and the importer re-points the
+        // setting at its own persisted `theme-background-*` copy.
+        cfg.settings.wallpaper_path = None;
         // A bundle whose background is not the video must not resurrect a stale
         // `video_wallpaper_path` on import — it only survives when a video is embedded.
         let video_bg = bg_source
@@ -3573,6 +3600,10 @@ impl App {
         );
         pick(&s.clock_style, sfs::CLOCK_WIDGET_DIR, "html");
         pick(&s.visualizer_style, sfs::VISUALIZER_WIDGET_DIR, "html");
+        // A custom `Live Effects` preset must travel too — without it the theme's
+        // `desktopEffect` resolves to nothing on the target machine. Builtin ids
+        // and factory presets resolve outside the user layer, so `pick` no-ops.
+        pick(&s.desktop_effect, sfs::LIVE_EFFECTS_DIR, "json");
         out
     }
 
@@ -3998,6 +4029,10 @@ impl App {
         {
             self.settings_mutated();
         }
+        // Record the SOURCE asset (not the derived `adaptive-*.jpg`) so a later
+        // export can fall back to the full-fidelity file when OS wallpaper
+        // queries report nothing.
+        self.state.config.settings.wallpaper_path = Some(bg.to_string_lossy().into_owned());
         let snap = coredesk_platform::wallpaper::query().ok();
         let dir = self
             .state
@@ -4906,6 +4941,11 @@ impl App {
         } else if persisted_bg.is_some() {
             cfg.settings.video_wallpaper_path = None;
             cfg.settings.video_master_path = None;
+            // The persisted copy is this machine's background source — the
+            // save path falls back to it if OS wallpaper queries come up empty.
+            cfg.settings.wallpaper_path = persisted_bg
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned());
         }
 
         // A picked file joins the library first: the card it becomes (not the file the

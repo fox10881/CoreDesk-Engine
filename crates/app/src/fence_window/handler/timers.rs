@@ -224,12 +224,13 @@ pub(super) fn on_timer_peek_open(
     } = h;
     window::kill_timer(hwnd, TIMER_PEEK_OPEN);
     peek_armed.set(false);
-    if in_size_move.get() || window::key_down(msg::VK_LBUTTON) {
+    let auto_fold = h.behavior.auto_fold.get();
+    let lbutton = window::key_down(msg::VK_LBUTTON);
+    if in_size_move.get() || (lbutton && !auto_fold) {
         // Modal move/size loop (or a press about to start one) owns the
         // window rect: do not fight it with a peek animation.
         return Some(0);
     }
-    let auto_fold = h.behavior.auto_fold.get();
     {
         let mut guard = view.borrow_mut();
         if let Some(v) = guard.as_mut()
@@ -239,6 +240,14 @@ pub(super) fn on_timer_peek_open(
             && (!v.peeking || (auto_fold && v.roll_target()))
             && (v.roll_anim.is_none() || auto_fold)
             && (v.title_hover || auto_fold)
+            // With auto_fold an OLE drag holds the button for the whole hover: open
+            // anyway, unless a gesture on this window itself owns the pointer.
+            && (!lbutton
+                || (v.pressed.is_none()
+                    && v.drag.is_none()
+                    && v.marquee.is_none()
+                    && v.tab_drag.is_none()
+                    && v.scroll_drag.is_none()))
         {
             v.manual_fold_latched = false;
             v.peeking = true;
@@ -265,17 +274,19 @@ pub(super) fn on_timer_drag_peek(
         view, in_size_move, ..
     } = h;
     window::kill_timer(hwnd, TIMER_DRAG_PEEK);
+    let auto_fold = h.behavior.auto_fold.get();
     if let Ok(mut guard) = view.try_borrow_mut()
         && let Some(v) = guard.as_mut()
     {
         v.drag_peek_armed = false;
         if !v.retired
-            && v.rolled_up
-            && !v.peeking
-            && v.roll_anim.is_none()
-            && (v.drop_hover || v.drop_tab.is_some())
+            && (v.rolled_up || (auto_fold && v.roll_target()))
+            && (!v.peeking || (auto_fold && v.roll_target()))
+            && (v.roll_anim.is_none() || auto_fold)
+            && (v.drop_hover || v.drop_tab.is_some() || auto_fold)
             && !in_size_move.get()
         {
+            v.manual_fold_latched = false;
             v.peeking = true;
             if v.expanded_h_px <= v.title_h_px() {
                 v.expanded_h_px = v.title_h_px() + (200.0 * v.scale()) as i32;

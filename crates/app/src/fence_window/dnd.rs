@@ -416,10 +416,15 @@ impl FenceDropHandler {
                 let _ = v.redraw_content();
             }
             v.apply_drop_feedback(None);
-            if v.peeking {
+            if v.peeking || (self.behavior.auto_fold.get() && !v.roll_target()) {
                 // Unrolled by the drag dwell: roll back once the drag has ended outside (the
                 // close timer re-arms itself while the button is still down).
-                window::set_timer(v.hwnd, TIMER_PEEK_CLOSE, PEEK_CLOSE_MS);
+                let close_ms = if self.behavior.auto_fold.get() {
+                    16
+                } else {
+                    PEEK_CLOSE_MS
+                };
+                window::set_timer(v.hwnd, TIMER_PEEK_CLOSE, close_ms);
             }
             return Feedback {
                 hwnd: v.hwnd,
@@ -429,7 +434,10 @@ impl FenceDropHandler {
         let internal = Self::internal();
         let spot = v.drop_spot_at(pt.x, pt.y, internal.as_ref());
         v.apply_drop_feedback(Some(spot));
-        v.update_drag_dwell(self.behavior.hover_peek.get());
+        v.update_drag_dwell(
+            self.behavior.hover_peek.get(),
+            self.behavior.auto_fold.get(),
+        );
         v.update_drag_scroll(pt);
         let on_bin = spot
             .folder
@@ -1047,16 +1055,21 @@ impl FenceViewState {
     /// a tab head deliberately does NOT switch tabs (Explorer's own strip does not either, and
     /// a drop onto the head already lands in that tab's page); a switch mid-drag would also run
     /// the content cross-fade and clear the selection while the OLE loop is active.
-    pub(super) fn update_drag_dwell(&mut self, hover_peek: bool) {
+    pub(super) fn update_drag_dwell(&mut self, hover_peek: bool, auto_fold: bool) {
         if self.rolled_up
             && !self.peeking
-            && self.roll_anim.is_none()
-            && hover_peek
+            && (self.roll_anim.is_none() || auto_fold)
+            && (hover_peek || auto_fold)
             && !self.drag_peek_armed
         {
             // A rolled fence is one title-bar target: any position within it keeps the dwell.
             self.drag_peek_armed = true;
-            window::set_timer(self.hwnd, TIMER_DRAG_PEEK, Tooltip::hover_delay_ms());
+            let delay = if auto_fold {
+                16
+            } else {
+                Tooltip::hover_delay_ms()
+            };
+            window::set_timer(self.hwnd, TIMER_DRAG_PEEK, delay);
         }
     }
 

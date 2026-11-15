@@ -113,8 +113,13 @@ impl FenceViewState {
                     && o.icon_key == n.icon_key
                     && o.name == n.name
                 {
+                    // icon, its bake size, variant epoch and GPU-upload key travel as one:
+                    // a carried bitmap without its draw key uploads under "" and every
+                    // carried-over cell then shares the first one's bitmap.
                     n.icon = o.icon;
                     n.icon_px = o.icon_px;
+                    n.icon_epoch = o.icon_epoch;
+                    n.icon_draw_key = o.icon_draw_key;
                     n.icon_fade = o.icon_fade;
                     n.icon_waited = o.icon_waited;
                     n.label = o.label;
