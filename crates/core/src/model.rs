@@ -1199,6 +1199,11 @@ pub struct RollUpSettings {
     /// Double-clicking the title and the fence menu still roll the fence up and down.
     #[serde(default)]
     pub hide_count_and_chevron: bool,
+    /// Automatically folds every fence at rest; moving the pointer over the fence or anywhere
+    /// inside its expanded zone opens it immediately, and leaving that zone folds it back
+    /// immediately.
+    #[serde(default)]
+    pub auto_fold: bool,
 }
 
 impl Default for RollUpSettings {
@@ -1215,6 +1220,7 @@ impl Default for RollUpSettings {
             push_neighbors: true,
             switch_tab_on_hover: false,
             hide_count_and_chevron: false,
+            auto_fold: false,
         }
     }
 }
@@ -3075,6 +3081,19 @@ mod tests {
         settings.roll_up.hide_count_and_chevron = true;
         let json = serde_json::to_value(&settings).unwrap();
         assert_eq!(json["rollUp"]["hideCountAndChevron"], true);
+        assert_eq!(serde_json::from_value::<Settings>(json).unwrap(), settings);
+    }
+
+    #[test]
+    fn auto_fold_defaults_off_and_roundtrips() {
+        let mut json = serde_json::to_value(Settings::default()).unwrap();
+        json["rollUp"].as_object_mut().unwrap().remove("autoFold");
+        let legacy: Settings = serde_json::from_value(json).unwrap();
+        assert!(!legacy.roll_up.auto_fold);
+        let mut settings = legacy;
+        settings.roll_up.auto_fold = true;
+        let json = serde_json::to_value(&settings).unwrap();
+        assert_eq!(json["rollUp"]["autoFold"], true);
         assert_eq!(serde_json::from_value::<Settings>(json).unwrap(), settings);
     }
 

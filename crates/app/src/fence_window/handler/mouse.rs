@@ -82,7 +82,12 @@ pub(super) fn on_mouseleave(
             let _ = v.redraw_content();
         }
         if v.peeking {
-            window::set_timer(hwnd, TIMER_PEEK_CLOSE, PEEK_CLOSE_MS);
+            let close_ms = if h.behavior.auto_fold.get() {
+                16
+            } else {
+                PEEK_CLOSE_MS
+            };
+            window::set_timer(hwnd, TIMER_PEEK_CLOSE, close_ms);
         }
     }
     Some(0)

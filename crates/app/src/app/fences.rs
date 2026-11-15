@@ -974,6 +974,44 @@ impl App {
             self.schedule_save();
         }
     }
+
+    pub(super) fn sync_auto_fold_timer(&mut self) {
+        if self.state.config.settings.roll_up.auto_fold {
+            window::set_timer(self.control.hwnd(), super::TIMER_AUTO_FOLD, 35);
+            self.tick_auto_fold_zones();
+        } else {
+            window::kill_timer(self.control.hwnd(), super::TIMER_AUTO_FOLD);
+        }
+    }
+
+    pub(super) fn tick_auto_fold_zones(&mut self) {
+        if !self.state.config.settings.roll_up.auto_fold {
+            return;
+        }
+        if window::key_down(msg::VK_LBUTTON) {
+            return;
+        }
+        let pt = window::cursor_pos();
+        let hit = desktop::window_from_point(pt.x, pt.y);
+        let root = desktop::root_ancestor(hit);
+        let class = desktop::class_name(root);
+        let on_fence = self.fences.values().any(|w| w.hwnd() == root);
+        let on_desktop = on_fence
+            || matches!(
+                class.as_str(),
+                "Progman" | "WorkerW" | "SHELLDLL_DefView" | "SysListView32"
+            )
+            || (class.starts_with("CoreDeskEngine.")
+                && class != "CoreDeskEngine.Settings"
+                && class != "CoreDeskEngine.FeGlass");
+        for w in self.fences.values() {
+            let inside = on_desktop
+                && w.expanded_zone_rect().is_some_and(|r| {
+                    pt.x >= r.left && pt.x < r.right && pt.y >= r.top && pt.y < r.bottom
+                });
+            w.sync_auto_fold_zone(inside);
+        }
+    }
 }
 
 fn fence_limit_text() -> String {

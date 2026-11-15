@@ -767,5 +767,7 @@
   "完成": "Terminé",
   "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Conserve les fonds vidéo, les effets météo/particules et le visualiseur audio actifs — limite la fréquence à 30 FPS et réduit le coût des effets sans changer la résolution de rendu",
   "偏移目标显示器": "Écran cible du décalage",
-  "选择应用偏移量的显示器，其余显示器保持不动": "Choisissez l'écran auquel le décalage s'applique ; les autres restent fixes"
+  "选择应用偏移量的显示器，其余显示器保持不动": "Choisissez l'écran auquel le décalage s'applique ; les autres restent fixes",
+  "自动收起栅栏并在进入区域时立即展开": "Replier automatiquement les groupes et développer immédiatement dans leur zone",
+  "栅栏平时自动保持收起；鼠标移入栅栏或其展开区域时立即展开，移出区域后立即收起": "Les groupes restent repliés par défaut ; déplacer le curseur sur le groupe ou sa zone l'ouvre immédiatement et le replie dès qu'il en sort"
 }

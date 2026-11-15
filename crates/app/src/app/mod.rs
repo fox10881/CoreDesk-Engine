@@ -118,6 +118,8 @@ const TIMER_CLOCK_PROBE: usize = 69;
 /// Visualizer-backdrop sampler cadence — same 2.5 s probe rhythm as the
 /// clock's; armed only while a visualizer host exists.
 const TIMER_VIZ_PROBE: usize = 70;
+/// Fast pointer-zone poll armed while `rollUp.autoFold` is enabled.
+const TIMER_AUTO_FOLD: usize = 71;
 /// `events.subscribe` diff tick while at least one CLI stream is open (see `ipc.rs`).
 const TIMER_IPC_EVENTS: usize = 53;
 /// Read only the 16-byte desktop identity, never images/COM, while otherwise idle.
@@ -809,8 +811,11 @@ impl App {
                                     if let Ok(mut guard) = cell.try_borrow_mut()
                                         && let Some(app) = guard.as_mut()
                                     {
+                                        // Surface watchdog only — the adaptive
+                                        // palette is frozen between event-driven
+                                        // probes (ready/move/resize/refresh) so a
+                                        // video wallpaper can't recolor every tick.
                                         app.check_widget_surfaces();
-                                        app.probe_clock_backdrop();
                                     }
                                 }
                                 TIMER_VIZ_PROBE => {
@@ -818,7 +823,13 @@ impl App {
                                         && let Some(app) = guard.as_mut()
                                     {
                                         app.check_widget_surfaces();
-                                        app.probe_viz_backdrop();
+                                    }
+                                }
+                                TIMER_AUTO_FOLD => {
+                                    if let Ok(mut guard) = cell.try_borrow_mut()
+                                        && let Some(app) = guard.as_mut()
+                                    {
+                                        app.tick_auto_fold_zones();
                                     }
                                 }
                                 TIMER_HOUSEKEEPING => {
@@ -1279,6 +1290,7 @@ impl App {
                 hide_count_and_chevron: std::cell::Cell::new(
                     state.config.settings.roll_up.hide_count_and_chevron,
                 ),
+                auto_fold: std::cell::Cell::new(state.config.settings.roll_up.auto_fold),
                 wheel_lines: std::cell::Cell::new(sysparams::wheel_scroll_lines()),
                 drop_preview: std::cell::RefCell::new(
                     crate::drop_preview::DropPreview::create()
@@ -1772,6 +1784,7 @@ impl App {
         sync_desktops_differ(app.control.hwnd(), &desktops_differ);
         window::set_coalescable_timer(app.control.hwnd(), TIMER_DESKTOP_ID, 100, 25);
         window::set_timer(app.control.hwnd(), TIMER_LIVE_WALLPAPER, 100);
+        app.sync_auto_fold_timer();
         // Close the gap between the startup snapshot and installing the registry watchers.
         if let Some(signature) = app.wallpaper_sig.clone() {
             // One check (no signal arrived, so no follow-ups), then prepare the other desktops.

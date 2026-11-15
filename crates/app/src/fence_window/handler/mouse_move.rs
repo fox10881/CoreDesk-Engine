@@ -457,18 +457,24 @@ pub(super) fn on_mousemove(
     // Hovering the title row of a rolled fence opens the peek, whether the
     // pointer is on the caption (WM_NCMOUSEMOVE) or on one of the row's
     // client-area controls (chevron box, tabs) handled here.
-    if in_title
+    let auto_fold = behavior.auto_fold.get();
+    if (in_title || auto_fold)
         && v.rolled_up
-        && !v.manual_fold_latched
+        && (!v.manual_fold_latched || auto_fold)
         && !v.peeking
         && v.roll_anim.is_none()
-        && behavior.hover_peek.get()
-        && !behavior.click_to_expand.get()
+        && (behavior.hover_peek.get() || auto_fold)
+        && (!behavior.click_to_expand.get() || auto_fold)
         && !in_size_move.get()
         && !menu_open.get()
         && !peek_armed.replace(true)
     {
-        window::set_timer(hwnd, TIMER_PEEK_OPEN, Tooltip::hover_delay_ms());
+        let delay = if auto_fold {
+            1
+        } else {
+            Tooltip::hover_delay_ms()
+        };
+        window::set_timer(hwnd, TIMER_PEEK_OPEN, delay);
     }
     if v.peeking {
         window::kill_timer(hwnd, TIMER_PEEK_CLOSE);

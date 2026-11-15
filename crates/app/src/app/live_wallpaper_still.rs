@@ -164,6 +164,10 @@ impl App {
             let known = known.map(|i| gone.swap_remove(i));
             match (live_wallpaper::covering(&windows, m.rect), known) {
                 (Some((hwnd, _)), known) => {
+                    // A new player surface (or a respawned hwnd) means the
+                    // pixels behind the widgets actually changed — re-adapt
+                    // the palettes once; the probe cadence is event-driven.
+                    let fresh = known.as_ref().is_none_or(|k| k.hwnd != hwnd.0 as isize);
                     let entry = known.unwrap_or_else(|| {
                         let class = desktop::class_name(hwnd);
                         tracing::info!(
@@ -192,6 +196,10 @@ impl App {
                         missing: None,
                         ..entry
                     });
+                    if fresh {
+                        self.probe_clock_backdrop();
+                        self.probe_viz_backdrop();
+                    }
                 }
                 (None, Some(mut entry)) => {
                     let since = *entry.missing.get_or_insert_with(Instant::now);
@@ -209,6 +217,9 @@ impl App {
                 monitor = ?l.monitor,
                 "live wallpaper gone; backdrops follow the Windows wallpaper"
             );
+            // Back to the static picture under the widgets — re-sample once.
+            self.probe_clock_backdrop();
+            self.probe_viz_backdrop();
         }
     }
 

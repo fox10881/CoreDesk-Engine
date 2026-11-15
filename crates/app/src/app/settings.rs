@@ -828,8 +828,9 @@ impl App {
             Ok(host) => {
                 self.register_widget(host.hwnd(), "clock widget registered");
                 self.clock = Some(host);
-                // Probe cadence lives for as long as the widget does;
-                // `clockReady` fires the first sample once the page listens.
+                // The surface-watchdog tick lives for as long as the widget
+                // does; the palette itself never re-samples on the tick —
+                // `clockReady`/`clockMoved`/refresh are the only probes.
                 window::set_timer(self.control.hwnd(), super::TIMER_CLOCK_PROBE, 2_500);
             }
             Err(e) => tracing::error!(error = %e, "clock widget failed"),
@@ -900,8 +901,8 @@ impl App {
                 if let Some(e) = self.visualizer.as_mut() {
                     e.set_active(true);
                 }
-                // Probe cadence lives for as long as the widget does;
-                // `vizReady` fires the first sample once the page listens.
+                // Same cadence split as the clock: the tick only guards the
+                // surface; probes fire on ready/move/resize/refresh events.
                 window::set_timer(self.control.hwnd(), super::TIMER_VIZ_PROBE, 2_500);
             }
             Err(e) => tracing::error!(error = %e, "visualizer widget failed"),
@@ -965,7 +966,8 @@ impl App {
         self.apply_clock_style(&style);
     }
 
-    /// Runs on every 2.5 s probe tick beside `probe_*_backdrop`: a widget's
+    /// Runs on every 2.5 s widget tick (the palette probes are event-driven
+    /// now — this timer is purely the surface watchdog): a widget's
     /// WebView companion window can be hidden or parked off-screen by
     /// desktop composition-band churn while its host stays alive and
     /// clickable — the widget looks gone yet right-click refresh still
@@ -977,15 +979,28 @@ impl App {
     pub(super) fn check_widget_surfaces(&mut self) {
         // Occluded → exposed edge (returned to the desktop from another
         // window): the runtime can leave a companion's input link and the
-        // page's visibility parked from the covered state — revive both
-        // surfaces once rather than waiting for the user to hit Win+D.
+        // page's visibility parked from the covered state — revive a lost
+        // surface once rather than waiting for the user to hit Win+D.
+        // The revive flick drops the widget through the topmost band above
+        // whatever window the user is on, so it must fire only when the
+        // probe proves a companion is actually missing — an unconditional
+        // edge revive visibly pops the widgets over maximized browsers on
+        // every transient pause/unpause flip.
         let occluded = coredesk_platform::wmf_wallpaper::should_pause_playback();
         if self.widgets_occluded && !occluded {
             if let Some(h) = &self.visualizer_host {
-                h.revive_surface();
+                let host = h.hwnd();
+                let other = self.clock.as_ref().map(|c| c.hwnd());
+                if widget_surface_lost(host, other) {
+                    h.revive_surface();
+                }
             }
             if let Some(h) = &self.clock {
-                h.revive_surface();
+                let host = h.hwnd();
+                let other = self.visualizer_host.as_ref().map(|v| v.hwnd());
+                if widget_surface_lost(host, other) {
+                    h.revive_surface();
+                }
             }
         }
         self.widgets_occluded = occluded;
@@ -1151,9 +1166,13 @@ impl App {
     }
 
     /// Adaptive backdrop contrast: spawns the off-thread sampler for the
-    /// widget's current rect. No-ops unless a widget exists and the setting
-    /// is on — the 2.5s timer may keep firing with no widget and costs a
-    /// no-op; `apply_clock_theme` re-checks the flag before posting.
+    /// widget's current rect. Event-driven only — page-ready, move/resize,
+    /// the 「تحديث」 restart, theme/style/bounds applies and toggle-on. The
+    /// 2.5 s tick deliberately never calls it: a video wallpaper would
+    /// otherwise recolor the widget on every sampled frame, so the palette
+    /// stays frozen until the backdrop context actually changes. No-ops
+    /// without a widget or with adaptive off; `apply_clock_theme` re-checks
+    /// the flag before posting.
     pub(super) fn probe_clock_backdrop(&mut self) {
         let Some(h) = &self.clock else {
             return;
@@ -1192,7 +1211,8 @@ impl App {
 
     /// Visualizer counterpart of `probe_clock_backdrop`: samples the region
     /// under the widget on a worker thread; the boxed `Sample` returns via
-    /// `WM_APP_VIZ_PROBE`. No-ops without a host or with adaptive off.
+    /// `WM_APP_VIZ_PROBE`. Same event-driven cadence as the clock probe —
+    /// never on the 2.5 s tick. No-ops without a host or with adaptive off.
     pub(super) fn probe_viz_backdrop(&mut self) {
         let Some(h) = &self.visualizer_host else {
             return;
@@ -2450,6 +2470,8 @@ impl App {
             .behavior
             .hide_count_and_chevron
             .set(new.roll_up.hide_count_and_chevron);
+        self.ctx.behavior.auto_fold.set(new.roll_up.auto_fold);
+        let auto_fold_changed = new.roll_up.auto_fold != old.roll_up.auto_fold;
         // Only whole rows show with 「调整大小时按整行整列对齐」 on: redraw.
         let chrome_changed = new.roll_up.title_on_hover != old.roll_up.title_on_hover
             || new.title_align != old.title_align
@@ -2512,6 +2534,15 @@ impl App {
         if push_changed {
             // Pushed fences go back at once when it is switched off.
             self.reflow_pushed();
+        }
+        if auto_fold_changed {
+            self.sync_auto_fold_timer();
+            if !self.state.config.settings.roll_up.auto_fold {
+                let hosts: Vec<FenceId> = self.fences.keys().copied().collect();
+                for host in hosts {
+                    self.set_roll(host, false);
+                }
+            }
         }
         if inbox_hiding_changed {
             self.sync_inbox_window();
@@ -3011,6 +3042,11 @@ impl App {
     /// transient made restart kill the video permanently. With no baseline
     /// recorded the broadcast itself is the evidence (a real apply).
     pub(super) fn on_wallpaper_changed(&mut self) {
+        // Whatever now sits behind the widgets may differ — one re-sample
+        // per signal (event-driven cadence; the 2.5 s tick never probes).
+        // Both no-op unless the widget exists and adaptive is on.
+        self.probe_clock_backdrop();
+        self.probe_viz_backdrop();
         if self.wmf_player.is_none() && self.state.config.settings.video_wallpaper_path.is_none() {
             return;
         }

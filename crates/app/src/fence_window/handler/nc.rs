@@ -265,17 +265,23 @@ pub(super) fn on_ncmousemove(
                 return Some(0);
             }
         }
+        let auto_fold = behavior.auto_fold.get();
         if v.rolled_up
-            && !v.manual_fold_latched
+            && (!v.manual_fold_latched || auto_fold)
             && !v.peeking
             && v.roll_anim.is_none()
-            && behavior.hover_peek.get()
-            && !behavior.click_to_expand.get()
+            && (behavior.hover_peek.get() || auto_fold)
+            && (!behavior.click_to_expand.get() || auto_fold)
             && !in_size_move.get()
             && !menu_open.get()
             && !peek_armed.replace(true)
         {
-            window::set_timer(hwnd, TIMER_PEEK_OPEN, Tooltip::hover_delay_ms());
+            let delay = if auto_fold {
+                1
+            } else {
+                Tooltip::hover_delay_ms()
+            };
+            window::set_timer(hwnd, TIMER_PEEK_OPEN, delay);
         }
         if v.peeking {
             window::kill_timer(hwnd, TIMER_PEEK_CLOSE);
@@ -325,7 +331,12 @@ pub(super) fn on_ncmouseleave(
             let _ = v.redraw_chrome_only();
         }
         if v.peeking {
-            window::set_timer(hwnd, TIMER_PEEK_CLOSE, PEEK_CLOSE_MS);
+            let close_ms = if h.behavior.auto_fold.get() {
+                16
+            } else {
+                PEEK_CLOSE_MS
+            };
+            window::set_timer(hwnd, TIMER_PEEK_CLOSE, close_ms);
         }
     }
     None

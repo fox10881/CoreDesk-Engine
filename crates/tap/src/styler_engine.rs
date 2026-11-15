@@ -315,6 +315,36 @@ static MODIFYING: AtomicBool = AtomicBool::new(false);
 /// the same thread deadlocks permanently).
 static READVISING: AtomicBool = AtomicBool::new(false);
 
+/// A panel-open burst left elements in `known()` that never got styled:
+/// every write path is quenched while `churn_recently_hot`, and panel
+/// elements — unlike taskbar chrome — never re-report to pick the style up
+/// on their next report (NC/QS flyouts, Start Menu tile storms that made
+/// icons scatter). `ensure_watching` re-advises once the burst quiets; the
+/// `READVISING` exemption lets the replay style them.
+static NC_RESWEEP: AtomicBool = AtomicBool::new(false);
+
+/// Mark the resweep flag — every non-tray shell host; the same suppression
+/// in the tray explorer is the intentional foreign-island quench, not a
+/// lost style, and its chrome re-reports constantly anyway.
+fn nc_mark_resweep() {
+    if !crate::site::is_shell_tray_host() {
+        NC_RESWEEP.store(true, Ordering::Release);
+    }
+}
+
+/// `true` when a burst suppressed styling in an NC host and the island has
+/// gone quiet — the re-advise replay can then restyle every re-reported
+/// element (it is exempt from the hot gate by `READVISING`).
+pub fn nc_resweep_needed() -> bool {
+    NC_RESWEEP.load(Ordering::Acquire) && !churn_recently_hot()
+}
+
+/// The post-quiet re-advise is firing — drop the flag so it doesn't rearm
+/// the tick every cycle.
+pub fn nc_resweep_clear() {
+    NC_RESWEEP.store(false, Ordering::Release);
+}
+
 /// Hard mute for the element path during a foreign-island burst. SnapLayout's
 /// drag flyout spins up ~hundreds of visual-tree events in <200ms inside the
 /// shell explorer; processing them (materialize, weak capture, deferred
@@ -340,7 +370,7 @@ fn churn_muted() -> bool {
     if let Some(since) = s.1 {
         if now.duration_since(since).as_millis() < MUTE_QUIET_MS {
             s.1 = Some(now);
-            return true;
+            return crate::site::is_shell_tray_host();
         }
         s.1 = None;
         s.0.clear();
@@ -351,6 +381,21 @@ fn churn_muted() -> bool {
     if s.0.len() as u32 >= MUTE_EVENTS_PER_WINDOW {
         s.0.clear();
         s.1 = Some(now);
+        // Non-tray shell hosts (`ShellHost`/`SEH`/`SMEH`/`SearchHost`): a
+        // panel's open-burst is legitimate traffic — muting dropped live
+        // elements before `known()` bookkeeping and they stayed default
+        // (scattered Start tiles, blank NC panels) until the next wire
+        // re-delivery. The SnapLayout/foreign-island storms this guard
+        // exists for cannot occur outside the tray explorer — the flyout
+        // lives inside the dragged window's own process, and no injected
+        // host other than the tray owner can host an `Experiences.*`
+        // subtree. Keep the CHURN accounting — `churn_recently_hot` still
+        // paces apply/release drains until the burst settles — but let the
+        // element flow through.
+        if !crate::site::is_shell_tray_host() {
+            crate::tap_log!("styler: churn burst in panel host — exempted, elements keep flowing");
+            return false;
+        }
         return true;
     }
     false
@@ -398,6 +443,11 @@ fn storm_limited() -> bool {
     if READVISING.load(Ordering::Acquire) {
         return false;
     }
+    // The brake stays armed in every host: a write→report→write layout
+    // loop is possible anywhere, not only under SnapLayout. What the
+    // panel hosts get instead of an exemption is `nc_mark_resweep` at the
+    // drop site — suppressed elements are re-styled by the post-quiet
+    // replay, so the brake costs nothing visually.
     let mut g = S.lock().unwrap_or_else(|p| p.into_inner());
     let now = std::time::Instant::now();
     let (start, count, storm) = g.get_or_insert((now, 0, false));
@@ -2687,13 +2737,49 @@ fn set_or_clear(
         value = cloned;
     }
     MODIFYING.store(true, Ordering::Relaxed);
-    let r = el.SetValue(dp, &value);
+    let mut r = el.SetValue(dp, &value);
     MODIFYING.store(false, Ordering::Relaxed);
-    if let Err(e) = r {
-        crate::tap_log!("SetValue {prop_name}: {e:?}");
+    if r.is_err() {
+        // `ToastBackgroundBorder`-class surfaces reject the composed XCBB
+        // (`E_NOINTERFACE`) — the `WindhawkBlur` contract says its
+        // `FallbackColor`/tint stands in when the effect can't attach, so
+        // retry once with a plain tinted `SolidColorBrush`. Any other
+        // failure mode retries identically and just fails again.
+        if let StyleVal::Blur(p) = val
+            && let Some(fb) = blur_fallback_brush(p.tint)
+        {
+            MODIFYING.store(true, Ordering::Relaxed);
+            r = el.SetValue(dp, &fb);
+            MODIFYING.store(false, Ordering::Relaxed);
+            if r.is_ok() {
+                crate::tap_log!("SetValue {prop_name}: blur rejected — tint fallback applied");
+                return Some(fb);
+            }
+        }
+        if let Err(e) = r {
+            crate::tap_log!("SetValue {prop_name}: {e:?}");
+        }
         return None;
     }
     Some(value)
+}
+
+/// `WindhawkBlur`'s declared fallback: a `SolidColorBrush` of its
+/// `TintColor` (`tint` = r,g,b,a 0..1), loaded through the same reader as
+/// every other literal XAML value — built when `SetValue` refuses the
+/// composed blur brush outright.
+fn blur_fallback_brush(tint: [f32; 4]) -> Option<IInspectable> {
+    let byte = |v: f32| -> u32 { (v.clamp(0.0, 1.0) * 255.0).round() as u32 };
+    let xaml = format!(
+        "<SolidColorBrush \
+         xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" \
+         Color=\"#{:02X}{:02X}{:02X}{:02X}\"/>",
+        byte(tint[3]),
+        byte(tint[0]),
+        byte(tint[1]),
+        byte(tint[2])
+    );
+    xb::XamlReader::Load(&windows_core::HSTRING::from(&xaml)).ok()
 }
 
 /// Per-element clones for definition collections (the mod clones through a
@@ -4855,13 +4941,19 @@ fn apply_theme_ui() {
     // application must resolve (the mod applies them in the same order).
     let dict = apply_resvars(&theme.resvars);
     state().theme_dict = dict;
-    // Re-advise the watcher — `RefreshExplorerTapStyle`'s approach: reported
-    // handles were already released back to the diagnostics service, so a
-    // handle-replay sweep resolves nothing; `Unadvise`+`Advise` makes the
-    // service re-report the whole tree and `on_element` styles each element
-    // against the new rules with live handles. Runs on a worker thread —
-    // `Advise` replays onto the UI thread, and we're already on it inside a
-    // dispatcher item, so a blocking advise would self-deadlock.
+    re_advise_service();
+}
+
+/// `Unadvise`+`Advise` on the armed diagnostics session — the service
+/// re-enumerates the islands alive NOW and replays their trees. Runs on a
+/// worker thread: `Advise` marshals onto the UI thread, and the apply
+/// sweep already sits inside a dispatcher item — a blocking advise would
+/// self-deadlock. Called by `apply_theme_ui` on every theme land
+/// (`RefreshExplorerTapStyle`'s approach: released handles resolve
+/// nothing, so the replay styles each re-reported element with live
+/// handles) and by `ensure_watching`'s NCH starvation recovery, where a
+/// lazily-created island never entered the first advise's report scope.
+pub fn re_advise_service() {
     let pair = mod_service_watcher();
     match pair {
         Some((service, watcher)) => {
@@ -4898,6 +4990,18 @@ fn apply_theme_ui() {
             crate::site::ensure_watching();
         }
     }
+}
+
+/// `true` while a theme waits to apply and no element callback has ever
+/// delivered a dispatcher — the starvation signature of a session whose
+/// advise ran before the target island existed (NC hosts build the
+/// ControlCenter island lazily at first panel open). `ensure_watching`'s
+/// 2s tick re-advises on this so the service re-enumerates the CURRENT
+/// islands; once any element reports, `on_element` captures the
+/// dispatcher and the pending apply proceeds.
+pub fn starved_pending() -> bool {
+    let eng = state();
+    eng.pending.is_some() && eng.dispatcher.is_none()
 }
 
 /// Re-resolves `failed` rulesets whose target is `type_name` — a live
@@ -5205,6 +5309,9 @@ pub fn on_element(
         if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
             crate::tap_log!("styler: STORM drop handle={} type={reported_type}", element.Handle.0);
         }
+        // Bookkeeping already ran, but the write path below won't — the
+        // post-quiet replay must re-report this element for styling.
+        nc_mark_resweep();
         return;
     }
     // Snapshot engine state first — `GetIInspectableFromHandle` and
@@ -5230,6 +5337,9 @@ pub fn on_element(
     if has_pending && !need_dispatcher && !island_hot {
         dispatch_apply();
         return;
+    }
+    if has_pending && island_hot {
+        nc_mark_resweep();
     }
     // Nothing applied and nothing to learn from this element.
     if !has_applied && !need_dispatcher && !has_pending {
@@ -5301,6 +5411,7 @@ pub fn on_element(
         // foreign island owns the thread — the deferred element restyles on
         // its next report.
         if churn_recently_hot() {
+            nc_mark_resweep();
             return;
         }
         let Ok(el_weak) = el.downgrade() else {
@@ -5315,6 +5426,7 @@ pub fn on_element(
         let payload = UiBound(el_weak);
         post_ui(&d, Prio::Normal, move || {
             if churn_recently_hot() {
+                nc_mark_resweep();
                 return Ok(());
             }
             if !known().contains_key(&handle) || state().applied.is_none() {
@@ -5338,6 +5450,8 @@ pub fn on_element(
     }
     if !churn_recently_hot() {
         let _ = style_element(element.Handle.0, &el, reported_type, parent);
+    } else {
+        nc_mark_resweep();
     }
 }
 

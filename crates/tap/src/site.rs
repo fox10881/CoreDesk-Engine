@@ -794,7 +794,17 @@ impl IObjectWithSite_Impl for TapSite_Impl {
                     shared.watcher.is_some()
                 };
                 if occupied {
-                    return Ok::<(), windows_core::Error>(()); // one watcher per session
+                    // Starvation replace: the armed WUX session reported
+                    // zero elements — the target island lives on a
+                    // different `VisualDiagConnection` generation and the
+                    // `nch_re_advise` install walk now delivered its SetSite.
+                    // Same semantics as the WinUI3 branch: the starved
+                    // session owns nothing (no elements, no dispatcher), so
+                    // swap it out. A *healthy* session still refuses —
+                    // one watcher per session.
+                    if !(!is_shell_tray_host() && crate::styler::wux::starved_pending()) {
+                        return Ok::<(), windows_core::Error>(());
+                    }
                 }
             }
             let diagnostics: Option<IXamlDiagnostics> =
@@ -836,6 +846,24 @@ impl IObjectWithSite_Impl for TapSite_Impl {
                     }
                     start_advise_winui3(diagnostics);
                 } else {
+                    // Replace semantics for a starved NCH session (see the
+                    // occupied gate above): unadvise the dead pair, reset
+                    // the engine's session-affine state, advise fresh.
+                    let previous = {
+                        let mut shared = shared::lock();
+                        let pair = shared.tree_service.clone().zip(shared.watcher.clone());
+                        shared.watcher = None;
+                        shared.tree_service = None;
+                        shared.diagnostics = None;
+                        pair
+                    };
+                    if let Some((service, watcher)) = previous {
+                        crate::tap_log!("SetSite: replacing starved WUX session");
+                        unsafe {
+                            let _ = service.UnadviseVisualTreeChange(&*watcher);
+                        }
+                        crate::styler::wux::session_reset();
+                    }
                     start_advise(diagnostics);
                 }
             }
@@ -993,7 +1021,59 @@ pub fn ensure_watching() {
                     std::thread::spawn(install);
                 }
             }
+            return;
         }
+    }
+    // NCH starvation recovery: the ControlCenter island is built lazily at
+    // first panel open — an advise armed before that watches only the
+    // dormant islands, so the panel's elements never report, the engine
+    // never captures a dispatcher, and the pending theme starves forever.
+    // The 2s tick re-advises (throttled) so the diagnostics service
+    // re-enumerates the islands alive NOW.
+    // Non-tray shell hosts (ShellHost/SEH/SMEH/SearchHost): two starvation
+    // shapes share this recovery — a pending theme with no captured
+    // dispatcher (the island was born after the advise armed) and a burst
+    // that suppressed styling writes mid-construction (panel opens, Start
+    // tile storms). The tray explorer is excluded: its write quench is the
+    // intentional foreign-island protection, and its chrome re-reports
+    // constantly so nothing is ever lost.
+    if !is_shell_tray_host() {
+        let starved = crate::styler::wux::starved_pending();
+        let resweep = crate::styler::wux::nc_resweep_needed();
+        if starved || resweep {
+            nch_re_advise(starved);
+        }
+    }
+}
+
+/// Throttled starvation recovery for `ensure_watching`'s panel-host path —
+/// bounded so a session starved with the panel closed doesn't re-advise
+/// on every 2s tick (each pass is a worker thread plus an ~800ms settle).
+/// Also arms the **mux** diagnostics session once: on builds where the
+/// ControlCenter surface is a WinUI3 island (ShellHost loads
+/// `Microsoft.UI.Xaml.dll`), the WUX session is blind to it and only a
+/// mux session reports its elements. `ensure_watching_winui3` self-gates
+/// (no-op once armed) and is already shell-tray-safe — it can never arm
+/// inside explorer.
+fn nch_re_advise(starved: bool) {
+    static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+    {
+        let mut last = LAST.lock().unwrap_or_else(|p| p.into_inner());
+        if last.is_some_and(|t| t.elapsed().as_secs() < 8) {
+            return;
+        }
+        *last = Some(std::time::Instant::now());
+    }
+    crate::tap_log!("site: panel re-advise (starved={starved}) — post-quiet sweep");
+    crate::styler::wux::nc_resweep_clear();
+    crate::styler::wux::re_advise_service();
+    ensure_watching_winui3();
+    if starved {
+        // The ControlCenter island may live on a different
+        // `VisualDiagConnection` index than the dormant one the first
+        // install grabbed — walk the next generation; a delivered SetSite
+        // replaces the starved session (see SetSite's occupied gate).
+        std::thread::spawn(install);
     }
 }
 

@@ -1671,6 +1671,49 @@ impl FenceWindow {
         self.with_view(|v| v.manual_fold_latched = false);
     }
 
+    /// Full expanded footprint of this fence on screen (device px), used by `rollUp.autoFold`
+    /// so moving the pointer anywhere inside the fence's zone opens it immediately even while
+    /// collapsed to its title sliver.
+    pub fn expanded_zone_rect(&self) -> Option<RECT> {
+        let guard = self.view.try_borrow().ok()?;
+        let v = guard.as_ref()?;
+        if v.retired || v.desktop {
+            return None;
+        }
+        let r = self.rect();
+        let w = v.expanded_w_px.max(r.right - r.left);
+        let h = v
+            .expanded_h_px
+            .max(v.title_h_px() + (200.0 * v.scale()) as i32);
+        Some(RECT {
+            left: r.left,
+            top: r.top,
+            right: r.left + w,
+            bottom: r.top + h,
+        })
+    }
+
+    /// Drives immediate zone-based expand / collapse while `rollUp.autoFold` is armed.
+    pub fn sync_auto_fold_zone(&self, inside_zone: bool) {
+        let state = {
+            let Ok(guard) = self.view.try_borrow() else {
+                return;
+            };
+            let Some(v) = guard.as_ref() else {
+                return;
+            };
+            if v.retired || v.desktop {
+                return;
+            }
+            v.roll_target()
+        };
+        if inside_zone && state {
+            window::send_message(self.hwnd(), msg::WM_TIMER, TIMER_PEEK_OPEN, 0);
+        } else if !inside_zone && !state {
+            window::send_message(self.hwnd(), msg::WM_TIMER, TIMER_PEEK_CLOSE, 1);
+        }
+    }
+
     /// Title-row height and the height the window settles at: the title row while it is rolled
     /// up, rolling up or hover-peeking, else the expanded height. The push pass lays the fences
     /// out from these (`app/push.rs`).

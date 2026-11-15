@@ -229,16 +229,18 @@ pub(super) fn on_timer_peek_open(
         // window rect: do not fight it with a peek animation.
         return Some(0);
     }
+    let auto_fold = h.behavior.auto_fold.get();
     {
         let mut guard = view.borrow_mut();
         if let Some(v) = guard.as_mut()
             && !v.retired
-            && v.rolled_up
-            && !v.manual_fold_latched
-            && !v.peeking
-            && v.roll_anim.is_none()
-            && v.title_hover
+            && (v.rolled_up || (auto_fold && v.roll_target()))
+            && (!v.manual_fold_latched || auto_fold)
+            && (!v.peeking || (auto_fold && v.roll_target()))
+            && (v.roll_anim.is_none() || auto_fold)
+            && (v.title_hover || auto_fold)
         {
+            v.manual_fold_latched = false;
             v.peeking = true;
             if v.expanded_h_px <= v.title_h_px() {
                 v.expanded_h_px = v.title_h_px() + (200.0 * v.scale()) as i32;
@@ -401,7 +403,7 @@ pub(super) fn on_timer_peek_close(
     h: &HandlerCtx,
     hwnd: HWND,
     _wparam: usize,
-    _lparam: isize,
+    lparam: isize,
 ) -> Option<isize> {
     let HandlerCtx {
         view,
@@ -409,10 +411,12 @@ pub(super) fn on_timer_peek_close(
         in_size_move,
         ..
     } = h;
+    let auto_fold = h.behavior.auto_fold.get();
+    let close_ms = if auto_fold { 16 } else { PEEK_CLOSE_MS };
     window::kill_timer(hwnd, TIMER_PEEK_CLOSE);
     if in_size_move.get() || window::key_down(msg::VK_LBUTTON) {
         // Never roll up under the user's hands (resize/drag in progress).
-        window::set_timer(hwnd, TIMER_PEEK_CLOSE, PEEK_CLOSE_MS);
+        window::set_timer(hwnd, TIMER_PEEK_CLOSE, close_ms);
         return Some(0);
     }
     // A spring-loaded container never closes under its own popup: the
@@ -434,23 +438,26 @@ pub(super) fn on_timer_peek_close(
     let pt = window::cursor_pos();
     let r = window::window_rect(hwnd);
     // A fence this one pushed out of its way counts as inside: moving onto it must not make it
-    // slide back from under the pointer.
-    let inside = (pt.x >= r.left && pt.x < r.right && pt.y >= r.top && pt.y < r.bottom)
-        || h.behavior.holds_open(hwnd, pt);
+    // slide back from under the pointer. When driven by `sync_auto_fold_zone(false)` (`lparam == 1`),
+    // the caller already verified that the pointer left the expanded zone (or is covered).
+    let inside =
+        (lparam == 0 && pt.x >= r.left && pt.x < r.right && pt.y >= r.top && pt.y < r.bottom)
+            || h.behavior.holds_open(hwnd, pt);
     if inside || popup {
-        window::set_timer(hwnd, TIMER_PEEK_CLOSE, PEEK_CLOSE_MS);
+        window::set_timer(hwnd, TIMER_PEEK_CLOSE, close_ms);
         return Some(0);
     }
     {
         let mut guard = view.borrow_mut();
         if let Some(v) = guard.as_mut()
             && !v.retired
-            && v.peeking
-            && v.roll_anim.is_none()
+            && (v.peeking || (auto_fold && !v.roll_target()))
+            && (v.roll_anim.is_none() || auto_fold)
             && v.drag.is_none()
             && !v.ole_drag
             && v.marquee.is_none()
         {
+            v.manual_fold_latched = false;
             v.peeking = false;
             v.start_roll_anim(true);
         }

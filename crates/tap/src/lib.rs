@@ -88,7 +88,13 @@ pub(crate) fn log(msg: &str) {
             .ok();
     }
     if let Some(f) = guard.as_mut() {
-        let _ = writeln!(f, "{:>8.3?} {msg}", std::time::Instant::now());
+        // `[pid]` tags every line — the log file is shared by up to four
+        // resident processes (explorer, SMEH, ShellHost/SEH, SearchHost)
+        // whose `Instant` epochs differ, so pid is the only reliable
+        // attribution.
+        static PID: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+        let pid = *PID.get_or_init(std::process::id);
+        let _ = writeln!(f, "{:>8.3?} [{pid}] {msg}", std::time::Instant::now());
         let _ = f.flush();
     }
 }

@@ -767,5 +767,7 @@
   "完成": "Concluído",
   "保持视频壁纸、天气粒子特效与音频可视化运行，仅将帧率限制为 30 FPS 并降低特效开销，不改变渲染分辨率": "Mantém papéis de parede em vídeo, efeitos de clima/partículas e o visualizador de áudio ativos — limita a taxa de quadros a 30 FPS e reduz o custo dos efeitos sem alterar a resolução de renderização",
   "偏移目标显示器": "Tela de destino do deslocamento",
-  "选择应用偏移量的显示器，其余显示器保持不动": "Escolha em qual tela os deslocamentos são aplicados; as demais permanecem fixas"
+  "选择应用偏移量的显示器，其余显示器保持不动": "Escolha em qual tela os deslocamentos são aplicados; as demais permanecem fixas",
+  "自动收起栅栏并在进入区域时立即展开": "Recolher grupos automaticamente e expandir imediatamente na área",
+  "栅栏平时自动保持收起；鼠标移入栅栏或其展开区域时立即展开，移出区域后立即收起": "Os grupos ficam recolhidos sozinhos; ao mover o cursor sobre o grupo ou sua área ele abre imediatamente e volta a recolher ao sair"
 }

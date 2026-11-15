@@ -943,6 +943,40 @@ unsafe fn attach_to_desktop_worker(
     }
 }
 
+/// Startup attach with a short settle window: on a cold boot the WorkerW
+/// background layer can still be materializing while Explorer restarts —
+/// a single-shot attempt loses that race and the whole session degrades to
+/// software decode (or the video never attaches at all). Normal boots find
+/// the layer on the first try and add zero latency; a genuine outage falls
+/// through after ~2 s, same as before. Mid-run re-attaches keep their own
+/// 30 s deadline retry inside the playback loops — this wrapper is for the
+/// one-shot startup calls only.
+fn attach_with_retry(hwnd: HWND) -> std::result::Result<(HWND, i32, i32), String> {
+    const ATTEMPTS: u32 = 8;
+    const STEP: Duration = Duration::from_millis(250);
+    let mut last = String::new();
+    for attempt in 0..ATTEMPTS {
+        match unsafe { attach_to_desktop_worker(hwnd) } {
+            Ok(v) => {
+                if attempt > 0 {
+                    tracing::info!(
+                        attempt,
+                        "wmf: desktop layer appeared after startup race; video window attached"
+                    );
+                }
+                return Ok(v);
+            }
+            Err(e) => {
+                last = e;
+                if attempt + 1 < ATTEMPTS {
+                    std::thread::sleep(STEP);
+                }
+            }
+        }
+    }
+    Err(last)
+}
+
 /// The frame shared with the paint path: the decoded frame at video resolution plus the
 /// window (destination) size. `StretchDIBits` cover-crops and stretches at blit time, so no
 /// screen-sized intermediate buffer is ever kept (~33 MB less at 4K).
@@ -2575,7 +2609,7 @@ unsafe fn run_gpu_wallpaper(
 
     let class_name = to_wide(VIDEO_WINDOW_CLASS);
     let hwnd = unsafe { create_video_window(&class_name, 0) }?;
-    let (host, win_w, win_h) = match unsafe { attach_to_desktop_worker(hwnd) } {
+    let (host, win_w, win_h) = match attach_with_retry(hwnd) {
         Ok(v) => v,
         Err(e) => {
             let _ = unsafe { DestroyWindow(hwnd) };
@@ -3203,7 +3237,7 @@ fn run_player_thread(
             }
         };
 
-        let (mut host, mut win_w, mut win_h) = match attach_to_desktop_worker(hwnd) {
+        let (mut host, mut win_w, mut win_h) = match attach_with_retry(hwnd) {
             Ok(v) => v,
             Err(e) => {
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
