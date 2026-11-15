@@ -27,6 +27,29 @@ CoreDesk Engine 是一款用 Rust 打造的超強次世代桌面整理與 Window
 
 ---
 
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ 主題展示
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ 在 DeviantArt 下載這些及更多主題</a></strong></p>
+
+---
+
 ## ✨ 本版本的非凡之處
 
 CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Windows 11 外殼本身擁有完全的創意掌控——同時 CPU 和 GPU 佔用近乎為零。
@@ -47,7 +70,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **完整阿拉伯語本地化與 RTL 介面 [新]：** 原生阿拉伯語介面（`العربية`），無縫從右到左配置與即時語言切換。
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** 新增「一般」分頁截圖，展示 4 種主題樣式（Fluent、Liquid Glass、Bookshelf、Invisible Canvas）和變色龍融合。*
 
 ---
@@ -64,7 +86,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **自適應桌布對比度（`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`）[新]：** CoreDesk Engine 持續取樣時鐘小工具正後方的精確桌布像素。無論桌布是刺眼的純白還是純黑，小工具都會自動翻轉文字、玻璃和強調的對比度，使時間和日期始終 100% 清晰可讀。
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** 新增一張桌面時鐘小工具懸浮截圖及其設定與自適應對比度開關。*
 
 ---
@@ -80,7 +101,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **通知中心樣式（`نمط مركز الإشعارات`）：***Layer Mica UI、Translucent Shell、Matte、Unified、JumpLists 10、Better Control 11、Fluid、Liquid Glass、Borderless、Dense、Frosty Glass、OS26 Tahoe Glass、Command Center*。
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** 新增自訂開始功能表、通知中心和工作列主題下拉選單實際運行的截圖。*
 
 ### 🔍 檔案總管玻璃工作室與統一應用透明化 [新]
@@ -90,7 +110,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **一鍵外觀重新整理（`تحديث المظهر`）[新]：** 即時重啟 `explorer.exe` 並乾淨地重新掛鉤所有桌面圍欄和活動影片桌布。
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** 新增檔案總管玻璃進階設定視窗的截圖，展示互動式即時預覽和自訂 RGBA 控制項。*
 
 ---
@@ -110,7 +129,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **3D 傾斜書架模式與透視縮放（`وضع الرف المائل` + `معامل التكبير`）[新]：** 將圍欄傾斜成 3D 透視平行四邊形，與帶角度的 3D 房間桌布對齊！調整**透視縮放係數（`معامل التكبير`）**讓圖示向書架遠端平滑縮小，營造真實縱深感。
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** 新增「圍欄」分頁截圖，展示複製設定、圖示框架與顏色選擇器、貼邊 2:3 模式、間距滑桿和傾斜書架模式。*
 
 ---
@@ -125,7 +143,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **一鍵快速預設（`إضافة سريعة`）：** 立即為*圖片、音樂、影片、壓縮檔、安裝程式*或*桌面清理*（僅掃走 30 天以上未動的安裝程式和壓縮檔，不刪除任何檔案）產生預建圍欄和規則。
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** 新增排序規則分頁截圖，突出顏色編碼圍欄徽章和橙色強制套用按鈕。*
 
 ---
@@ -139,7 +156,6 @@ CoreDesk Engine 的每一層都經過重新設計，讓你對桌面圖示和 Win
 - **每日自動儲存（`حفظ تحديث الثيم تلقائياً كل يوم`）[新]：** 每天自動就地更新你的活動 `.cde` 主題檔案——最新桌面調整始終儲存且無重複。
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** 新增主題庫截圖，展示帶套用/匯出 .cde/刪除按鈕的視覺化主題卡片和智慧桌布適配開關。*
 
 ---

@@ -27,6 +27,29 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 
 ---
 
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ معرض الثيمات
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ حمّل هذه الثيمات والمزيد على DeviantArt</a></strong></p>
+
+---
+
 ## ✨ ما الذي يجعل هذه النسخة استثنائية؟
 
 أُعيدت هندسة كل طبقة من CoreDesk Engine لتمنحك تحكماً إبداعياً كاملاً في أيقونات سطح مكتبك وقشرة Windows 11 نفسها — مع الحفاظ على استهلاك المعالج والبطاقة الرسومية قريباً من الصفر.
@@ -47,7 +70,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **ترجمة عربية كاملة وواجهة RTL [جديد]:** واجهة عربية أصلية (`العربية`) مع تخطيط من اليمين إلى اليسار وتبديل فوري للغة.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** أضف لقطة لتبويب «عام» تُظهر أنماط الثيمات الأربعة (Fluent وLiquid Glass وBookshelf وInvisible Canvas) ودمج الحرباء.*
 
 ---
@@ -64,7 +86,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **تباين الخلفية التكيفي (تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية) [جديد]:** يأخذ CoreDesk Engine عينات مستمرة من بكسلات الخلفية خلف الودجت بدقة. سواء كانت الخلفية بيضاء ساطعة أو سوداء حالكة، تقلب الودجت تلقائياً تباين نصها وزجاجها ولمساتها اللونية ليبقى الوقت والتاريخ مقروءين بوضوح تام دائماً.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** أضف لقطة تُظهر ودجت الساعة على سطح المكتب مع إعداداتها ومفتاح التباين التكيفي.*
 
 ---
@@ -80,7 +101,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **أنماط مركز الإشعارات (نمط مركز الإشعارات):** جمّل مركز الإجراءات ونوافذ الإشعارات مع *Layer Mica UI وTranslucent Shell وMatte وUnified وJumpLists 10 وBetter Control 11 وFluid وLiquid Glass وBorderless وDense وFrosty Glass وOS26 Tahoe Glass وCommand Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** أضف لقطة لقوائم اختيار ثيمات قائمة ابدأ ومركز الإشعارات وشريط المهام أثناء العمل.*
 
 ### 🔍 استوديو زجاج مستكشف الملفات وشفافية التطبيق الموحّدة [جديد]
@@ -90,7 +110,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **تحديث المظهر بنقرة واحدة (تحديث المظهر) [جديد]:** يعيد تشغيل `explorer.exe` فوراً ويعيد ربط كل أسوار سطح المكتب وخلفية الفيديو النشطة بكل نظافة.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** أضف لقطة لنافذة الإعدادات المتقدمة لزجاج المستكشف مع المعاينة المباشرة وعناصر RGBA.*
 
 ---
@@ -110,7 +129,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **وضع الرف المائل ثلاثي الأبعاد ومعامل المنظور (وضع الرف المائل + معامل التكبير) [جديد]:** يميل السور إلى متوازي أضلاع بمنظور ثلاثي الأبعاد يتماشى مع خلفيات الغرف المائلة! اضبط **معامل التكبير (معامل التكبير)** لتتصغّر الأيقونات بسلاسة نحو حافة الرف البعيدة لعمق واقعي.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** أضف لقطة لتبويب الأسوار مع نسخ الإعدادات وإطارات الأيقونات ومنتقيات الألوان ووضع 2:3 الملتصق ومنزلقات التباعد ووضع الرف المائل.*
 
 ---
@@ -125,7 +143,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **قوالب سريعة بنقرة (إضافة سريعة):** ولّد فوراً أسواراً وقواعد جاهزة لـ *الصور والموسيقى والفيديوهات والأرشيف والمثبّتات* أو *تنظيف سطح المكتب* (الذي يكنس فقط المثبّتات والأرشيفات غير الملموسة لأكثر من 30 يوماً دون حذف ملف واحد).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** أضف لقطة لتبويب قواعد الفرز مع الشارات اللونية وزر التطبيق الإجباري البرتقالي.*
 
 ---
@@ -139,7 +156,6 @@ CoreDesk Engine هي مجموعة تخصيص فائقة التطوّر لتنظ�
 - **حفظ يومي تلقائي (حفظ تحديث الثيم تلقائياً كل يوم) [جديد]:** يحدّث ملف `.cde` النشط مرة يومياً في مكانه لتبقى آخر تعديلاتك محفوظة دون تكديس النسخ.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** أضف لقطة لمعرض الثيمات ببطاقاته البصرية وأزرار تطبيق/تصدير .cde/حذف ومفتاح ملاءمة الخلفية الذكية.*
 
 ---

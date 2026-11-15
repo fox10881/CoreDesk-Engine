@@ -27,6 +27,29 @@ CoreDesk Engine est une suite d'organisation de bureau et de personnalisation du
 
 ---
 
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ Galerie de thèmes
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ Téléchargez ces thèmes et plus sur DeviantArt</a></strong></p>
+
+---
+
 ## ✨ Qu'est-ce qui rend cette édition extraordinaire ?
 
 Chaque couche de CoreDesk Engine a été réarchitecturée pour te donner un contrôle créatif total sur tes icônes et le shell Windows 11 lui-même — avec une consommation CPU/GPU quasi nulle.
@@ -47,7 +70,6 @@ Va au-delà des conteneurs classiques avec quatre paradigmes visuels :
 - **Localisation arabe complète et interface RTL [NOUVEAU] :** Interface arabe native (`العربية`) avec mise en page droite-à-gauche et changement de langue instantané.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Ajoute une capture de l'onglet Général montrant les 4 styles de thème (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) et la fusion Caméléon.*
 
 ---
@@ -64,7 +86,6 @@ Va au-delà des conteneurs classiques avec quatre paradigmes visuels :
 - **Contraste adaptatif du fond (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NOUVEAU] :** CoreDesk Engine échantillonne en continu les pixels exacts derrière le widget. Fond blanc éclatant ou noir profond, le widget inverse automatiquement le contraste du texte, du verre et des accents pour une lisibilité parfaite.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Ajoute une capture du widget d'horloge sur le bureau avec ses réglages et l'interrupteur de contraste adaptatif.*
 
 ---
@@ -80,7 +101,6 @@ Change de thème à la volée — appliqué immédiatement, sans redémarrage :
 - **Styles du centre de notifications (`نمط مركز الإشعارات`) :** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Ajoute une capture des listes déroulantes de thèmes du menu Démarrer, du centre de notifications et de la barre des tâches.*
 
 ### 🔍 Studio de verre de l'Explorateur et transparence unifiée de l'app [NOUVEAU]
@@ -90,7 +110,6 @@ Change de thème à la volée — appliqué immédiatement, sans redémarrage :
 - **Rafraîchir l'apparence en un clic (`تحديث المظهر`) [NOUVEAU] :** Redémarre `explorer.exe` instantanément et raccroche proprement toutes les clôtures et ton fond vidéo actif.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Ajoute une capture de la fenêtre Paramètres avancés du verre de l'Explorateur avec l'aperçu interactif et les contrôles RGBA.*
 
 ---
@@ -110,7 +129,6 @@ Chaque clôture se règle au pixel près dans l'onglet **Clôtures (`الأسو�
 - **Étagère inclinée 3D et échelle de perspective (`وضع الرف المائل` + `معامل التكبير`) [NOUVEAU] :** Incline la clôture en parallélogramme 3D aligné avec les fonds de pièces en angle ! Règle le **facteur d'échelle de perspective (`معامل التكبير`)** pour que les icônes rétrécissent vers le bord lointain de l'étagère.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Ajoute une capture de l'onglet Clôtures montrant le clonage de réglages, les cadres d'icônes et sélecteurs de couleur, le mode jointif 2:3, les curseurs d'écart et l'étagère inclinée.*
 
 ---
@@ -125,7 +143,6 @@ Le moteur de **règles de tri (`قواعد الفرز`)** a été entièrement r
 - **Presets rapides en un clic (`إضافة سريعة`) :** Génère instantanément des clôtures et règles pour *Images, Musique, Vidéos, Archives, Installateurs* ou *Nettoyage du bureau* (qui ne balaie que les installateurs et archives intacts depuis 30+ jours sans supprimer un seul fichier).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Ajoute une capture de l'onglet Règles de tri avec les badges colorés et le bouton orange d'application forcée.*
 
 ---
@@ -139,7 +156,6 @@ Oublie les sauvegardes `.json` — l'onglet **Disposition et sauvegardes (`ال�
 - **Sauvegarde quotidienne auto (`حفظ تحديث الثيم تلقائياً كل يوم`) [NOUVEAU] :** Met à jour ton `.cde` actif une fois par jour sur place — tes derniers réglages sont toujours préservés sans doublons.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Ajoute une capture de la galerie de thèmes avec cartes visuelles, boutons Appliquer/Exporter .cde/Supprimer et l'interrupteur d'ajustement intelligent.*
 
 ---

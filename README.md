@@ -13,8 +13,6 @@
   &nbsp;·&nbsp;     <a href="docs/readme/README.ru.md">Русский</a>
 </p>
 
-
-
 # 💠 CoreDesk Engine — Ultimate Desktop Customization & Organization Suite
 
 **Transform Windows 11 into a living, breathing, ultra-organized glass workspace.**
@@ -22,6 +20,29 @@
 CoreDesk Engine is a heavily supercharged, next-generation desktop organization and Windows 11 shell customization suite built in Rust. Moving far beyond basic icon fences, CoreDesk Engine combines magnetic desktop organization, 3D perspective shelves, live H.264 video wallpapers, adaptive desktop clock widgets, deep Windows 11 shell theming (Taskbar, Start Menu, Notification Center, and File Explorer Mica/Acrylic), and one-click `.cde` full-desktop theme packages.
 
 </div>
+
+---
+
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ Theme Showcase
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="docs/readme/assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="docs/readme/assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="docs/readme/assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="docs/readme/assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="docs/readme/assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="docs/readme/assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ Download these themes & more on DeviantArt</a></strong></p>
 
 ---
 
@@ -46,9 +67,6 @@ Go beyond standard containers with four distinct visual paradigms:
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
 
-<img width="3837" height="2064" alt="image" src="https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb" />
-
-
 ---
 
 ## 🎬 2. Native H.264 Video Wallpapers & Adaptive Clock Widgets
@@ -64,9 +82,6 @@ Go beyond standard containers with four distinct visual paradigms:
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
 
-<img width="3066" height="1530" alt="image" src="https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb" />
-
-
 ---
 
 ## 🪟 3. Deep Windows 11 Shell & File Explorer Glass Customization
@@ -81,9 +96,6 @@ Switch themes on the fly—applied immediately upon selection with zero reboots:
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
 
-<img width="3837" height="1716" alt="image" src="https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1" />
-
-
 ### 🔍 File Explorer Glass Studio & Unified App Transparency [NEW]
 - **Dedicated File Explorer Glass Editor (`تأثير خلفية مستكشف الملفات`):** Open the **Advanced Settings (`الإعدادات المتقدمة`)** studio featuring an interactive **Live File Explorer Preview (`معاينة مباشرة`)** with selectable preview backdrops!
 - Customize **Blur, Acrylic, Mica, Mica Alt, and Clear Blur**, toggle address bar/scrollbar/WinUI toolbar transparency, and fine-tune custom `#AARRGGBB` Light & Dark blend tints and opacity.
@@ -91,8 +103,6 @@ Switch themes on the fly—applied immediately upon selection with zero reboots:
 - **One-Click Appearance Refresh (`تحديث المظهر`) [NEW]:** Instantly restarts `explorer.exe` and cleanly re-hooks all desktop fences and your active video wallpaper whenever Windows needs a fresh state.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-
-<img width="3837" height="2058" alt="image" src="https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3" />
 
 ---
 
@@ -112,9 +122,6 @@ Every single fence can be tailored down to the pixel in the **Fences (`الأس�
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
 
-<img width="3837" height="2067" alt="image" src="https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a" />
-
-
 ---
 
 ## ⚡ 5. Color-Coded Sorting Engine & Force Apply
@@ -128,9 +135,6 @@ The **Sorting Rules (`قواعد الفرز`)** engine has been completely rebui
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
 
-<img width="3837" height="2055" alt="image" src="https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6" />
-
-
 ---
 
 ## 📦 6. `.cde` Complete Theme Packages & Smart Wallpaper Fitting
@@ -142,9 +146,6 @@ Forget basic `.json` layout backups—the **Layout & Backups (`التخطيط و
 - **Daily Auto-Save (`حفظ تحديث الثيم تلقائياً كل يوم`) [NEW]:** Automatically updates your active `.cde` theme file once a day in-place so your latest desktop tweaks are always preserved without creating duplicate clutter.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-
-<img width="3837" height="2061" alt="image" src="https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334" />
-
 
 ---
 

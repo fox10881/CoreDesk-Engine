@@ -27,6 +27,29 @@ CoreDesk Engine es una suite de organización de escritorio y personalización d
 
 ---
 
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ Galería de temas
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ Descarga estos temas y más en DeviantArt</a></strong></p>
+
+---
+
 ## ✨ ¿Qué hace extraordinaria a esta edición?
 
 Cada capa de CoreDesk Engine se reingenierizó para darte control creativo total sobre tus iconos y el propio shell de Windows 11, con consumo de CPU y GPU casi nulo.
@@ -47,7 +70,6 @@ Supera los contenedores estándar con cuatro paradigmas visuales:
 - **Localización árabe completa e interfaz RTL [NUEVO]:** Interfaz árabe nativa (`العربية`) con diseño de derecha a izquierda y cambio de idioma instantáneo.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Agrega una captura de la pestaña General con los 4 estilos de tema (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) y la fusión Camaleón.*
 
 ---
@@ -64,7 +86,6 @@ Supera los contenedores estándar con cuatro paradigmas visuales:
 - **Contraste adaptativo de fondo (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NUEVO]:** CoreDesk Engine muestrea continuamente los píxeles exactos del fondo tras el widget. Sea blanco brillante o negro absoluto, el widget invierte automáticamente el contraste de texto, vidrio y acento para que la hora y la fecha sigan 100% legibles.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Agrega una captura del widget de reloj en el escritorio con sus ajustes y el interruptor de contraste adaptativo.*
 
 ---
@@ -80,7 +101,6 @@ Cambia temas al instante — se aplican al seleccionarlos, sin reinicios:
 - **Estilos del centro de notificaciones (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Agrega una captura de los menús desplegables de temas de Inicio, centro de notificaciones y barra de tareas en acción.*
 
 ### 🔍 Estudio de vidrio del Explorador y transparencia unificada de la app [NUEVO]
@@ -90,7 +110,6 @@ Cambia temas al instante — se aplican al seleccionarlos, sin reinicios:
 - **Actualizar apariencia con un clic (`تحديث المظهر`) [NUEVO]:** Reinicia `explorer.exe` al instante y reconecta limpiamente todas las cercas y tu fondo de video activo.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Agrega una captura de la ventana de configuración avanzada del vidrio del Explorador con la vista previa interactiva y los controles RGBA.*
 
 ---
@@ -110,7 +129,6 @@ Cada cerca se adapta hasta el último píxel en la pestaña **Cercas (`الأس�
 - **Estante inclinado 3D y escala de perspectiva (`وضع الرف المائل` + `معامل التكبير`) [NUEVO]:** Inclina la cerca en un paralelogramo 3D que combina con fondos de habitaciones anguladas. Ajusta el **factor de escala de perspectiva (`معامل التكبير`)** para que los iconos se reduzcan hacia el borde lejano del estante.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Agrega una captura de la pestaña Cercas con clonar ajustes, marcos de icono y selectores de color, modo contiguo 2:3, deslizantes de separación y modo de estante inclinado.*
 
 ---
@@ -125,7 +143,6 @@ El motor de **reglas de ordenación (`قواعد الفرز`)** fue reconstruido
 - **Presets rápidos de un clic (`إضافة سريعة`):** Genera al instante cercas y reglas para *Imágenes, Música, Videos, Archivos, Instaladores* o *Limpieza de escritorio* (solo barre instaladores y archivos sin tocar por 30+ días sin borrar ni un archivo).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Agrega una captura de la pestaña de reglas con las insignias de color y el botón naranja de aplicación forzada.*
 
 ---
@@ -139,7 +156,6 @@ Olvida los respaldos `.json` — la pestaña **Diseño y respaldos (`التخط�
 - **Autoguardado diario (`حفظ تحديث الثيم تلقائياً كل يوم`) [NUEVO]:** Actualiza tu `.cde` activo una vez al día en el mismo archivo, sin crear duplicados.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Agrega una captura de la galería de temas con tarjetas visuales, botones Aplicar/Exportar .cde/Eliminar y el interruptor de ajuste inteligente.*
 
 ---

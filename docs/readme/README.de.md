@@ -27,6 +27,29 @@ CoreDesk Engine ist eine enorm aufgewertete Desktop-Organisation und Windows-11-
 
 ---
 
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ Theme-Galerie
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ Diese und weitere Themes auf DeviantArt herunterladen</a></strong></p>
+
+---
+
 ## ✨ Was macht diese Edition so außergewöhnlich?
 
 Jede Ebene von CoreDesk Engine wurde neu entwickelt, um dir volle kreative Kontrolle über deine Desktop-Icons und die Windows-11-Shell selbst zu geben – bei nahezu null CPU- und GPU-Last.
@@ -47,7 +70,6 @@ Gehe mit vier visuellen Paradigmen über Standard-Container hinaus:
 - **Vollständige Arabisch-Lokalisierung & RTL-UI [NEU]:** Native arabische Oberfläche (`العربية`) mit nahtlosem Rechts-nach-links-Layout und sofortigem Live-Sprachwechsel.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Füge einen Screenshot des Allgemein-Tabs mit den 4 Theme-Stilen (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) und der Chamäleon-Verschmelzung hinzu.*
 
 ---
@@ -64,7 +86,6 @@ Gehe mit vier visuellen Paradigmen über Standard-Container hinaus:
 - **Adaptiver Hintergrund-Kontrast (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [NEU]:** CoreDesk Engine tastet kontinuierlich die exakten Hintergrundpixel hinter dem Widget ab. Ob gleißend weiß oder pechschwarz – das Widget dreht automatisch Text-, Glas- und Akzentkontrast um, damit Zeit und Datum immer zu 100 % scharf lesbar bleiben.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Füge einen Screenshot mit dem Desktop-Uhr-Widget samt Widget-Einstellungen und adaptivem Kontrast-Schalter hinzu.*
 
 ---
@@ -80,7 +101,6 @@ Wechsle Themes im laufenden Betrieb – sofort bei Auswahl, ohne Neustart:
 - **Info-Center-Stile (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Füge einen Screenshot der Startmenü-, Info-Center- und Taskleisten-Theme-Dropdowns im Einsatz hinzu.*
 
 ### 🔍 Explorer-Glas-Studio & einheitliche App-Transparenz [NEU]
@@ -90,7 +110,6 @@ Wechsle Themes im laufenden Betrieb – sofort bei Auswahl, ohne Neustart:
 - **Ein-Klick-Erscheinungsbild-Refresh (`تحديث المظهر`) [NEU]:** Startet `explorer.exe` sofort neu und verbindet alle Desktop-Fences sowie dein aktives Videohintergrund sauber wieder.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Füge einen Screenshot des Explorer-Glas-Editors mit Live-Vorschau und RGBA-Reglern hinzu.*
 
 ---
@@ -110,7 +129,6 @@ Jeder einzelne Fence lässt sich im Tab **Fences (`الأسوار`)** bis aufs P
 - **3D-Schrägstellungs-Regal & Perspektiv-Skalierung (`وضع الرف المائل` + `معامل التكبير`) [NEU]:** Kippt den Fence als 3D-Parallelogramm passend zu angeschrägten Raum-Hintergründen! Stelle den **Perspektiv-Skalierfaktor (`معامل التكبير`)** ein, damit Icons zum fernen Regalrand realistisch kleiner werden.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Füge einen Screenshot des Fences-Tabs mit Einstellungen klonen, Icon-Rahmen & Farbpickern, Contiguous-2:3-Modus, Abstandsreglern und Schrägregal-Modus hinzu.*
 
 ---
@@ -125,7 +143,6 @@ Die **Sortierregeln-Engine (`قواعد الفرز`)** wurde für Zuverlässigke
 - **Ein-Klick-Schnell-Presets (`إضافة سريعة`):** Erzeuge sofort fertige Fences und Regeln für *Bilder, Musik, Videos, Archive, Installer* oder *Desktop-Aufräumen* (kehrt nur Installer und Archive, die seit 30+ Tagen unberührt liegen, ohne eine einzige Datei zu löschen).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Füge einen Screenshot des Sortierregeln-Tabs mit den farbkodierten Fence-Badges und dem orangefarbenen Force-Apply-Button hinzu.*
 
 ---
@@ -139,7 +156,6 @@ Vergiss einfache `.json`-Backups – der Tab **Layout & Backups (`التخطيط
 - **Tägliches Auto-Speichern (`حفظ تحديث الثيم تلقائياً كل يوم`) [NEU]:** Aktualisiert dein aktives `.cde`-Theme einmal täglich an Ort und Stelle – deine neuesten Änderungen bleiben erhalten, ohne Duplikat-Chaos.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Füge einen Screenshot der Theme-Galerie mit visuellen Theme-Karten, Anwenden/Exportieren/Löschen-Buttons und dem Smart-Fit-Schalter hinzu.*
 
 ---

@@ -27,6 +27,29 @@ CoreDesk Engine — это мощно прокачанный набор ново
 
 ---
 
+<p align="center">
+  <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+</p>
+
+## 🎞️ Галерея тем
+
+<table>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-midnight.gif" alt="macOS Tahoe Midnight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/tahoe-daylight.gif" alt="macOS Tahoe Daylight" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-twilight.gif" alt="Zelda Twilight" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/zelda-kokiri.gif" alt="Zelda Kokiri" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/spiderman.gif" alt="SPIDERMAN" width="100%"></a></td>
+    <td width="33%"><a href="https://www.deviantart.com/fox881"><img src="assets/resident-evil-leon.gif" alt="Resident Evil Leon" width="100%"></a></td>
+  </tr>
+</table>
+
+<p align="center"><strong><a href="https://www.deviantart.com/fox881">⬇️ Скачайте эти и другие темы на DeviantArt</a></strong></p>
+
+---
+
 ## ✨ Что делает это издание необыкновенным?
 
 Каждый слой CoreDesk Engine перепроектирован, чтобы дать тебе полный творческий контроль над значками и самой оболочкой Windows 11 — при почти нулевой нагрузке на CPU и GPU.
@@ -47,7 +70,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Полная арабская локализация и RTL-интерфейс [НОВОЕ]:** Нативный арабский интерфейс (`العربية`) с раскладкой справа налево и мгновенным переключением языка.
 
 <!-- TODO: ADD IMAGE 2 (Fence Styles & Chameleon Mode) -->
-![Fence Styles Showcase](https://github.com/user-attachments/assets/ba1ce0b3-861f-42e0-b2d9-7445825b7aeb)
 *> **[IMAGE PLACEHOLDER 2]:** Добавь скриншот вкладки «Общие» с 4 стилями тем (Fluent, Liquid Glass, Bookshelf, Invisible Canvas) и режимом «Хамелеон».*
 
 ---
@@ -64,7 +86,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Адаптивный контраст обоев (`تنسيق ألوان الويدجت تلقائياً لتناسب الخلفية`) [НОВОЕ]:** CoreDesk Engine непрерывно сэмплирует точные пиксели обоев за виджетом. Ослепительно белый или чёрный фон — виджет автоматически инвертирует контраст текста, стекла и акцентов, чтобы время и дата оставались читаемыми на 100%.
 
 <!-- TODO: ADD IMAGE 3 (Desktop Clock Widget & Video Wallpaper) -->
-![Desktop Clock Widget Showcase](https://github.com/user-attachments/assets/96265444-24cd-40e5-813c-b1f874ce94fb)
 *> **[IMAGE PLACEHOLDER 3]:** Добавь скриншот виджета часов на рабочем столе с его настройками и переключателем адаптивного контраста.*
 
 ---
@@ -80,7 +101,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Стили центра уведомлений (`نمط مركز الإشعارات`):** *Layer Mica UI, Translucent Shell, Matte, Unified, JumpLists 10, Better Control 11, Fluid, Liquid Glass, Borderless, Dense, Frosty Glass, OS26 Tahoe Glass, Command Center*.
 
 <!-- TODO: ADD IMAGE 4 (Taskbar, Start Menu & Notification Center Themes) -->
-![Windows 11 Shell Customization](https://github.com/user-attachments/assets/e5653484-b329-4150-a151-297c65a2c5a1)
 *> **[IMAGE PLACEHOLDER 4]:** Добавь скриншот выпадающих списков тем «Пуска», центра уведомлений и панели задач в действии.*
 
 ### 🔍 Студия стекла Проводника и единая прозрачность приложения [НОВОЕ]
@@ -90,7 +110,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Обновление внешнего вида в один клик (`تحديث المظهر`) [НОВОЕ]:** Мгновенно перезапускает `explorer.exe` и чисто переподхватывает все ограждения и активные видеообои.
 
 <!-- TODO: ADD IMAGE 5 (File Explorer Glass Studio & Live Preview) -->
-![File Explorer Glass Editor](https://github.com/user-attachments/assets/67bb0f05-997b-4844-8158-c718580501b3)
 *> **[IMAGE PLACEHOLDER 5]:** Добавь скриншот окна расширенных настроек стекла Проводника с интерактивным предпросмотром и RGBA-контролами.*
 
 ---
@@ -110,7 +129,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Наклонённая 3D-полка и масштаб перспективы (`وضع الرف المائل` + `معامل التكبير`) [НОВОЕ]:** Наклоняет ограждение в 3D-параллелограмм, выравниваемый под угловые обои «комнат»! Регулируй **коэффициент масштаба перспективы (`معامل التكبير`)**, чтобы значки плавно уменьшались к дальнему краю полки для реалистичной глубины.
 
 <!-- TODO: ADD IMAGE 6 (Per-Fence Customization, Icon Frames & Tilted Shelf) -->
-![Advanced Fence Layout & 3D Shelf](https://github.com/user-attachments/assets/233e8c03-7580-4ba0-9d47-15948d8c5d3a)
 *> **[IMAGE PLACEHOLDER 6]:** Добавь скриншот вкладки «Ограждения» с клонированием настроек, рамками значков и цветовыми пикерами, плотным режимом 2:3, ползунками зазоров и наклонённой полкой.*
 
 ---
@@ -125,7 +143,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Быстрые пресеты в один клик (`إضافة سريعة`):** Мгновенно создавай готовые ограждения и правила для *Картинок, Музыки, Видео, Архивов, Установщиков* или *Очистки рабочего стола* (сметает только установщики и архивы, нетронутые 30+ дней, не удаляя ни одного файла).
 
 <!-- TODO: ADD IMAGE 7 (Color-Coded Sorting Rules & Force Apply) -->
-![Sorting Rules Engine](https://github.com/user-attachments/assets/6a99d08c-0124-4581-bb3e-36e0d587c4f6)
 *> **[IMAGE PLACEHOLDER 7]:** Добавь скриншот вкладки правил с цветными бейджами и оранжевой кнопкой принудительного применения.*
 
 ---
@@ -139,7 +156,6 @@ CoreDesk Engine — это мощно прокачанный набор ново
 - **Ежедневное автосохранение (`حفظ تحديث الثيم تلقائياً كل يوم`) [НОВОЕ]:** Автоматически обновляет активный `.cde` раз в день на месте — свежие правки всегда сохранены без дублирующего мусора.
 
 <!-- TODO: ADD IMAGE 8 (Theme Gallery & .cde Packages) -->
-![Theme Gallery Showcase](https://github.com/user-attachments/assets/6d74f4a5-814f-4b17-867a-bf493a4c4334)
 *> **[IMAGE PLACEHOLDER 8]:** Добавь скриншот галереи тем с визуальными карточками, кнопками Применить/Экспорт .cde/Удалить и переключателем умной подгонки.*
 
 ---
