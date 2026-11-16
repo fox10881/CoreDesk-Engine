@@ -17,3 +17,14 @@ other tool on that server). The account has no credit — every call fails or
 costs money the user does not want to spend. This is a permanent ban, not a
 preference: never invoke it, even for architectural reviews. Do the analysis
 and self-review locally instead.
+
+## Granular commits — commit and push every change immediately
+
+From 2026-11-16 onward: every change, however small, gets its own commit that
+is committed AND pushed to `main` right away — no batching multiple edits into
+one commit, no leaving work uncommitted at the end of a session. One logical
+change = one commit. The user wants their contribution count on GitHub to grow
+steadily with real work; granular commits also give a cleaner bisectable
+history. Applies to every kind of edit: code fixes, docs, config, rules files.
+Never create empty or meaningless commits — every commit must carry a real
+change.
