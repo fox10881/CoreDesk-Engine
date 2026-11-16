@@ -49,6 +49,9 @@ jobs:
         env:
           PACKAGE_REPOSITORY: ${{ github.repository }}
         run: python scripts/test-windows-packaging.py --repository "$env:PACKAGE_REPOSITORY"
+      - name: Generate release notes
+        shell: pwsh
+        run: python scripts/release_notes.py --to "$env:GITHUB_REF_NAME" --repo "${{ github.repository }}" --out dist/release-notes.md
       - name: Publish GitHub Release
         shell: pwsh
         env:
@@ -64,6 +67,6 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:GITHUB_REF_NAME @assets --repo $env:GH_REPO --clobber
           } else {
-            gh release create $env:GITHUB_REF_NAME @assets --repo $env:GH_REPO --verify-tag --generate-notes --title "CoreDesk $env:GITHUB_REF_NAME"
+            gh release create $env:GITHUB_REF_NAME @assets --repo $env:GH_REPO --verify-tag --notes-file dist/release-notes.md --title "CoreDesk $env:GITHUB_REF_NAME"
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
