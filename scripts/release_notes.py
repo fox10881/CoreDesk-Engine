@@ -11,6 +11,8 @@ import re
 import subprocess
 import sys
 
+import _llm
+
 GROUPS = [
     ("✨ Features", re.compile(r"^(add|feat|implement|new|support|introduce|enable)", re.I)),
     ("🐛 Fixes", re.compile(r"^(fix|repair|resolve|prevent|correct|stop|restore)", re.I)),
@@ -76,9 +78,17 @@ def main():
     ap.add_argument("--from", dest="frm", default=None, help="start ref (default: previous tag)")
     ap.add_argument("--repo", default="", help="owner/repo for the compare link")
     ap.add_argument("--out", default="", help="write notes to this file instead of stdout")
+    ap.add_argument("--polish", action="store_true", help="prepend an LLM-written intro (needs secrets/llm.json)")
     args = ap.parse_args()
     frm = args.frm if args.frm is not None else previous_tag(args.to)
     notes = build_notes(commits_between(frm, args.to), args.repo, frm, args.to)
+    if args.polish:
+        intro = _llm.ask(
+            f"Write a 2-3 sentence intro paragraph for the GitHub release page of {args.to}. "
+            f"Confident, no hype words. Notes:\n{notes}",
+            system="You write concise release intros for an open-source Windows desktop tool.")
+        if intro:
+            notes = intro.strip() + "\n\n" + notes
     if args.out:
         with open(args.out, "w", encoding="utf-8", newline="\n") as f:
             f.write(notes)
