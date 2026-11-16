@@ -28,3 +28,7 @@ steadily with real work; granular commits also give a cleaner bisectable
 history. Applies to every kind of edit: code fixes, docs, config, rules files.
 Never create empty or meaningless commits — every commit must carry a real
 change.
+
+Commit messages carry NO Devin signature: no "Generated with Devin" line and
+no "Co-Authored-By: Devin" trailer. Commits are authored solely under the
+user's identity so the repository shows a single contributor.
