@@ -18,6 +18,8 @@ import sys
 import urllib.request
 from pathlib import Path
 
+import _llm
+
 ROOT = Path(__file__).resolve().parents[1]
 REPO = "fox10881/CoreDesk-Engine"
 KOFI = "https://ko-fi.com/fox881"
@@ -45,9 +47,8 @@ def drafts(tag, notes):
     feat_lines = "\n".join(f"- {re.sub(r' \(\w+\)$', '', f)}" for f in feats[:8])
     fix_lines = "\n".join(f"- {re.sub(r' \(\w+\)$', '', f)}" for f in fixes[:5])
 
-    reddit = f"""Title: CoreDesk {tag} — Windows 11 shell customization suite (open source, Rust)
-
-{r'Hey r/desktops — CoreDesk Engine ' + tag + ' is out. It’s a Rust-native Windows 11 desktop suite: icon fences, live H.264 video wallpapers, Direct2D particle effects, and deep shell theming (taskbar, Start menu, Notification Center, File Explorer).'}
+    reddit_title = f"CoreDesk {tag} — Windows 11 shell customization suite (open source, Rust)"
+    reddit = f"""Hey r/desktops — CoreDesk Engine {tag} is out. It's a Rust-native Windows 11 desktop suite: icon fences, live H.264 video wallpapers, Direct2D particle effects, and deep shell theming (taskbar, Start menu, Notification Center, File Explorer).
 
 Highlights:
 {feat_lines}
@@ -81,7 +82,19 @@ Engine (free): https://github.com/{REPO}
 More themes & previews: https://www.deviantart.com/fox881
 Support: {KOFI}"""
 
-    return {"reddit.md": reddit, "x_thread.txt": x_thread, "discord.txt": discord, "deviantart.txt": deviantart}
+    kofi = f"""New release: CoreDesk {tag} ☕
+
+{feat_lines}
+
+Get it free: {release_url(tag)}"""
+
+    return {
+        "reddit": {"title.txt": reddit_title, "body.md": reddit},
+        "x": {"thread.txt": x_thread},
+        "discord": {"message.txt": discord},
+        "deviantart": {"title.txt": f"CoreDesk {tag}", "description.txt": deviantart},
+        "kofi": {"post.txt": kofi},
+    }
 
 
 def post_json(url, payload, headers=None):
@@ -112,27 +125,62 @@ def post_discord(content):
     return "sent"
 
 
+POLISH_PROMPTS = {
+    "reddit": "Rewrite this release announcement for r/desktops. Technical and honest, no marketing fluff, keep every link. Return only the post body in markdown.",
+    "x": "Rewrite this X/Twitter thread for a Rust desktop-customization release. Keep the N/M numbering, every tweet under 270 characters, keep the links. Return only the thread.",
+    "discord": "Rewrite this Discord release announcement — punchy, sparse emoji, keep @everyone, bullets and links. Return only the message.",
+    "deviantart": "Rewrite this DeviantArt artwork description for a desktop theme — artistic but concise. Return only the description.",
+    "kofi": "Rewrite this Ko-fi supporter update — warm and brief, keep the link. Return only the post.",
+}
+POLISHED_FILE = {"reddit": "body.md", "x": "thread.txt", "discord": "message.txt",
+                 "deviantart": "description.txt", "kofi": "post.txt"}
+
+
+def polish(package, tag):
+    for platform, prompt in POLISH_PROMPTS.items():
+        fname = POLISHED_FILE[platform]
+        draft = package[platform][fname]
+        better = _llm.ask(f"Release tag: {tag}\n\nDraft:\n{draft}", system=prompt)
+        if better:
+            package[platform][fname] = better.strip() + "\n"
+            print(f"polished {platform}")
+
+
+def write_package(out, tag, notes, image=None, assets=None, use_polish=False):
+    package = drafts(tag, notes)
+    if use_polish:
+        polish(package, tag)
+    for platform, files in package.items():
+        folder = out / platform
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, text in files.items():
+            (folder / name).write_text(text, encoding="utf-8")
+        for src in ([image] if image else []) + list(assets or []):
+            if src and Path(src).exists():
+                (folder / Path(src).name).write_bytes(Path(src).read_bytes())
+        print(f"packed {folder}")
+    return package
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--to", required=True, help="release tag the posts describe")
     ap.add_argument("--notes", default="", help="markdown notes file (default: generated)")
-    ap.add_argument("--out", default="out/broadcast")
+    ap.add_argument("--out", default="out/publish")
+    ap.add_argument("--image", default="", help="promo image copied into every platform folder")
+    ap.add_argument("--assets", nargs="*", default=[], help="extra files copied into every platform folder")
     ap.add_argument("--post", action="append", choices=["reddit", "discord"], default=[])
+    ap.add_argument("--polish", action="store_true", help="rewrite drafts via the free LLM in secrets/llm.json")
     args = ap.parse_args()
 
     notes = Path(args.notes).read_text(encoding="utf-8") if args.notes else notes_for(args.to)
-    out = ROOT / args.out
-    out.mkdir(parents=True, exist_ok=True)
-    files = drafts(args.to, notes)
-    for name, text in files.items():
-        (out / name).write_text(text, encoding="utf-8")
-        print(f"wrote {out/name}")
+    package = write_package(ROOT / args.out, args.to, notes, args.image, args.assets, args.polish)
 
     if "discord" in args.post:
-        print("discord:", post_discord(files["discord.txt"]))
+        print("discord:", post_discord(package["discord"]["message.txt"]))
     if "reddit" in args.post:
-        title, _, body = files["reddit.md"].partition("\n")
-        print("reddit:", post_reddit(title.replace("Title: ", ""), body.strip()))
+        r = package["reddit"]
+        print("reddit:", post_reddit(r["title.txt"], r["body.md"]))
 
 
 if __name__ == "__main__":
