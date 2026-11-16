@@ -83,6 +83,30 @@ def comfy_image(prompt, w=CANVAS[0], h=CANVAS[1], seed=None):
     raise TimeoutError("ComfyUI job did not finish in 6 minutes")
 
 
+def pexels_key():
+    p = ROOT / "secrets" / "pexels.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8")).get("api_key")
+        except (OSError, json.JSONDecodeError):
+            return None
+    return None
+
+
+def pexels_image(query):
+    key = pexels_key()
+    if not key:
+        return None
+    url = "https://api.pexels.com/v1/search?" + urllib.parse.urlencode(
+        {"query": query, "orientation": "landscape", "per_page": 15})
+    req = urllib.request.Request(url, headers={"Authorization": key})
+    photos = json.loads(urllib.request.urlopen(req, timeout=20).read()).get("photos", [])
+    if not photos:
+        return None
+    src = random.choice(photos)["src"]["large2x"]
+    return Image.open(io.BytesIO(urllib.request.urlopen(src, timeout=60).read()))
+
+
 def font(size):
     for name in ("segoeui.ttf", "arial.ttf", "DejaVuSans.ttf"):
         try:
@@ -121,6 +145,7 @@ def main():
     ap.add_argument("--capture", action="store_true", help="grab the primary screen via PIL")
     ap.add_argument("--tag", default="", help="release tag printed on the promo")
     ap.add_argument("--comfy", default="", help="prompt for an AI backdrop via local ComfyUI")
+    ap.add_argument("--pexels", default="", help="query for a Pexels stock backdrop (needs secrets/pexels.json)")
     ap.add_argument("--out", default="out/media")
     args = ap.parse_args()
 
@@ -132,12 +157,16 @@ def main():
     else:
         ap.error("give a screenshot path or --capture")
 
+    backdrop = None
     if args.comfy and comfy_up():
         print("ComfyUI is up — generating backdrop…")
         backdrop = comfy_image(args.comfy)
-    else:
-        if args.comfy:
-            print("ComfyUI offline — falling back to gradient")
+    elif args.comfy:
+        print("ComfyUI offline — trying Pexels / gradient")
+    if backdrop is None and args.pexels:
+        backdrop = pexels_image(args.pexels)
+        print("pexels backdrop" if backdrop else "pexels unavailable — gradient")
+    if backdrop is None:
         backdrop = gradient(CANVAS)
 
     name = f"promo_{args.tag or 'shot'}.png"
