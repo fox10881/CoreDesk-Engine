@@ -1198,7 +1198,7 @@ pub struct RollUpSettings {
     pub hide_inactive_scrollbar: bool,
     /// While a fence is expanded (a click or a hover peek), the fences stacked below it slide down
     /// out of its way and slide back when it rolls up. The saved positions stay where they were.
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub push_neighbors: bool,
     /// Resting the pointer on a tab of a tabbed fence for the hover delay switches to it, as a
     /// click would.
@@ -1220,13 +1220,13 @@ impl Default for RollUpSettings {
         Self {
             double_click_title: true,
             auto_on_screen_edge: true,
-            hover_peek: true,
+            hover_peek: false,
             hover_open_ms: 400,
             close_grace_ms: 400,
             click_to_expand: false,
             title_on_hover: false,
             hide_inactive_scrollbar: false,
-            push_neighbors: true,
+            push_neighbors: false,
             switch_tab_on_hover: false,
             hide_count_and_chevron: false,
             auto_fold: false,
