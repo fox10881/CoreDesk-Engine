@@ -29,6 +29,8 @@ CoreDesk Engine 是一款用 Rust 打造的超強次世代桌面整理與 Window
 
 <p align="center">
   <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+  &nbsp;
+  <a href="https://ko-fi.com/fox881"><img alt="Ko-fi" src="https://img.shields.io/badge/Ko--fi-fox881-FF5E5B?logo=kofi&logoColor=white"></a>
 </p>
 
 ## 🎞️ 主題展示

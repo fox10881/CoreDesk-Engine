@@ -29,6 +29,8 @@ CoreDesk Engine は Rust 製の次世代デスクトップ整理＆Windows 11 �
 
 <p align="center">
   <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+  &nbsp;
+  <a href="https://ko-fi.com/fox881"><img alt="Ko-fi" src="https://img.shields.io/badge/Ko--fi-fox881-FF5E5B?logo=kofi&logoColor=white"></a>
 </p>
 
 ## 🎞️ テーマショーケース

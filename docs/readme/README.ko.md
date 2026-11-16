@@ -29,6 +29,8 @@ CoreDesk는 Rust로 작성된 강력하게 업그레이드된 차세대 데스�
 
 <p align="center">
   <a href="https://www.deviantart.com/fox881"><img alt="DeviantArt" src="https://img.shields.io/badge/DeviantArt-fox881-05cc47?logo=deviantart&logoColor=white"></a>
+  &nbsp;
+  <a href="https://ko-fi.com/fox881"><img alt="Ko-fi" src="https://img.shields.io/badge/Ko--fi-fox881-FF5E5B?logo=kofi&logoColor=white"></a>
 </p>
 
 ## 🎞️ 테마 쇼케이스
