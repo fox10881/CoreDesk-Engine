@@ -532,6 +532,19 @@ fn nodiag_clear_if_stale() {
     if (b, u) == current_build_ubr() {
         return;
     }
+    if nodiag_clear() {
+        tracing::info!("taskbar styler: stale NoDiag flag cleared — OS revision changed");
+    }
+}
+
+/// Deletes the whole `NoDiag` breaker state — the manual "retry styling"
+/// affordance behind the Refresh button. The armed theme is NOT re-sent here:
+/// the explorer restart that follows re-injects the resident, which reads the
+/// flag at install time and re-arms diagnostics; `ensure` then re-delivers
+/// the still-armed wire. If the crash repeats, the strike counter re-trips
+/// the breaker — the lock is a retry, not a permanent pardon.
+pub fn nodiag_clear() -> bool {
+    const HKEY_CURRENT_USER: isize = -0x7FFF_FFFFisize;
     let sub = widestr(NODIAG_SUBKEY);
     let mut hkey: isize = 0;
     const KEY_WRITE: u32 = 0x2_0006;
@@ -558,8 +571,9 @@ fn nodiag_clear_if_stale() {
         unsafe {
             let _ = RegCloseKey(hkey);
         }
-        tracing::info!("taskbar styler: stale NoDiag flag cleared — OS revision changed");
+        return true;
     }
+    false
 }
 
 /// Called from `ensure` while armed — attributes shell-explorer deaths to

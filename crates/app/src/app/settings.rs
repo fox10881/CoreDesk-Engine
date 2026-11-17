@@ -2086,6 +2086,10 @@ impl App {
                     // coming back; the video player's pending-reattach loop and
                     // the TaskbarCreated recovery ride out the gap.
                     self.settings_toast(coredesk_core::i18n::text("正在重启资源管理器…"));
+                    // Refresh is also the sanctioned way out of the taskbar
+                    // crash-breaker: clear NoDiag so the freshly injected
+                    // resident re-arms diagnostics. A repeat crash re-trips it.
+                    coredesk_platform::taskbar_styler::nodiag_clear();
                     self.request_shell_restart("manual refresh");
                 }
                 Some("repairIcons") => self.set_desktop_icons_hidden(false),
