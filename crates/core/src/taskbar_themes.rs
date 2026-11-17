@@ -63,18 +63,19 @@ pub fn theme_wire(id: &str, use_variant: bool) -> Option<String> {
 }
 
 /// Whether one selector segment roots on a runtime-transient surface — Task
-/// View tiles (`Switcher.*`), the Snap flyout, popup menus, the
-/// volume/brightness OSD, the hover-flyout window (`HoverFlyoutGrid`), or a
-/// bare framework type (persistent shell elements always carry an app
-/// namespace such as `Taskbar.`/`SystemTray.`/`SearchUx.`; a
-/// `Microsoft.UI.Xaml.` root only exists inside a transient popup). Styling
-/// a transient element is a proven Explorer crash vector — a WER record on
-/// build 26300 names `Switcher.dll` as the faulting module: the styled
-/// element dies mid-write. Deliberately NOT filtered: `TaskbarExtensionElement`
-/// (the persistent host of the modern tray/clock — blocking it unstylizes the
-/// whole tray area), `Gleam` (a persistent search-pill decoration), and
-/// `HoverFlyoutBackgroundControl` (a `Taskbar.`-namespaced persistent child;
-/// only the `HoverFlyoutGrid` window itself is transient).
+/// View tiles (`Switcher.*`), the Snap flyout, popup menus, the OSD
+/// confirmators, the hover-flyout window (`HoverFlyoutGrid`), or an
+/// OSD/Quick-Settings-specific element name (`volumeLevelText`,
+/// `BrightnessIcon`, slider track parts). Styling a transient element is a
+/// proven Explorer crash vector — a WER record on build 26300 names
+/// `Switcher.dll` as the faulting module: the styled element dies mid-write.
+///
+/// Deliberately NOT filtered: generic framework names like `BackgroundRect`,
+/// `ContentPresenter` or `ProgressBar` internals — they also select the
+/// persistent tray pill, the task button progress bars and other durable
+/// elements (blocking them visibly unstylizes the tray), and
+/// `TaskbarExtensionElement`/`Gleam`/`HoverFlyoutBackgroundControl` which are
+/// persistent `Taskbar.`-namespaced children.
 fn transient_segment(seg: &str) -> bool {
     const MARKERS: &[&str] = &[
         "Switcher.",
@@ -86,15 +87,11 @@ fn transient_segment(seg: &str) -> bool {
         "VirtualDesktop",
         "HoverFlyoutGrid",
         "volumeLevelText",
-        "DeterminateProgressBar",
+        "BrightnessIcon",
         "HorizontalDecrease",
         "HorizontalTrack",
-        "ProgressBarTrack",
     ];
-    let seg = seg.trim();
-    seg.starts_with("Microsoft.UI.Xaml.")
-        || seg.starts_with("Windows.UI.Xaml.")
-        || MARKERS.iter().any(|m| seg.contains(m))
+    MARKERS.iter().any(|m| seg.contains(m))
 }
 
 /// Drops transient selector segments from a comma-joined `target` so the
