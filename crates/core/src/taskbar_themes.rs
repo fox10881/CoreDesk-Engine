@@ -64,12 +64,17 @@ pub fn theme_wire(id: &str, use_variant: bool) -> Option<String> {
 
 /// Whether one selector segment roots on a runtime-transient surface — Task
 /// View tiles (`Switcher.*`), the Snap flyout, popup menus, the
-/// volume/brightness OSD, the search gleam, hover flyouts, or a bare
-/// framework type (persistent shell elements always carry an app namespace
-/// such as `Taskbar.`/`SystemTray.`/`SearchUx.`; a `Microsoft.UI.Xaml.` root
-/// only exists inside a transient popup). Styling a transient element is a
-/// proven Explorer crash vector — a WER record on build 26300 names
-/// `Switcher.dll` as the faulting module: the styled element dies mid-write.
+/// volume/brightness OSD, the hover-flyout window (`HoverFlyoutGrid`), or a
+/// bare framework type (persistent shell elements always carry an app
+/// namespace such as `Taskbar.`/`SystemTray.`/`SearchUx.`; a
+/// `Microsoft.UI.Xaml.` root only exists inside a transient popup). Styling
+/// a transient element is a proven Explorer crash vector — a WER record on
+/// build 26300 names `Switcher.dll` as the faulting module: the styled
+/// element dies mid-write. Deliberately NOT filtered: `TaskbarExtensionElement`
+/// (the persistent host of the modern tray/clock — blocking it unstylizes the
+/// whole tray area), `Gleam` (a persistent search-pill decoration), and
+/// `HoverFlyoutBackgroundControl` (a `Taskbar.`-namespaced persistent child;
+/// only the `HoverFlyoutGrid` window itself is transient).
 fn transient_segment(seg: &str) -> bool {
     const MARKERS: &[&str] = &[
         "Switcher.",
@@ -79,9 +84,7 @@ fn transient_segment(seg: &str) -> bool {
         "MenuFlyout",
         "Confirmator",
         "VirtualDesktop",
-        "HoverFlyout",
-        "Gleam",
-        "TaskbarExtensionElement",
+        "HoverFlyoutGrid",
         "volumeLevelText",
         "DeterminateProgressBar",
         "HorizontalDecrease",
