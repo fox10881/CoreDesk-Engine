@@ -62,6 +62,50 @@ pub fn theme_wire(id: &str, use_variant: bool) -> Option<String> {
     Some(wire_from_payload(&theme(id)?, use_variant))
 }
 
+/// Whether one selector segment roots on a runtime-transient surface — Task
+/// View tiles (`Switcher.*`), the Snap flyout, popup menus, the
+/// volume/brightness OSD, the search gleam, hover flyouts, or a bare
+/// framework type (persistent shell elements always carry an app namespace
+/// such as `Taskbar.`/`SystemTray.`/`SearchUx.`; a `Microsoft.UI.Xaml.` root
+/// only exists inside a transient popup). Styling a transient element is a
+/// proven Explorer crash vector — a WER record on build 26300 names
+/// `Switcher.dll` as the faulting module: the styled element dies mid-write.
+fn transient_segment(seg: &str) -> bool {
+    const MARKERS: &[&str] = &[
+        "Switcher.",
+        "SnapLayout",
+        "SnapBarBorder",
+        "SnapPickerBorder",
+        "MenuFlyout",
+        "Confirmator",
+        "VirtualDesktop",
+        "HoverFlyout",
+        "Gleam",
+        "TaskbarExtensionElement",
+        "volumeLevelText",
+        "DeterminateProgressBar",
+        "HorizontalDecrease",
+        "HorizontalTrack",
+        "ProgressBarTrack",
+    ];
+    let seg = seg.trim();
+    seg.starts_with("Microsoft.UI.Xaml.")
+        || seg.starts_with("Windows.UI.Xaml.")
+        || MARKERS.iter().any(|m| seg.contains(m))
+}
+
+/// Drops transient selector segments from a comma-joined `target` so the
+/// resident never writes on elements that can die mid-flight. Persistent
+/// segments in the same list survive — `None` when nothing remains.
+fn strip_transient_segments(target: &str) -> Option<String> {
+    let kept: Vec<&str> = target
+        .split(',')
+        .map(str::trim)
+        .filter(|seg| !seg.is_empty() && !transient_segment(seg))
+        .collect();
+    (!kept.is_empty()).then(|| kept.join(", "))
+}
+
 /// The wire serializer against an already-loaded payload — kept separate
 /// from file resolution so unit tests need no filesystem.
 fn wire_from_payload(theme: &serde_json::Value, use_variant: bool) -> String {
@@ -108,6 +152,9 @@ fn wire_from_payload(theme: &serde_json::Value, use_variant: bool) -> String {
                 continue;
             }
             let target = styles_fs::expand_constants(target, &constants);
+            let Some(target) = strip_transient_segments(&target) else {
+                continue;
+            };
             let mut emitted_target = false;
             if let Some(arr) = entry["styles"].as_array() {
                 for style in arr.iter().filter_map(|s| s.as_str()) {
