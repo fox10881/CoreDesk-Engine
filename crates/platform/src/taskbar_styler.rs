@@ -50,6 +50,10 @@ struct Tb {
     /// and our property writes inside that churn freeze the shell UI thread
     /// — the taskbar never renders and explorer's input loop starves.
     suppressed: bool,
+    /// Read-side probe deadline on an OS build we have never styled: the
+    /// theme wire is held until this instant so the resident's diagnostics
+    /// walk runs with zero property writes in flight.
+    probe_until: Option<std::time::Instant>,
 }
 
 static TB: Mutex<Option<Tb>> = Mutex::new(None);
@@ -154,6 +158,9 @@ fn deliver(hwnd: crate::bindings::HWND, tb: &mut Tb) -> bool {
             tb.hello_sent = true;
         }
     }
+    if !probe_gate(tb) {
+        return false; // probe window open — `ensure` retries next tick
+    }
     if crate::tap::send_copydata(hwnd, CDS_TB_THEME, tb.wire.as_bytes()) {
         tb.cmd_hwnd = hwnd.0 as usize;
         true
@@ -184,6 +191,7 @@ pub fn apply(id: &str) -> bool {
         cmd_hwnd: 0,
         hello_sent: false,
         suppressed: false,
+        probe_until: None,
     });
     tb.style = id.to_string();
     tb.wire = wire;
@@ -315,6 +323,89 @@ fn current_build_ubr() -> (u32, u32) {
         0
     };
     (build, ubr)
+}
+
+/// How long the theme wire is withheld on an OS build this app has never
+/// styled. The hello has already woken the resident by then, so its
+/// diagnostics walk the island read-side while our `SetValue` traffic stays
+/// parked — a crash inside the window belongs to the island itself, and the
+/// breaker bans exactly that revision. Seen builds pay zero delay: the
+/// verdict persists under the same Debug subkey.
+const PROBE_SETTLE: std::time::Duration = std::time::Duration::from_secs(45);
+
+/// Returns `true` once the theme wire may be delivered: either this build was
+/// probed before, or its probe window just elapsed. While the window is open
+/// the caller treats `false` as "delivery pending" and retries next tick.
+fn probe_gate(tb: &mut Tb) -> bool {
+    const HKEY_CURRENT_USER: isize = -0x7FFF_FFFFisize;
+    let (build, ubr) = current_build_ubr();
+    let seen = build != 0
+        && reg_dword(HKEY_CURRENT_USER, NODIAG_SUBKEY, "ProbeBuild") == Some(build)
+        && reg_dword(HKEY_CURRENT_USER, NODIAG_SUBKEY, "ProbeUbr") == Some(ubr);
+    if seen {
+        return true;
+    }
+    match tb.probe_until {
+        Some(until) if std::time::Instant::now() >= until => {
+            tb.probe_until = None;
+            probe_mark_seen(build, ubr);
+            true
+        }
+        Some(_) => false,
+        None => {
+            tb.probe_until = Some(std::time::Instant::now() + PROBE_SETTLE);
+            tracing::info!(
+                settle_secs = PROBE_SETTLE.as_secs(),
+                "taskbar styler: unseen OS build — diagnostics probe first, theme wire held"
+            );
+            false
+        }
+    }
+}
+
+/// Persists the probe verdict (`ProbeBuild`/`ProbeUbr`). Written only after
+/// the window elapsed, never ahead of it — a crash inside the window keeps
+/// the build "unseen" so the next launch probes again.
+fn probe_mark_seen(build: u32, ubr: u32) {
+    const HKEY_CURRENT_USER: isize = -0x7FFF_FFFFisize;
+    const KEY_WRITE: u32 = 0x2_0006;
+    const REG_DWORD: u32 = 4;
+    let sub = widestr(NODIAG_SUBKEY);
+    let mut hkey: isize = 0;
+    if unsafe {
+        RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            PCWSTR(sub.as_ptr()),
+            0,
+            PCWSTR::null(),
+            0,
+            KEY_WRITE,
+            core::ptr::null(),
+            &mut hkey,
+            core::ptr::null_mut(),
+        )
+    } != 0
+    {
+        return;
+    }
+    let set = |name: &str, v: u32| {
+        let name = widestr(name);
+        unsafe {
+            RegSetValueExW(
+                hkey,
+                PCWSTR(name.as_ptr()),
+                0,
+                REG_DWORD,
+                (&v as *const u32).cast(),
+                4,
+            ) == 0
+        }
+    };
+    let _ = set("ProbeBuild", build) && set("ProbeUbr", ubr);
+    unsafe {
+        let _ = RegCloseKey(hkey);
+    }
+    tracing::info!("taskbar styler: OS build probe passed — theme writes enabled");
 }
 
 /// Writes `NoDiag`=1 + `NoDiagBuild`/`NoDiagUbr` under HKCU — the resident
