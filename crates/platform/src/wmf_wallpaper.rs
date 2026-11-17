@@ -9,26 +9,27 @@ use crate::bindings::*;
 use crate::desktop;
 use crate::wide::to_wide;
 use crate::wmf_bindings::{
-    D3D_DRIVER_TYPE_HARDWARE, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_9_1, D3D_FEATURE_LEVEL_9_3,
-    D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_11_0, D3D11_CPU_ACCESS_READ,
-    D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_MAP_READ, D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION,
-    D3D11_TEX2D_VPIV, D3D11_TEX2D_VPOV, D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
-    D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE, D3D11_VIDEO_PROCESSOR_CONTENT_DESC,
-    D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT, D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT,
-    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC_0,
-    D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC, D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC_0,
-    D3D11_VIDEO_PROCESSOR_STREAM, D3D11_VIDEO_USAGE_OPTIMAL_SPEED, D3D11_VPIV_DIMENSION_TEXTURE2D,
+    D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_9_1,
+    D3D_FEATURE_LEVEL_9_3, D3D_FEATURE_LEVEL_10_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_11_0,
+    D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_MAP_READ,
+    D3D11_MAPPED_SUBRESOURCE, D3D11_SDK_VERSION, D3D11_TEX2D_VPIV, D3D11_TEX2D_VPOV,
+    D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC, D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT,
+    D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT, D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC,
+    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC_0, D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC,
+    D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC_0, D3D11_VIDEO_PROCESSOR_STREAM,
+    D3D11_VIDEO_USAGE_OPTIMAL_SPEED, D3D11_VPIV_DIMENSION_TEXTURE2D,
     D3D11_VPOV_DIMENSION_TEXTURE2D, D3D11CreateDevice, DCompositionCreateDevice2,
-    DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12, DXGI_RATIONAL,
-    DXGI_SAMPLE_DESC, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1,
+    DXGI_ADAPTER_DESC, DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_NV12,
+    DXGI_RATIONAL, DXGI_SAMPLE_DESC, DXGI_SCALING_STRETCH, DXGI_SWAP_CHAIN_DESC1,
     DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL, DXGI_USAGE, GUID_ContainerFormatJpeg,
     GUID_WICPixelFormat24bppBGR, GetParent, HALFTONE, ID3D11Device, ID3D11DeviceContext,
     ID3D11Texture2D, ID3D11VideoContext, ID3D11VideoDevice, ID3D11VideoProcessor,
     ID3D11VideoProcessorEnumerator, ID3D11VideoProcessorInputView, ID3D11VideoProcessorOutputView,
     IDCompositionDesktopDevice, IDCompositionTarget, IDCompositionVisual, IDCompositionVisual2,
-    IDXGIAdapter, IDXGIDevice, IDXGIFactory2, IDXGIOutput, IDXGISwapChain1, IMF2DBuffer,
-    IMFAttributes, IMFDXGIBuffer, IMFDXGIDeviceManager, IMFMediaBuffer, IMFSample, IMFSourceReader,
-    IMFTransform, IWICBitmapEncoder, IWICBitmapFrameEncode, IntersectClipRect,
+    IDXGIAdapter, IDXGIDevice, IDXGIFactory, IDXGIFactory2, IDXGIOutput, IDXGISwapChain1,
+    IMF2DBuffer, IMFAttributes, IMFDXGIBuffer, IMFDXGIDeviceManager, IMFMediaBuffer, IMFSample,
+    IMFSourceReader, IMFTransform, IWICBitmapEncoder, IWICBitmapFrameEncode, IntersectClipRect,
     MF_MT_DEFAULT_STRIDE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_MAJOR_TYPE, MF_MT_SUBTYPE,
     MF_SOURCE_READER_ALL_STREAMS, MF_SOURCE_READER_FIRST_VIDEO_STREAM,
     MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED, MF_SOURCE_READERF_ENDOFSTREAM,
@@ -169,6 +170,56 @@ enum OutputKind {
     Rgb32,
 }
 
+/// The DXGI adapter that scans out the primary monitor — decoding onto the
+/// same card that displays the frames avoids a per-frame cross-GPU copy on
+/// hybrid systems (an Optimus laptop otherwise keeps its discrete card awake
+/// just to move pixels). `None` on topologies the display-config query can't
+/// resolve so `D3D11CreateDevice` falls back to its default adapter.
+fn scan_out_adapter() -> Option<IDXGIAdapter> {
+    windows_core::link!("dxgi.dll" "system" fn CreateDXGIFactory1(riid: *const windows_core::GUID, ppfactory: *mut *mut core::ffi::c_void) -> windows_core::HRESULT);
+    let mon = crate::monitors::enumerate()
+        .into_iter()
+        .find(|m| m.primary)?;
+    let (low, high) = crate::monitors::scan_out_adapter_luid(mon.handle)?;
+    let factory: IDXGIFactory = unsafe {
+        let mut result__ = core::ptr::null_mut();
+        CreateDXGIFactory1(&IDXGIFactory::IID, &mut result__)
+            .and_then(|| windows_core::imp::Type::from_abi(result__))
+            .ok()?
+    };
+    // `EnumAdapters` isn't generated in the bindings — its vtable slot still
+    // holds the real COM function pointer, so invoke it by signature. Slot
+    // index 7 = IUnknown(3) + IDXGIObject(4) prefix. The returned
+    // `IDXGIAdapter` is a transparent wrapper over the raw pointer.
+    type EnumAdaptersFn = unsafe extern "system" fn(
+        *mut core::ffi::c_void,
+        u32,
+        *mut *mut core::ffi::c_void,
+    ) -> windows_core::HRESULT;
+    let vt = windows_core::Interface::vtable(&factory);
+    let enum_adapters: EnumAdaptersFn =
+        unsafe { core::mem::transmute(*((&vt as *const _ as *const usize).add(7))) };
+    unsafe {
+        for i in 0.. {
+            let mut raw = core::ptr::null_mut();
+            if enum_adapters(windows_core::Interface::as_raw(&factory), i, &mut raw)
+                != windows_core::HRESULT(0)
+            {
+                break;
+            }
+            let adapter: IDXGIAdapter = windows_core::Interface::from_raw(raw);
+            let mut desc = DXGI_ADAPTER_DESC::default();
+            if adapter.GetDesc(&mut desc).is_ok()
+                && desc.AdapterLuid.LowPart == low
+                && desc.AdapterLuid.HighPart == high
+            {
+                return Some(adapter);
+            }
+        }
+    }
+    None
+}
+
 /// Creates a D3D11 device on the system's default adapter — on low-end hardware that is the
 /// integrated GPU (Iris Xe & friends); no discrete card required — plus its immediate context
 /// and an `IMFDXGIDeviceManager` bound to it. The device powers three things at once: the
@@ -187,11 +238,20 @@ fn create_d3d_device() -> Option<(ID3D11Device, ID3D11DeviceContext, IMFDXGIDevi
     // SAFETY: standard D3D11/MF creation calls; every out-param points at a valid slot and the
     // returned device manager holds the device alive internally.
     unsafe {
+        // Render adapter = the primary monitor's scan-out GPU when resolvable;
+        // an explicit adapter requires DRIVER_TYPE_UNKNOWN (HARDWARE is only
+        // legal with a null adapter).
+        let adapter = scan_out_adapter();
+        let driver = if adapter.is_some() {
+            D3D_DRIVER_TYPE_UNKNOWN
+        } else {
+            D3D_DRIVER_TYPE_HARDWARE
+        };
         let mut device: Option<ID3D11Device> = None;
         let mut context: Option<ID3D11DeviceContext> = None;
         if D3D11CreateDevice(
-            None,
-            D3D_DRIVER_TYPE_HARDWARE,
+            adapter.as_ref(),
+            driver,
             crate::wmf_bindings::HINSTANCE(core::ptr::null_mut()),
             D3D11_CREATE_DEVICE_VIDEO_SUPPORT as u32,
             Some(&LEVELS),
