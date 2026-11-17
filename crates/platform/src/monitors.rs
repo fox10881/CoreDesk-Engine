@@ -103,8 +103,9 @@ pub struct DisplayTarget {
     pub connector: (i32, u32),
 }
 
-/// The monitors on the active display paths. Empty when the query fails (session 0).
-pub fn display_targets() -> Vec<DisplayTarget> {
+/// The active display paths — the retry loop shared by [`display_targets`]
+/// and [`scan_out_adapter_luid`]. Empty when the query fails (session 0).
+fn active_paths() -> Vec<DISPLAYCONFIG_PATH_INFO> {
     // The topology can change between sizing and querying: then the query asks for more room.
     for _ in 0..3 {
         let (mut paths_n, mut modes_n) = (0u32, 0u32);
@@ -135,9 +136,44 @@ pub fn display_targets() -> Vec<DisplayTarget> {
             return Vec::new();
         }
         paths.truncate(paths_n as usize);
-        return paths.iter().filter_map(target_of).collect();
+        return paths;
     }
     Vec::new()
+}
+
+/// The monitors on the active display paths. Empty when the query fails (session 0).
+pub fn display_targets() -> Vec<DisplayTarget> {
+    active_paths().iter().filter_map(target_of).collect()
+}
+
+/// The LUID of the GPU adapter scanning out `monitor` — which card physically
+/// drives that display, `(LowPart, HighPart)`. Rendering surfaces bound for a
+/// monitor work best on this adapter: a mismatch means every frame crosses
+/// between GPUs (Optimus laptops keep the discrete card awake just to copy).
+/// `None` when the monitor's path can't be resolved — callers then use the
+/// system default adapter.
+pub fn scan_out_adapter_luid(monitor: HMONITOR) -> Option<(u32, i32)> {
+    let device = query(monitor)?.device_name;
+    for path in active_paths() {
+        let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME {
+            header: DISPLAYCONFIG_DEVICE_INFO_HEADER {
+                r#type: DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
+                size: size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32,
+                adapterId: path.sourceInfo.adapterId,
+                id: path.sourceInfo.id,
+            },
+            ..Default::default()
+        };
+        // SAFETY: the header announces the packet size.
+        if unsafe { DisplayConfigGetDeviceInfo(&mut source.header) } != 0 {
+            continue;
+        }
+        if from_wide(&source.viewGdiDeviceName) == device {
+            let id = path.sourceInfo.adapterId;
+            return Some((id.LowPart, id.HighPart));
+        }
+    }
+    None
 }
 
 fn target_of(path: &DISPLAYCONFIG_PATH_INFO) -> Option<DisplayTarget> {
