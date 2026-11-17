@@ -267,6 +267,10 @@ fn control_loop(
     // a beat, silent = under 1 % for ~4 s.
     let mut audible = false;
     let mut silent_since: Option<Instant> = None;
+    // Capture-start failures (device busy, endpoint rebuilding) retry with a
+    // backoff that doubles per miss — a permanently-failing endpoint stops
+    // producing a warn line every second once the cap is reached.
+    let mut cap_backoff_ms = 1_000u64;
 
     while !stop.load(Ordering::Relaxed) {
         if !active.load(Ordering::Relaxed) {
@@ -302,14 +306,17 @@ fn control_loop(
             match LoopbackCapture::start(move |blk| feed_ring(&ring2, blk)) {
                 Ok(c) => {
                     c.set_paused(false);
+                    cap_backoff_ms = 1_000;
                     capture = Some(c);
                     let info = capture.as_ref().unwrap().info();
                     tracing::info!(endpoint = %info.device_name, rate = info.sample_rate,
                         "visualizer: loopback capture armed");
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "visualizer: capture failed; retrying");
-                    std::thread::sleep(Duration::from_millis(1000));
+                    tracing::warn!(error = %e, retry_ms = cap_backoff_ms,
+                        "visualizer: capture failed; retrying");
+                    std::thread::sleep(Duration::from_millis(cap_backoff_ms));
+                    cap_backoff_ms = cap_backoff_ms.saturating_mul(2).min(30_000);
                     continue;
                 }
             }
