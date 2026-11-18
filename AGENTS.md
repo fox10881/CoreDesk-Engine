@@ -32,3 +32,23 @@ change.
 Commit messages carry NO Devin signature: no "Generated with Devin" line and
 no "Co-Authored-By: Devin" trailer. Commits are authored solely under the
 user's identity so the repository shows a single contributor.
+
+## Release checklist — build tracking is mandatory
+
+Every release MUST record which Windows build it was verified on — shell
+styling targets unstable XAML surfaces and Windows updates are the main
+breakage source, so "tested build" is release-critical information, not
+trivia.
+
+For every version tag:
+
+- Release notes MUST end with a `Verified live on Windows build <build>.<UBR>`
+  line naming the exact build used for verification.
+- `COMPATIBILITY.md` MUST get a new row for the release (app version × build +
+  UBR × result × date × source). If the release was not verified on a
+  particular build class, say so explicitly — an honest "untested" row is more
+  valuable than silence.
+- If a Windows update provably breaks an older release, record the cause in a
+  **Known issues** section of `COMPATIBILITY.md` — which app version, which
+  build, and what broke — so the matrix answers "did my update break me?"
+  without a support round-trip.
