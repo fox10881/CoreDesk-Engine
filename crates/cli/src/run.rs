@@ -9,8 +9,8 @@ use serde_json::{Value, json};
 
 use crate::cli::split_set_args;
 use crate::cli::{
-    BackupCmd, Command, ConfigCmd, FenceCmd, ItemCmd, MonitorCmd, PeekCmd, RuleAddArgs, RuleCmd,
-    SettingsCmd, SnapshotCmd, ThemeCmd,
+    BackupCmd, Command, CompatCmd, ConfigCmd, FenceCmd, ItemCmd, MonitorCmd, PeekCmd, RuleAddArgs,
+    RuleCmd, SettingsCmd, SnapshotCmd, ThemeCmd,
 };
 use crate::output::{Reply, Style};
 use crate::{client, describe, local, output};
@@ -86,6 +86,20 @@ pub fn run(ctx: &Ctx, command: Command) -> Result<Reply, IpcError> {
         Command::Fence { cmd } => run_fence(ctx, cmd),
         Command::Item { cmd } => run_item(ctx, cmd),
         Command::Settings { cmd } => run_settings(ctx, cmd),
+        Command::Compat { cmd } => match cmd {
+            CompatCmd::Report { print } => {
+                if print {
+                    crate::output::print_text(
+                        &coredesk_platform::compat_report::render(),
+                        false,
+                    );
+                    std::process::exit(0);
+                }
+                let path = coredesk_platform::compat_report::write()
+                    .map_err(coredesk_ipc::IpcError::internal)?;
+                Ok(Reply::new(serde_json::json!({ "path": path })))
+            }
+        },
         Command::Rule { cmd } => run_rule(ctx, cmd),
         Command::Snapshot { cmd } => run_snapshot(ctx, cmd),
         Command::Config {

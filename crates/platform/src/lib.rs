@@ -76,6 +76,7 @@ mod wmf_bindings;
 pub mod autostart;
 pub mod backdrop_probe;
 pub mod clipboard;
+pub mod compat_report;
 pub mod com;
 pub mod crashlog;
 pub mod d2d;

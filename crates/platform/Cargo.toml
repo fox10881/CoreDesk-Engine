@@ -13,6 +13,7 @@ windows-future = "0.100"
 windows-time = "0.100"
 uuid = { workspace = true }
 tracing = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 windows-sys = { version = "0.61", features = [

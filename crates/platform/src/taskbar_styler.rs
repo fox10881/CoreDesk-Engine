@@ -228,7 +228,7 @@ pub fn apply(id: &str) -> bool {
 // When the OS revision changes the keys mismatch and the resident's
 // `diag_disabled()` re-arms on its own; `nodiag_clear_if_stale` sweeps the
 // leftover values.
-const NODIAG_SUBKEY: &str = r"Software\CoreDeskEngine\Debug";
+pub(crate) const NODIAG_SUBKEY: &str = r"Software\CoreDeskEngine\Debug";
 /// Explorer deaths inside one armed run before the breaker trips.
 const TAP_BREAKER_STRIKES: u32 = 2;
 /// Process-handle rights for crash attribution only.
@@ -274,7 +274,7 @@ fn judge_proc(proc: usize) -> Option<bool> {
     Some(ok && exception_exit(code))
 }
 
-fn reg_dword(root: isize, sub: &str, name: &str) -> Option<u32> {
+pub(crate) fn reg_dword(root: isize, sub: &str, name: &str) -> Option<u32> {
     const RRF_RT_REG_DWORD: u32 = 0x10;
     let sub = widestr(sub);
     let name = widestr(name);
@@ -296,7 +296,7 @@ fn reg_dword(root: isize, sub: &str, name: &str) -> Option<u32> {
 
 /// `<build>.<UBR>` split into numbers — same source the resident's
 /// `diag_disabled` reads (`CurrentBuild` + `UBR` under `HKLM`).
-fn current_build_ubr() -> (u32, u32) {
+pub(crate) fn current_build_ubr() -> (u32, u32) {
     const HKEY_LOCAL_MACHINE: isize = -0x7FFF_FFFEisize; // 0xFFFFFFFF80000002
     const RRF_RT_REG_SZ: u32 = 0x02;
     const CV: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";

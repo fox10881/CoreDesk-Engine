@@ -69,6 +69,12 @@ pub enum Command {
         #[command(subcommand)]
         cmd: ItemCmd,
     },
+    /// Compatibility report: build, armed styles, NoDiag state, WER shell crashes, log tail
+    #[command(after_help = "Example: coredesk-cli compat report")]
+    Compat {
+        #[command(subcommand)]
+        cmd: CompatCmd,
+    },
     /// Global settings (see `describe --schema Settings` for the keys)
     Settings {
         #[command(subcommand)]
@@ -375,6 +381,18 @@ pub enum ItemCmd {
         /// Only report what would happen (per item: action, destination, skip reason)
         #[arg(long)]
         dry_run: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CompatCmd {
+    /// Write the report under the data dir's reports\ folder and print its path
+    /// (the same file the in-app "share report" prompt attaches)
+    #[command(after_help = "Example: coredesk-cli compat report")]
+    Report {
+        /// Print the report to stdout instead of writing a file
+        #[arg(long)]
+        print: bool,
     },
 }
 
