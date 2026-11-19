@@ -308,6 +308,13 @@ pub struct App {
     /// fed `vizSpectrum` frames by its own `WM_TIMER` reading the engine's
     /// shared spectrum.
     visualizer_host: Option<crate::visualizer_host::VisualizerHost>,
+    /// Native taskbar resource strip (Direct2D text over the taskbar's left
+    /// band) — the host object is cheap and always `Some`; its window exists
+    /// only while `taskbar_widget_style` names a real style.
+    taskbar_widget: Option<crate::taskbar_widget::TaskbarWidgetHost>,
+    /// 1 Hz PDH sampler feeding the taskbar widget — `None` while the widget
+    /// is disarmed, so an unused feature costs literally nothing.
+    perf: Option<coredesk_platform::perf_probe::PerfProbe>,
     /// Probe ticks where a widget's WebView companion window was lost while
     /// the host showed; sustained loss means `revive_surface` can't re-pin
     /// it and the widget gets a soft restart (see `check_widget_surfaces`).
@@ -1349,6 +1356,7 @@ impl App {
         let visualizer_class = crate::visualizer_host::VisualizerHost::register_class()?;
         let peek_class = PeekOverlay::register_class()?;
         let effects_class = crate::effects_host::EffectsHost::register_class()?;
+        let taskbar_widget_class = crate::taskbar_widget::TaskbarWidgetHost::register_class()?;
 
         // CLI named pipe: requests land in `ipc_pending`, the control window is poked.
         let ipc_pending: PendingQueue = Arc::new(Mutex::new(VecDeque::new()));
@@ -1416,6 +1424,12 @@ impl App {
             )),
             visualizer: None,
             visualizer_host: None,
+            taskbar_widget: Some(crate::taskbar_widget::TaskbarWidgetHost::new(
+                taskbar_widget_class,
+                stack.clone(),
+                queue.clone(),
+            )),
+            perf: None,
             clock_surface_misses: 0,
             viz_surface_misses: 0,
             clock_restarts: 0,
@@ -1511,6 +1525,10 @@ impl App {
         // creates the overlay window).
         let fx = app.state.config.settings.clone();
         app.apply_desktop_effect(&fx);
+        // Same for the taskbar resource widget — "none"/"" never opens the
+        // PDH query or the overlay window.
+        let tbw = app.state.config.settings.taskbar_widget_style.clone();
+        app.apply_taskbar_widget_style(&tbw);
         // Watch both wallpaper settings and virtual-desktop state; either signal starts a
         // bounded burst of fast reads, because the image may arrive after the notification.
         {
@@ -2242,6 +2260,8 @@ impl App {
             Command::RefreshFence(fence) => self.manual_refresh(fence),
             Command::RefreshClock => self.soft_restart_clock(),
             Command::RefreshVisualizer => self.soft_restart_visualizer(),
+            Command::RefreshTaskbarWidget => self.soft_restart_taskbar_widget(),
+            Command::ToggleTaskbarWidgetLock => self.toggle_taskbar_widget_lock(),
             Command::RenameFence { fence, title } => {
                 self.end_item_rename_visuals();
                 let title = title.trim();

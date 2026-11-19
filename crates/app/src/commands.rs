@@ -222,6 +222,12 @@ pub enum Command {
     RefreshClock,
     /// Same fail-safe on the visualizer widget's context menu.
     RefreshVisualizer,
+    /// The taskbar resource widget's context menu (「تحديث」): soft-restart
+    /// the native overlay — close and respawn on the live taskbar band.
+    RefreshTaskbarWidget,
+    /// The taskbar widget's context menu (「قفل الموقع」): flip the drag
+    /// lock — persists through `taskbar_widget_locked` in settings.
+    ToggleTaskbarWidgetLock,
     /// Context menu on a fence's title/background at screen coordinates.
     FenceMenu {
         fence: FenceId,

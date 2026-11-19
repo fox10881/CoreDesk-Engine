@@ -25,6 +25,7 @@ mod settings_host;
 mod shadow;
 mod share_log;
 mod state;
+mod taskbar_widget;
 mod visualizer_engine;
 mod visualizer_host;
 mod webview_comp;

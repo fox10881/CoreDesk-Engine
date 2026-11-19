@@ -967,6 +967,83 @@ impl App {
         self.apply_clock_style(&style);
     }
 
+    /// Taskbar resource widget: `""`/`"none"` closes the overlay and drops
+    /// the PDH sampler (zero resources); any other style id arms the native
+    /// strip on the taskbar's left band. Called from `apply_settings`' diff
+    /// and once at startup.
+    pub(super) fn apply_taskbar_widget_style(&mut self, style: &str) {
+        let s = style.trim();
+        if s.is_empty() || s == "none" {
+            if let Some(h) = &self.taskbar_widget {
+                h.close();
+            }
+            self.perf = None;
+            return;
+        }
+        let Some(desc) = coredesk_core::taskbar_widget_styles::style(s) else {
+            tracing::warn!(
+                style = s,
+                "taskbar widget style file missing — keeping current"
+            );
+            return;
+        };
+        let (offset, locked) = (
+            self.state
+                .config
+                .settings
+                .taskbar_widget_offset
+                .unwrap_or(-1),
+            self.state.config.settings.taskbar_widget_locked,
+        );
+        // Engine before window — the strip clones the shared snapshot at
+        // open and must never observe a dropped probe.
+        let shared = self
+            .perf
+            .get_or_insert_with(coredesk_platform::perf_probe::PerfProbe::new)
+            .shared();
+        let Some(h) = &self.taskbar_widget else {
+            return;
+        };
+        if h.hwnd().is_some() {
+            h.apply(desc, offset, locked);
+        } else if let Err(e) = h.open(desc, offset, locked, shared) {
+            tracing::error!(error = %e, "taskbar widget failed");
+        }
+    }
+
+    /// Soft restart for the taskbar widget (its 「تحديث」 context menu):
+    /// close + rearm at the live offset — the strip's own `tbWidgetMoved`
+    /// already persisted the drag, so nothing needs rescuing here.
+    pub(super) fn soft_restart_taskbar_widget(&mut self) {
+        if self
+            .taskbar_widget
+            .as_ref()
+            .and_then(|h| h.hwnd())
+            .is_none()
+        {
+            return;
+        }
+        merge_sidecar_deltas(&mut self.state.config.settings, &self.state.store);
+        self.settings_mutated();
+        if let Some(h) = &self.taskbar_widget {
+            h.close();
+        }
+        tracing::info!("taskbar widget respawned");
+        let style = self.state.config.settings.taskbar_widget_style.clone();
+        self.apply_taskbar_widget_style(&style);
+    }
+
+    /// 「قفل الموقع」 on the strip's context menu: flips the persisted lock
+    /// and applies it to the live window without a respawn.
+    pub(super) fn toggle_taskbar_widget_lock(&mut self) {
+        let locked = !self.state.config.settings.taskbar_widget_locked;
+        self.state.config.settings.taskbar_widget_locked = locked;
+        self.settings_mutated();
+        if let Some(h) = &self.taskbar_widget {
+            h.set_locked(locked);
+        }
+    }
+
     /// Runs on every 2.5 s widget tick (the palette probes are event-driven
     /// now — this timer is purely the surface watchdog): a widget's
     /// WebView companion window can be hidden or parked off-screen by
@@ -1511,6 +1588,10 @@ impl App {
                 coredesk_core::styles_fs::VISUALIZER_WIDGET_DIR,
                 "无（关闭）",
             ),
+            // Taskbar Widget dropdown — `Styles\Taskbar Widget\*.json`
+            // descriptors for the native D2D strip (no WebView).
+            "taskbarWidgetDesigns":
+                coredesk_core::taskbar_widget_styles::style_options_json(),
             // Live Effects dropdown — preset files ∪ compiled builtins.
             "desktopEffects": coredesk_core::live_effect_options_json(),
         })
@@ -1765,6 +1846,13 @@ impl App {
                     }
                     self.probe_viz_backdrop();
                 }
+            }
+            // Taskbar widget drag ended — the strip already persisted its
+            // own offset into the message; just land it in settings.
+            Some("tbWidgetMoved") => {
+                let offset = v.get("offset").and_then(|n| n.as_i64()).unwrap_or(0) as i32;
+                self.state.config.settings.taskbar_widget_offset = Some(offset);
+                self.settings_mutated();
             }
             Some("feApply") => self.apply_fe_glass(&v),
             Some("feCancel") => {
@@ -2392,6 +2480,32 @@ impl App {
                     .unwrap_or_else(crate::clock_host::default_bounds);
                 let _ = window::set_window_bounds(h.hwnd(), x, y, w, hh);
                 self.probe_clock_backdrop();
+            }
+        }
+        // Taskbar widget: style/offset/lock all ride `.cde` themes — sync
+        // them into state before the diff so `apply_taskbar_widget_style`
+        // reads the incoming values, then arm/disarm on a style change or
+        // reposition/relock the live strip on an offset/lock change.
+        self.state.config.settings.taskbar_widget_offset = new.taskbar_widget_offset;
+        self.state.config.settings.taskbar_widget_locked = new.taskbar_widget_locked;
+        if new.taskbar_widget_style != old.taskbar_widget_style {
+            self.state.config.settings.taskbar_widget_style = new.taskbar_widget_style.clone();
+            self.apply_taskbar_widget_style(&new.taskbar_widget_style);
+        } else if new.taskbar_widget_style != "none"
+            && (new.taskbar_widget_offset != old.taskbar_widget_offset
+                || new.taskbar_widget_locked != old.taskbar_widget_locked)
+        {
+            if let Some(h) = &self.taskbar_widget {
+                let (offset, locked) = (
+                    new.taskbar_widget_offset.unwrap_or(-1),
+                    new.taskbar_widget_locked,
+                );
+                h.apply(
+                    coredesk_core::taskbar_widget_styles::style(&new.taskbar_widget_style)
+                        .unwrap_or_default(),
+                    offset,
+                    locked,
+                );
             }
         }
         if new.desktop_effect != old.desktop_effect

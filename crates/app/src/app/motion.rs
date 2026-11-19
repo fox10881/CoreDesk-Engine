@@ -35,12 +35,17 @@ impl App {
         let back_to_gpu =
             self.ctx.stack.on_fallback_warp() && self.device_retry_ms < DEVICE_RETRY_MAX_MS;
         let effects_lost = self.effects.as_ref().is_some_and(|e| e.device_lost());
+        let tbw_lost = self
+            .taskbar_widget
+            .as_ref()
+            .is_some_and(|t| t.device_lost());
         if !self
             .fences
             .values()
             .chain(self.desktop_windows.values())
             .any(|w| w.device_lost())
             && !effects_lost
+            && !tbw_lost
             && !back_to_gpu
         {
             self.device_retry_ms = DEVICE_RETRY_FIRST_MS;
@@ -57,6 +62,7 @@ impl App {
             .chain(self.desktop_windows.values())
             .any(|w| w.device_lost())
             || effects_lost
+            || tbw_lost
             || self.ctx.stack.on_fallback_warp()
         {
             // A window got no new surfaces (logged there), or WARP draws: rebuild everything
@@ -99,6 +105,9 @@ impl App {
         }
         if let Some(e) = self.effects.as_ref() {
             e.recreate_surfaces();
+        }
+        if let Some(t) = self.taskbar_widget.as_ref() {
+            t.recreate_surfaces();
         }
         self.redraw_notices();
         Ok(())
