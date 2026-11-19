@@ -198,42 +198,52 @@ fn tap_dll_path() -> Option<PathBuf> {
 /// fresh resident co-load beside the stale image (which then reads as
 /// stale via `CoreDeskEngine.TAP.Build` and is told to unload).
 pub(crate) fn tap_injectable_path() -> Option<PathBuf> {
+    // The OnceLock fixes only the version+hash-derived file NAME — the
+    // bytes on disk are re-verified against our image on every call: a
+    // same-user overwrite between injects must never be what gets
+    // LoadLibrary'd into a shell host.
     static PATH: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
-    PATH.get_or_init(|| {
-        let real = tap_dll_path()?;
-        let bytes = std::fs::read(&real).ok()?;
-        // FNV-1a over the whole image — any rebuild yields a new module name.
-        let mut h: u64 = 0xcbf29ce484222325;
-        for &b in &bytes {
-            h = (h ^ b as u64).wrapping_mul(0x100000001b3);
-        }
-        let name = format!("coredesk_tap_v{TAP_PROTOCOL_VERSION}_{h:016x}.dll");
-        let dir = std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)?
-            .join("CoreDeskEngine")
-            .join("residents");
-        std::fs::create_dir_all(&dir).ok()?;
-        let out = dir.join(&name);
-        let matches_real = std::fs::read(&out).ok().as_deref() == Some(bytes.as_slice());
-        if !matches_real {
-            // Garbage-collect superseded copies — pinned ones (loaded in a
-            // live host) fail removal harmlessly and get a retry next run.
-            if let Ok(rd) = std::fs::read_dir(&dir) {
-                for e in rd.flatten() {
-                    let p = e.path();
-                    let stale = p
-                        .file_name()
-                        .is_some_and(|n| n.to_string_lossy().starts_with("coredesk_tap_v"));
-                    if stale && p != out {
-                        let _ = std::fs::remove_file(&p);
-                    }
+    let out = PATH
+        .get_or_init(|| {
+            let real = tap_dll_path()?;
+            let bytes = std::fs::read(&real).ok()?;
+            // FNV-1a over the whole image — any rebuild yields a new module name.
+            let mut h: u64 = 0xcbf29ce484222325;
+            for &b in &bytes {
+                h = (h ^ b as u64).wrapping_mul(0x100000001b3);
+            }
+            let name = format!("coredesk_tap_v{TAP_PROTOCOL_VERSION}_{h:016x}.dll");
+            let dir = std::env::var_os("LOCALAPPDATA")
+                .map(PathBuf::from)?
+                .join("CoreDeskEngine")
+                .join("residents");
+            std::fs::create_dir_all(&dir).ok()?;
+            Some(dir.join(name))
+        })
+        .as_ref()?
+        .clone();
+    let real = std::fs::read(tap_dll_path()?).ok()?;
+    if std::fs::read(&out).ok().as_deref() != Some(real.as_slice()) {
+        // Mismatch = first deploy or a tampered staged file — rewrite the
+        // byte-exact image either way. Garbage-collect superseded copies —
+        // pinned ones (loaded in a live host) fail removal harmlessly and
+        // get a retry next run.
+        if let Some(dir) = out.parent()
+            && let Ok(rd) = std::fs::read_dir(dir)
+        {
+            for e in rd.flatten() {
+                let p = e.path();
+                let stale = p
+                    .file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with("coredesk_tap_v"));
+                if stale && p != out {
+                    let _ = std::fs::remove_file(&p);
                 }
             }
-            std::fs::write(&out, &bytes).ok()?;
         }
-        Some(out)
-    })
-    .clone()
+        std::fs::write(&out, &real).ok()?;
+    }
+    Some(out)
 }
 
 /// The deployed resident's file-hash tag — the `<hash>` in
@@ -255,24 +265,29 @@ pub(crate) fn tap_image_tag() -> Option<String> {
 /// `%ProgramData%`. Byte-level verification against `tap_dll_path()` ensures an
 /// existing file is never trusted without matching the current build image.
 pub(crate) fn tap_injectable_path_appcontainer() -> Option<PathBuf> {
+    // OnceLock fixes the path; the ACE grants are idempotent (kept inside
+    // the init) while the byte-verify re-runs per call — same tamper
+    // window as `tap_injectable_path`, but into an AppContainer host.
     static PATH: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
-    PATH.get_or_init(|| {
-        let local = tap_injectable_path()?;
-        let real = tap_dll_path()?;
-        let expected = std::fs::read(&real).ok()?;
-        if std::fs::read(&local).ok().as_deref() != Some(expected.as_slice()) {
-            std::fs::write(&local, &expected).ok()?;
-        }
-        if let Some(residents_dir) = local.parent() {
-            if let Some(app_dir) = residents_dir.parent() {
-                grant_app_packages_access(app_dir);
+    let local = PATH
+        .get_or_init(|| {
+            let local = tap_injectable_path()?;
+            if let Some(residents_dir) = local.parent() {
+                if let Some(app_dir) = residents_dir.parent() {
+                    grant_app_packages_access(app_dir);
+                }
+                grant_app_packages_access(residents_dir);
             }
-            grant_app_packages_access(residents_dir);
-        }
-        grant_app_packages_access(&local);
-        Some(local)
-    })
-    .clone()
+            grant_app_packages_access(&local);
+            Some(local)
+        })
+        .as_ref()?
+        .clone();
+    let expected = std::fs::read(tap_dll_path()?).ok()?;
+    if std::fs::read(&local).ok().as_deref() != Some(expected.as_slice()) {
+        std::fs::write(&local, &expected).ok()?;
+    }
+    Some(local)
 }
 
 const WM_COPYDATA: u32 = 0x004A;
