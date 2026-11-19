@@ -271,13 +271,34 @@ fn control_loop(
     // backoff that doubles per miss — a permanently-failing endpoint stops
     // producing a warn line every second once the cap is reached.
     let mut cap_backoff_ms = 1_000u64;
+    // A capture that died on a hostile endpoint (repeated early invalidations —
+    // driver/APO crashing audiodg on loopback start) gets a much longer cool
+    // down: re-arming immediately would keep the system audio engine in a
+    // crash loop. Five minutes lets an external service restart recover.
+    const DEAD_COOLDOWN_MS: u64 = 5 * 60 * 1_000;
+    let mut dead_cooldown: Option<Instant> = None;
 
     while !stop.load(Ordering::Relaxed) {
         if !active.load(Ordering::Relaxed) {
             if capture.take().is_some() {
                 tracing::debug!("visualizer: capture released (inactive)");
             }
+            dead_cooldown = None;
             std::thread::sleep(Duration::from_millis(120));
+            continue;
+        }
+        if let Some(until) = dead_cooldown {
+            if Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(5_000));
+                continue;
+            }
+            dead_cooldown = None;
+            tracing::info!("visualizer: dead-cooldown elapsed — retrying capture");
+        }
+        if capture.as_ref().map(|c| c.is_dead()).unwrap_or(false) {
+            tracing::warn!("visualizer: capture died on a hostile endpoint; cooling down 5min");
+            capture = None;
+            dead_cooldown = Some(Instant::now() + Duration::from_millis(DEAD_COOLDOWN_MS));
             continue;
         }
 

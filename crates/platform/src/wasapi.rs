@@ -33,6 +33,21 @@ const BUFFER_HNS: i64 = 400_000;
 const REPOLL_MS: u128 = 1_000;
 /// Capture-event wait: doubles as the stop/pause poll — never blocks longer.
 const WAIT_MS: u32 = 200;
+/// Session-open failure backoff bounds: 500 ms doubling to 30 s. A flat 500 ms
+/// retry loop lets a hostile endpoint absorb two `Activate`+`Initialize`
+/// attempts per second forever — on drivers whose loopback path crashes
+/// `audiodg.exe` (buggy APOs: Nahimic/SonicStudio class), that cadence keeps
+/// the audio engine in a permanent restart cycle and system audio dies.
+const OPEN_BACKOFF_MIN_MS: u64 = 500;
+const OPEN_BACKOFF_MAX_MS: u64 = 30_000;
+/// A session that dies within this window of arming is counted as an
+/// *early invalidation* — the signature of an endpoint/driver that crashes
+/// the moment loopback streaming starts.
+const EARLY_DEAD_WINDOW: Duration = Duration::from_secs(15);
+/// Consecutive early invalidations after which the capture thread gives up
+/// permanently rather than keep crash-looping the audio engine. The
+/// visualizer surfaces a dead snapshot instead of an audible signal.
+const EARLY_DEAD_GIVE_UP: u32 = 3;
 
 /// Observable state of the running capture (written by the capture thread,
 /// read by the engine/UI thread).
@@ -44,6 +59,10 @@ pub struct CaptureInfo {
     pub sample_rate: u32,
     /// `true` while the audio client streams (cleared while paused).
     pub running: bool,
+    /// `true` once the capture thread gave up permanently (repeated early
+    /// invalidations — a hostile endpoint). The engine should drop the
+    /// capture and cool down instead of re-arming in a tight loop.
+    pub dead: bool,
 }
 
 #[derive(Debug)]
@@ -60,6 +79,10 @@ enum SampleFormat {
 struct Shared {
     stop: AtomicBool,
     paused: AtomicBool,
+    /// Permanent give-up flag — set when the endpoint keeps invalidating
+    /// sessions right after arming. Distinct from `stop` (caller shutdown):
+    /// `dead` means "the audio stack rejected us; don't re-arm".
+    dead: AtomicBool,
     info: Mutex<CaptureInfo>,
     /// Last error string surfaced for diagnostics (latest wins).
     error: Mutex<Option<String>>,
@@ -92,6 +115,7 @@ impl LoopbackCapture {
         let shared = Arc::new(Shared {
             stop: AtomicBool::new(false),
             paused: AtomicBool::new(false),
+            dead: AtomicBool::new(false),
             info: Mutex::new(CaptureInfo::default()),
             error: Mutex::new(None),
             frames: AtomicU32::new(0),
@@ -136,6 +160,12 @@ impl LoopbackCapture {
     /// The last error the capture thread recorded, if any.
     pub fn last_error(&self) -> Option<String> {
         self.shared.error.lock().ok().and_then(|g| g.clone())
+    }
+
+    /// `true` once the capture thread gave up on a hostile endpoint — the
+    /// caller should drop this capture and cool down before arming another.
+    pub fn is_dead(&self) -> bool {
+        self.shared.dead.load(Ordering::Acquire)
     }
 
     /// Total delivered mono frames — a cheap liveness counter.
@@ -471,6 +501,11 @@ where
         let event = wasapi_bindings::HANDLE(event.0);
         let mut mono: Vec<f32> = Vec::with_capacity(8192);
         let mut session: Option<Session> = None;
+        // When the live session was armed — a session dying inside
+        // `EARLY_DEAD_WINDOW` is a crash signature, not a hot-swap.
+        let mut armed_at: Option<Instant> = None;
+        let mut open_backoff_ms = OPEN_BACKOFF_MIN_MS;
+        let mut early_dead = 0u32;
         let mut last_poll = Instant::now() - Duration::from_millis(REPOLL_MS as u64);
 
         while !shared.stop.load(Ordering::Relaxed) {
@@ -497,13 +532,19 @@ where
                         if s.client.SetEventHandle(event).is_err() {
                             set_error(&shared, "SetEventHandle failed".into());
                         } else {
+                            open_backoff_ms = OPEN_BACKOFF_MIN_MS;
+                            armed_at = Some(Instant::now());
                             session = Some(s);
                         }
                     }
                     Err(e) => {
                         set_error(&shared, e);
-                        // No endpoint yet (all devices unplugged) — retry shortly.
-                        std::thread::sleep(Duration::from_millis(500));
+                        // No endpoint yet (all devices unplugged) or a stack
+                        // that keeps refusing — exponential backoff so a wedged
+                        // endpoint builder is not re-probed twice a second.
+                        std::thread::sleep(Duration::from_millis(open_backoff_ms));
+                        open_backoff_ms =
+                            open_backoff_ms.saturating_mul(2).min(OPEN_BACKOFF_MAX_MS);
                         continue;
                     }
                 }
@@ -523,20 +564,50 @@ where
                 std::thread::sleep(Duration::from_millis(100));
                 continue;
             }
+            let mut killed = false;
             if !s.started {
                 if s.client.Start().is_err() {
                     set_error(&shared, "IAudioClient::Start failed".into());
-                    session = None;
-                    continue;
+                    killed = true;
+                } else {
+                    s.started = true;
+                    set_running(&shared, true);
+                    tracing::debug!("wasapi: stream started");
                 }
-                s.started = true;
-                set_running(&shared, true);
-                tracing::debug!("wasapi: stream started");
             }
 
-            // Event-driven reads; the timeout keeps stop/pause responsive.
-            let _ = bindings::WaitForSingleObject(bindings::HANDLE(event.0), WAIT_MS);
-            if !drain_packets(s, &mut on_block, &mut mono, &shared) {
+            if !killed {
+                // Event-driven reads; the timeout keeps stop/pause responsive.
+                let _ = bindings::WaitForSingleObject(bindings::HANDLE(event.0), WAIT_MS);
+                if !drain_packets(s, &mut on_block, &mut mono, &shared) {
+                    killed = true;
+                }
+            }
+            if killed {
+                let early = armed_at
+                    .map(|t| t.elapsed() < EARLY_DEAD_WINDOW)
+                    .unwrap_or(false);
+                early_dead = if early { early_dead + 1 } else { 0 };
+                if early_dead >= EARLY_DEAD_GIVE_UP {
+                    // The endpoint keeps killing sessions moments after they
+                    // arm — classic signature of a driver/APO crashing in
+                    // audiodg on loopback start. Re-arming would crash the
+                    // system audio engine in a loop; stop permanently and let
+                    // the owner cool down.
+                    shared.dead.store(true, Ordering::Release);
+                    if let Ok(mut g) = shared.info.lock() {
+                        g.dead = true;
+                    }
+                    set_error(
+                        &shared,
+                        format!(
+                            "endpoint invalidated {early_dead} sessions within \
+                             {EARLY_DEAD_WINDOW:?} of arming — capture stopped \
+                             to protect the audio stack"
+                        ),
+                    );
+                    break;
+                }
                 session = None;
             }
         }
