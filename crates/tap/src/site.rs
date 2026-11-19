@@ -1034,10 +1034,16 @@ pub fn ensure_watching() {
     // shapes share this recovery — a pending theme with no captured
     // dispatcher (the island was born after the advise armed) and a burst
     // that suppressed styling writes mid-construction (panel opens, Start
-    // tile storms). The tray explorer is excluded: its write quench is the
-    // intentional foreign-island protection, and its chrome re-reports
-    // constantly so nothing is ever lost.
-    if !is_shell_tray_host() {
+    // tile storms). The tray explorer joins only the resweep shape, never
+    // the install respawn: its muted elements include rebuilt chrome
+    // (SystemTray subtrees report once and stay unstyled without a
+    // replay), while `starved`+install churn stays excluded — the pin and
+    // write quench keep foreign islands out of every replay anyway.
+    if is_shell_tray_host() {
+        if crate::styler::wux::nc_resweep_needed() {
+            nch_re_advise(false);
+        }
+    } else {
         let starved = crate::styler::wux::starved_pending();
         let resweep = crate::styler::wux::nc_resweep_needed();
         if starved || resweep {
@@ -1135,6 +1141,15 @@ fn on_visual_tree_change(
     // The mux session must never feed the shell pid — a straggler session
     // racing its teardown still gets its elements dropped at the door.
     if session == 2 && shell {
+        static S2_DROP: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        if S2_DROP.fetch_add(1, Ordering::Relaxed) < 40 {
+            crate::tap_log!(
+                "vtw: s2-drop tid={} type={:?} handle={}",
+                unsafe { win32::GetCurrentThreadId() },
+                String::from_utf16_lossy(&element.Type[..]),
+                element.Handle.0
+            );
+        }
         crate::styler::mux::drop_untracked(element.Handle.0, relation.Parent.0);
         return;
     }
@@ -1145,13 +1160,31 @@ fn on_visual_tree_change(
             let ty = String::from_utf16_lossy(&element.Type[..]);
             if ty.starts_with("Taskbar.") {
                 PINNED_TID.store(tid, Ordering::Release);
+                crate::tap_log!("vtw: pinned tid={tid} on {ty}");
             }
         } else if tid != pinned {
-            // Foreign-thread report — the pin drops the element, but the
+            // Foreign-thread report. Sibling taskbar islands (`SystemTray`,
+            // `SearchUx`) can sit on their own dispatcher on some builds —
+            // admit scope roots and children of scope-marked parents so a
+            // tray island still styles wherever it lands. True foreign
+            // islands (SnapLayout, `Experiences.*`) stay dropped: they can
+            // never report a taskbar-scope type or a marked parent. The
             // callback still owns the handles and a dropped Remove would
             // leave a stale scope mark a recycled handle could inherit.
-            crate::styler::wux::drop_untracked(element.Handle.0, relation.Parent.0);
-            return;
+            let ty = String::from_utf16_lossy(&element.Type[..]);
+            if !crate::styler::wux::taskbar_scope_admit(element.Handle.0, relation.Parent.0, &ty) {
+                static PIN_DROP: std::sync::atomic::AtomicU32 =
+                    std::sync::atomic::AtomicU32::new(0);
+                if PIN_DROP.fetch_add(1, Ordering::Relaxed) < 40 {
+                    crate::tap_log!(
+                        "vtw: pin-drop tid={tid} pinned={pinned} type={:?} handle={}",
+                        String::from_utf16_lossy(&element.Type[..]),
+                        element.Handle.0
+                    );
+                }
+                crate::styler::wux::drop_untracked(element.Handle.0, relation.Parent.0);
+                return;
+            }
         }
     }
     // DIAG: element-feed telemetry while bringing up the taskbar styler —

@@ -18,7 +18,7 @@ use crate::win32;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::{Rc, Weak as RcWeak};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, Ordering};
 use windows_core::{GUID, HRESULT, IInspectable, Interface};
 use xb::{
     DependencyObject, DependencyProperty, DependencyPropertyChangedCallback, FontWeight,
@@ -305,6 +305,18 @@ fn in_taskbar_scope(handle: u64, parent: u64, reported_type: &str) -> bool {
     false
 }
 
+/// Admission test for foreign-thread reports in the shell pid (`site`'s
+/// thread-pin gate): `true` when the element is a taskbar-scope root or a
+/// child of an already scope-marked parent. A sibling `SystemTray`/
+/// `SearchUx` island can live on its own dispatcher thread; without this
+/// admission its whole subtree is dropped at the door and tray chrome
+/// (the clock/tray frame) stays unstyled for the session. Marks admitted
+/// handles so their children inherit scope — the same propagation the
+/// pinned thread uses in `on_element`.
+pub fn taskbar_scope_admit(handle: u64, parent: u64, reported_type: &str) -> bool {
+    in_taskbar_scope(handle, parent, reported_type)
+}
+
 /// `g_elementPropertyModifying` — set while we write a property so the
 /// re-apply callback skips our own writes.
 static MODIFYING: AtomicBool = AtomicBool::new(false);
@@ -315,26 +327,29 @@ static MODIFYING: AtomicBool = AtomicBool::new(false);
 /// the same thread deadlocks permanently).
 static READVISING: AtomicBool = AtomicBool::new(false);
 
-/// A panel-open burst left elements in `known()` that never got styled:
-/// every write path is quenched while `churn_recently_hot`, and panel
-/// elements — unlike taskbar chrome — never re-report to pick the style up
-/// on their next report (NC/QS flyouts, Start Menu tile storms that made
-/// icons scatter). `ensure_watching` re-advises once the burst quiets; the
-/// `READVISING` exemption lets the replay style them.
+/// A burst left elements in `known()` (or muted out of it) that never got
+/// styled: every write path is quenched while `churn_recently_hot`, and
+/// dropped elements do not re-report on their own — NC/QS flyouts, Start
+/// Menu tile storms that made icons scatter, and rebuilt `SystemTray`
+/// subtrees in the tray explorer. `ensure_watching` re-advises once the
+/// burst quiets; the `READVISING` exemption lets the replay style them.
 static NC_RESWEEP: AtomicBool = AtomicBool::new(false);
 
-/// Mark the resweep flag — every non-tray shell host; the same suppression
-/// in the tray explorer is the intentional foreign-island quench, not a
-/// lost style, and its chrome re-reports constantly anyway.
+/// Mark the resweep flag — every shell host, the tray explorer included.
+/// Tray-host drops used to assume "its chrome re-reports constantly
+/// anyway", but a rebuilt `SystemTray` subtree reports once and is done:
+/// elements muted or storm-dropped mid-rebuild stayed unstyled for the
+/// session's life (the visible clock/tray frame loss). The post-quiet
+/// re-advise replays the tree — foreign-island elements in the replay are
+/// still filtered by the pin/scope/immersive gates, so the write-quench's
+/// crash protection is unchanged.
 fn nc_mark_resweep() {
-    if !crate::site::is_shell_tray_host() {
-        NC_RESWEEP.store(true, Ordering::Release);
-    }
+    NC_RESWEEP.store(true, Ordering::Release);
 }
 
-/// `true` when a burst suppressed styling in an NC host and the island has
-/// gone quiet — the re-advise replay can then restyle every re-reported
-/// element (it is exempt from the hot gate by `READVISING`).
+/// `true` when a burst suppressed styling and the host has gone quiet —
+/// the re-advise replay can then restyle every re-reported element (it is
+/// exempt from the hot gate by `READVISING`).
 pub fn nc_resweep_needed() -> bool {
     NC_RESWEEP.load(Ordering::Acquire) && !churn_recently_hot()
 }
@@ -5255,6 +5270,10 @@ pub fn on_element(
     // reach bookkeeping, materialization, or the deferred-write queue at all.
     if churn_muted() {
         crate::tap_log!("styler: churn muted handle={} type={reported_type}", element.Handle.0);
+        // Muted elements never enter `known()` and rebuilt tray subtrees
+        // do not re-report — flag the post-quiet replay so a rebuild that
+        // lands inside a burst is restyled instead of lost for the session.
+        nc_mark_resweep();
         return;
     }
     if is_immersive(element.Handle.0, parent, reported_type) {
@@ -5262,7 +5281,8 @@ pub fn on_element(
         // matcher, dispatcher or write work. Immersive churn also stays
         // out of the storm counter so a Task View open can never pause
         // taskbar styling.
-        if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
+        static IMM_DROP: AtomicU32 = AtomicU32::new(0);
+        if IMM_DROP.fetch_add(1, Ordering::Relaxed) < 40 {
             crate::tap_log!("styler: IMMERSIVE drop handle={} type={reported_type} parent={parent}", element.Handle.0);
         }
         queue_release(element.Handle.0);
@@ -5276,7 +5296,8 @@ pub fn on_element(
     if crate::site::is_shell_tray_host()
         && !in_taskbar_scope(element.Handle.0, parent, reported_type)
     {
-        if reported_type.starts_with("SystemTray.") || reported_type.starts_with("Taskbar.") {
+        static SCOPE_DROP: AtomicU32 = AtomicU32::new(0);
+        if SCOPE_DROP.fetch_add(1, Ordering::Relaxed) < 40 {
             crate::tap_log!("styler: SCOPE drop handle={} type={reported_type} parent={parent}", element.Handle.0);
         }
         queue_release(element.Handle.0);
