@@ -214,20 +214,24 @@ static EBM_DLL: &[u8] = include_bytes!(concat!(
 
 /// Source bytes to deploy. `COREDESK_EBM_DLL=<path>` overrides for engine
 /// development only — anything loaded into explorer.exe must come from an
-/// explicit opt-in or the bytes this build was tested with.
+/// explicit opt-in or the bytes this build was tested with. Release
+/// builds always take the vendored image: an env var every child process
+/// inherits (and anything the user shell passes us) must not pick the
+/// code that runs inside explorer.exe.
 fn ebm_source_bytes() -> Option<Vec<u8>> {
-    match std::env::var("COREDESK_EBM_DLL") {
-        Ok(p) => match std::fs::read(&p) {
-            Ok(b) => Some(b),
+    if cfg!(debug_assertions)
+        && let Ok(p) = std::env::var("COREDESK_EBM_DLL")
+    {
+        match std::fs::read(&p) {
+            Ok(b) => return Some(b),
             Err(e) => {
                 // A set-but-unreadable override must not silently fall back —
                 // the developer asked for specific bytes.
                 tracing::warn!(path = %p, error = %e, "COREDESK_EBM_DLL unreadable; using vendored engine");
-                Some(EBM_DLL.to_vec())
             }
-        },
-        Err(_) => Some(EBM_DLL.to_vec()),
+        }
     }
+    Some(EBM_DLL.to_vec())
 }
 
 /// FNV-1a over the engine bytes — labels the deploy dir; every content change
