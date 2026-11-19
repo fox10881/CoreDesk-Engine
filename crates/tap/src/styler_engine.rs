@@ -952,6 +952,11 @@ struct Eval<'a> {
     s: &'a [u8],
     pos: usize,
     live: bool,
+    /// Recursion depth — nested parens, chained `?:` and unary runs all
+    /// recurse on the pump thread's fixed stack; a wire can carry tens of
+    /// thousands of `(` and overflow it (uncatchable `STATUS_STACK_OVERFLOW`
+    /// inside the shell host).
+    depth: u32,
     /// Consumer's spine node for capture ranking.
     node: Option<Rc<TreeNode>>,
     /// Consumer's scope key.
@@ -1011,10 +1016,32 @@ impl Eval<'_> {
             ExprVal::Str(s) => s,
         })
     }
+    /// Recursion-depth cap shared by `parse_expr` / `parse_ternary` /
+    /// `parse_factor` — the three entries attacker-controlled nesting
+    /// recurses through.
+    const MAX_DEPTH: u32 = 64;
+
     fn parse_expr(&mut self) -> Result<ExprVal, EvalErr> {
-        self.parse_ternary()
+        self.depth += 1;
+        let r = if self.depth > Self::MAX_DEPTH {
+            Err(EvalErr::Fail)
+        } else {
+            self.parse_ternary()
+        };
+        self.depth -= 1;
+        r
     }
     fn parse_ternary(&mut self) -> Result<ExprVal, EvalErr> {
+        self.depth += 1;
+        let r = if self.depth > Self::MAX_DEPTH {
+            Err(EvalErr::Fail)
+        } else {
+            self.parse_ternary_impl()
+        };
+        self.depth -= 1;
+        r
+    }
+    fn parse_ternary_impl(&mut self) -> Result<ExprVal, EvalErr> {
         let cond = self.parse_equality()?;
         if !self.eat(b'?') {
             return Ok(cond);
@@ -1110,6 +1137,16 @@ impl Eval<'_> {
         Ok(v)
     }
     fn parse_factor(&mut self) -> Result<ExprVal, EvalErr> {
+        self.depth += 1;
+        let r = if self.depth > Self::MAX_DEPTH {
+            Err(EvalErr::Fail)
+        } else {
+            self.parse_factor_impl()
+        };
+        self.depth -= 1;
+        r
+    }
+    fn parse_factor_impl(&mut self) -> Result<ExprVal, EvalErr> {
         self.ws();
         if self.eat(b'+') {
             let v = self.parse_factor()?;
@@ -1303,6 +1340,7 @@ fn eval_expr_text(
         s: t.as_bytes(),
         pos: 0,
         live: true,
+        depth: 0,
         node: node.cloned(),
         scope,
         deps,
