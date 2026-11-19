@@ -564,6 +564,14 @@ fn handle_message(_hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) {
             cds.dw_data as u32,
             cds.cb_data
         );
+        // Payload-size cap: cb_data is sender-chosen and seeds the copies
+        // below; theme wires run well under 1 MiB, so anything larger is
+        // corrupt or a memory-exhaustion probe against the host's queue.
+        const MAX_COPYDATA: u32 = 4 * 1024 * 1024;
+        if cds.cb_data > MAX_COPYDATA {
+            crate::tap_log!("copydata drop: oversized cb_data={}", cds.cb_data);
+            return;
+        }
         match cds.dw_data {
             CDS_THEME | CDS_TB_THEME | CDS_NC_THEME
                 if !cds.lp_data.is_null() && cds.cb_data > 0 =>
