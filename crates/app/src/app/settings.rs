@@ -1266,8 +1266,8 @@ impl App {
                 let _com = coredesk_platform::com::MtaGuard::init();
                 let sample =
                     backdrop_probe::sample(HWND(widget as _), rect, &monitors::enumerate());
-                let boxed = Box::into_raw(Box::new(sample));
-                window::post_message(HWND(control as _), WM_APP_CLOCK_PROBE, 0, boxed as isize);
+                let token = backdrop_probe::publish(sample);
+                window::post_message(HWND(control as _), WM_APP_CLOCK_PROBE, 0, token);
             })
             .ok();
     }
@@ -1306,8 +1306,8 @@ impl App {
                 let _com = coredesk_platform::com::MtaGuard::init();
                 let sample =
                     backdrop_probe::sample(HWND(widget as _), rect, &monitors::enumerate());
-                let boxed = Box::into_raw(Box::new(sample));
-                window::post_message(HWND(control as _), WM_APP_VIZ_PROBE, 0, boxed as isize);
+                let token = backdrop_probe::publish(sample);
+                window::post_message(HWND(control as _), WM_APP_VIZ_PROBE, 0, token);
             })
             .ok();
     }

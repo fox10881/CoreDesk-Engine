@@ -231,11 +231,11 @@ impl TaskbarWidgetHost {
                         Some(0)
                     }
                     m if m == WM_TBW_SAMPLE => {
-                        // SAFETY: lParam owns a boxed Sample produced by the
-                        // probe thread — take it exactly once.
-                        let sample =
-                            unsafe { *Box::from_raw(lparam as *mut backdrop_probe::Sample) };
-                        c.apply_sample(sample);
+                        // lparam is a publish() token — a forged id finds
+                        // no parked sample and the message is dropped.
+                        if let Some(sample) = backdrop_probe::take(lparam) {
+                            c.apply_sample(sample);
+                        }
                         Some(0)
                     }
                     msg::WM_DESTROY => {
@@ -617,8 +617,8 @@ impl Core {
             .spawn(move || {
                 let _com = coredesk_platform::com::MtaGuard::init();
                 let sample = backdrop_probe::sample(HWND(hwnd as _), rect, &monitors::enumerate());
-                let boxed = Box::into_raw(Box::new(sample));
-                window::post_message(HWND(hwnd as _), WM_TBW_SAMPLE, 0, boxed as isize);
+                let token = backdrop_probe::publish(sample);
+                window::post_message(HWND(hwnd as _), WM_TBW_SAMPLE, 0, token);
             })
             .ok();
     }

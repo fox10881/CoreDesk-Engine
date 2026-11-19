@@ -29,6 +29,39 @@ pub struct Sample {
 
 const DEFAULT_ACCENT: [u8; 3] = [0x38, 0xbd, 0xf8];
 
+/// Pending samples keyed by a rolling token — the pump posts the token
+/// as the message's `lparam` instead of a raw `Box` pointer, so a forged
+/// message can at worst consume a real in-flight sample early, never
+/// dereference an attacker-chosen pointer.
+static PENDING: std::sync::Mutex<(u64, std::collections::VecDeque<(u64, Sample)>)> =
+    std::sync::Mutex::new((0, std::collections::VecDeque::new()));
+
+/// Cap on in-flight samples — a lost message must never grow the store
+/// unboundedly.
+const PENDING_CAP: usize = 64;
+
+/// Park `sample` and return the token to post as `lparam`.
+pub fn publish(sample: Sample) -> isize {
+    let mut g = PENDING.lock().unwrap_or_else(|e| e.into_inner());
+    g.0 = g.0.wrapping_add(1);
+    let token = g.0;
+    g.1.push_back((token, sample));
+    if g.1.len() > PENDING_CAP {
+        g.1.pop_front();
+    }
+    token as isize
+}
+
+/// Reclaim the sample for `token`; `None` for forged or already-taken ids.
+pub fn take(token: isize) -> Option<Sample> {
+    if token <= 0 {
+        return None;
+    }
+    let mut g = PENDING.lock().unwrap_or_else(|e| e.into_inner());
+    let pos = g.1.iter().position(|(t, _)| *t == token as u64)?;
+    g.1.remove(pos).map(|(_, s)| s)
+}
+
 fn area(r: RECT) -> i64 {
     (r.right - r.left).max(0) as i64 * (r.bottom - r.top).max(0) as i64
 }

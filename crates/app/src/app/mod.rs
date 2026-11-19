@@ -678,24 +678,23 @@ impl App {
                             Some(0)
                         }
                         WM_APP_CLOCK_PROBE => {
-                            // Reclaim the worker's box even when the UI is
-                            // too busy to apply it (modal loop).
-                            let sample =
-                                unsafe { Box::from_raw(lparam as *mut backdrop_probe::Sample) };
-                            if let Ok(mut guard) = cell.try_borrow_mut()
+                            // Take the parked sample even when the UI is
+                            // too busy to apply it (modal loop) so the
+                            // slot frees; a forged lparam finds nothing.
+                            if let Some(sample) = backdrop_probe::take(lparam)
+                                && let Ok(mut guard) = cell.try_borrow_mut()
                                 && let Some(app) = guard.as_mut()
                             {
-                                app.apply_clock_theme(*sample);
+                                app.apply_clock_theme(sample);
                             }
                             Some(0)
                         }
                         WM_APP_VIZ_PROBE => {
-                            let sample =
-                                unsafe { Box::from_raw(lparam as *mut backdrop_probe::Sample) };
-                            if let Ok(mut guard) = cell.try_borrow_mut()
+                            if let Some(sample) = backdrop_probe::take(lparam)
+                                && let Ok(mut guard) = cell.try_borrow_mut()
                                 && let Some(app) = guard.as_mut()
                             {
-                                app.apply_viz_theme(*sample);
+                                app.apply_viz_theme(sample);
                             }
                             Some(0)
                         }
