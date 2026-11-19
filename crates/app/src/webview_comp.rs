@@ -357,6 +357,51 @@ impl IWv2 {
         }
         Ok(token)
     }
+    pub unsafe fn add_NavigationStarting(
+        &self,
+        handler: *const IWv2NavigationStarting,
+    ) -> Result<i64> {
+        let mut token = 0;
+        unsafe {
+            (Interface::vtable(self).add_NavigationStarting)(
+                Interface::as_raw(self),
+                handler,
+                &mut token,
+            )
+            .ok()?;
+        }
+        Ok(token)
+    }
+    pub unsafe fn add_FrameNavigationStarting(
+        &self,
+        handler: *const IWv2NavigationStarting,
+    ) -> Result<i64> {
+        let mut token = 0;
+        unsafe {
+            (Interface::vtable(self).add_FrameNavigationStarting)(
+                Interface::as_raw(self),
+                handler,
+                &mut token,
+            )
+            .ok()?;
+        }
+        Ok(token)
+    }
+    pub unsafe fn add_NewWindowRequested(
+        &self,
+        handler: *const IWv2NewWindowRequested,
+    ) -> Result<i64> {
+        let mut token = 0;
+        unsafe {
+            (Interface::vtable(self).add_NewWindowRequested)(
+                Interface::as_raw(self),
+                handler,
+                &mut token,
+            )
+            .ok()?;
+        }
+        Ok(token)
+    }
 }
 #[repr(C)]
 pub struct IWv2_Vtbl {
@@ -365,7 +410,8 @@ pub struct IWv2_Vtbl {
     Source: usize,
     Navigate: usize,
     NavigateToString: unsafe extern "system" fn(CF, PCWSTR) -> HRESULT,
-    add_NavigationStarting: usize,
+    add_NavigationStarting:
+        unsafe extern "system" fn(CF, *const IWv2NavigationStarting, *mut i64) -> HRESULT,
     remove_NavigationStarting: usize,
     add_ContentLoading: usize,
     remove_ContentLoading: usize,
@@ -375,7 +421,8 @@ pub struct IWv2_Vtbl {
     remove_HistoryChanged: usize,
     add_NavigationCompleted: usize,
     remove_NavigationCompleted: usize,
-    add_FrameNavigationStarting: usize,
+    add_FrameNavigationStarting:
+        unsafe extern "system" fn(CF, *const IWv2NavigationStarting, *mut i64) -> HRESULT,
     remove_FrameNavigationStarting: usize,
     add_FrameNavigationCompleted: usize,
     remove_FrameNavigationCompleted: usize,
@@ -403,7 +450,8 @@ pub struct IWv2_Vtbl {
     GoForward: usize,
     GetDevToolsProtocolEventReceiver: usize,
     Stop: usize,
-    add_NewWindowRequested: usize,
+    add_NewWindowRequested:
+        unsafe extern "system" fn(CF, *const IWv2NewWindowRequested, *mut i64) -> HRESULT,
     remove_NewWindowRequested: usize,
     add_DocumentTitleChanged: usize,
     remove_DocumentTitleChanged: usize,
@@ -654,6 +702,164 @@ impl IWv2WebMessageReceived_Vtbl {
 impl windows_core::RuntimeName for IWv2WebMessageReceived {}
 
 windows_core::imp::define_interface!(
+    IWv2NavigationStartingEventArgs,
+    IWv2NavigationStartingEventArgs_Vtbl,
+    0x5b495469_e119_438a_9b18_7604f25f2e49
+);
+windows_core::imp::interface_hierarchy!(IWv2NavigationStartingEventArgs, windows_core::IUnknown);
+impl IWv2NavigationStartingEventArgs {
+    /// Navigation target URI; freed with `CoTaskMemFree`.
+    unsafe fn uri(&self) -> Result<String> {
+        let mut raw = PWSTR::null();
+        unsafe {
+            (Interface::vtable(self).get_Uri)(Interface::as_raw(self), &mut raw).ok()?;
+        }
+        let text = if raw.is_null() {
+            String::new()
+        } else {
+            unsafe { PCWSTR::from_raw(raw.0).to_string().unwrap_or_default() }
+        };
+        unsafe { CoTaskMemFree(raw.0.cast()) };
+        Ok(text)
+    }
+    unsafe fn put_cancel(&self, cancel: bool) -> Result<()> {
+        unsafe { (Interface::vtable(self).put_Cancel)(Interface::as_raw(self), cancel as i32).ok() }
+    }
+}
+#[repr(C)]
+pub struct IWv2NavigationStartingEventArgs_Vtbl {
+    pub base__: IUnknown_Vtbl,
+    get_Uri: unsafe extern "system" fn(CF, *mut PWSTR) -> HRESULT,
+    get_IsUserInitiated: usize,
+    get_IsRedirected: usize,
+    get_NavigationId: usize,
+    put_Cancel: unsafe extern "system" fn(CF, i32) -> HRESULT,
+    get_Cancel: usize,
+}
+impl windows_core::RuntimeName for IWv2NavigationStartingEventArgs {}
+
+windows_core::imp::define_interface!(
+    IWv2NavigationStarting,
+    IWv2NavigationStarting_Vtbl,
+    0x9adbe429_f36d_432b_9ddc_f8881fbd76e3
+);
+windows_core::imp::interface_hierarchy!(IWv2NavigationStarting, windows_core::IUnknown);
+#[repr(C)]
+pub struct IWv2NavigationStarting_Vtbl {
+    pub base__: IUnknown_Vtbl,
+    pub Invoke: unsafe extern "system" fn(CF, CF, CF) -> HRESULT,
+}
+pub trait IWv2NavigationStarting_Impl: windows_core::IUnknownImpl {
+    fn Invoke(&self, sender: Ref<IWv2>, args: Ref<IWv2NavigationStartingEventArgs>) -> Result<()>;
+}
+impl IWv2NavigationStarting_Vtbl {
+    pub const fn new<Identity: IWv2NavigationStarting_Impl, const OFFSET: isize>() -> Self {
+        unsafe extern "system" fn Invoke<
+            Identity: IWv2NavigationStarting_Impl,
+            const OFFSET: isize,
+        >(
+            this: CF,
+            sender: CF,
+            args: CF,
+        ) -> HRESULT {
+            unsafe {
+                let this: &Identity =
+                    &*((this as *const *const ()).offset(OFFSET) as *const Identity);
+                IWv2NavigationStarting_Impl::Invoke(
+                    this,
+                    core::mem::transmute_copy(&sender),
+                    core::mem::transmute_copy(&args),
+                )
+                .into()
+            }
+        }
+        Self {
+            base__: IUnknown_Vtbl::new::<Identity, OFFSET>(),
+            Invoke: Invoke::<Identity, OFFSET>,
+        }
+    }
+    pub fn matches(iid: &windows_core::GUID) -> bool {
+        iid == &<IWv2NavigationStarting as Interface>::IID
+    }
+}
+impl windows_core::RuntimeName for IWv2NavigationStarting {}
+
+windows_core::imp::define_interface!(
+    IWv2NewWindowRequestedEventArgs,
+    IWv2NewWindowRequestedEventArgs_Vtbl,
+    0x34acb11c_fc37_4418_9132_f9c21d1eafb9
+);
+windows_core::imp::interface_hierarchy!(IWv2NewWindowRequestedEventArgs, windows_core::IUnknown);
+impl IWv2NewWindowRequestedEventArgs {
+    /// Suppress the popup — the page's `window.open`/`target=_blank`
+    /// request dies handled, nothing is spawned.
+    unsafe fn put_handled(&self, handled: bool) -> Result<()> {
+        unsafe {
+            (Interface::vtable(self).put_Handled)(Interface::as_raw(self), handled as i32).ok()
+        }
+    }
+}
+#[repr(C)]
+pub struct IWv2NewWindowRequestedEventArgs_Vtbl {
+    pub base__: IUnknown_Vtbl,
+    get_Uri: usize,
+    put_NewWindow: usize,
+    get_NewWindow: usize,
+    put_Handled: unsafe extern "system" fn(CF, i32) -> HRESULT,
+    get_Handled: usize,
+    get_IsUserInitiated: usize,
+    get_WindowFeatures: usize,
+    get_Deferral: usize,
+}
+impl windows_core::RuntimeName for IWv2NewWindowRequestedEventArgs {}
+
+windows_core::imp::define_interface!(
+    IWv2NewWindowRequested,
+    IWv2NewWindowRequested_Vtbl,
+    0xd4c185fe_c81c_4989_97af_2d3fa7ab5651
+);
+windows_core::imp::interface_hierarchy!(IWv2NewWindowRequested, windows_core::IUnknown);
+#[repr(C)]
+pub struct IWv2NewWindowRequested_Vtbl {
+    pub base__: IUnknown_Vtbl,
+    pub Invoke: unsafe extern "system" fn(CF, CF, CF) -> HRESULT,
+}
+pub trait IWv2NewWindowRequested_Impl: windows_core::IUnknownImpl {
+    fn Invoke(&self, sender: Ref<IWv2>, args: Ref<IWv2NewWindowRequestedEventArgs>) -> Result<()>;
+}
+impl IWv2NewWindowRequested_Vtbl {
+    pub const fn new<Identity: IWv2NewWindowRequested_Impl, const OFFSET: isize>() -> Self {
+        unsafe extern "system" fn Invoke<
+            Identity: IWv2NewWindowRequested_Impl,
+            const OFFSET: isize,
+        >(
+            this: CF,
+            sender: CF,
+            args: CF,
+        ) -> HRESULT {
+            unsafe {
+                let this: &Identity =
+                    &*((this as *const *const ()).offset(OFFSET) as *const Identity);
+                IWv2NewWindowRequested_Impl::Invoke(
+                    this,
+                    core::mem::transmute_copy(&sender),
+                    core::mem::transmute_copy(&args),
+                )
+                .into()
+            }
+        }
+        Self {
+            base__: IUnknown_Vtbl::new::<Identity, OFFSET>(),
+            Invoke: Invoke::<Identity, OFFSET>,
+        }
+    }
+    pub fn matches(iid: &windows_core::GUID) -> bool {
+        iid == &<IWv2NewWindowRequested as Interface>::IID
+    }
+}
+impl windows_core::RuntimeName for IWv2NewWindowRequested {}
+
+windows_core::imp::define_interface!(
     IWv2EnvCompleted,
     IWv2EnvCompleted_Vtbl,
     0x4a5c436e_a9e3_4a2e_89c3_910d3513f5cc
@@ -771,6 +977,39 @@ impl IWv2WebMessageReceived_Impl for WebMessageReceived_Impl {
             && let Ok(json) = unsafe { args.WebMessageAsJson() }
         {
             (self.0)(json);
+        }
+        Ok(())
+    }
+}
+
+/// Navigation gate: every hosted page is a `NavigateToString`'d local
+/// document, so the only legitimate navigation is its `about:blank`
+/// initial load. Anything else — `location.href` hops, injected links —
+/// is page-initiated from widget/theme JS and is cancelled.
+#[implement(IWv2NavigationStarting)]
+struct NavigationStarting;
+
+impl IWv2NavigationStarting_Impl for NavigationStarting_Impl {
+    fn Invoke(&self, _sender: Ref<IWv2>, args: Ref<IWv2NavigationStartingEventArgs>) -> Result<()> {
+        if let Ok(args) = args.ok() {
+            let uri = unsafe { args.uri() }.unwrap_or_default();
+            if !uri.eq_ignore_ascii_case("about:blank") {
+                let _ = unsafe { args.put_cancel(true) };
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Popup gate: `window.open`/`target=_blank` from a hosted widget page
+/// is always suppressed.
+#[implement(IWv2NewWindowRequested)]
+struct NewWindowRequested;
+
+impl IWv2NewWindowRequested_Impl for NewWindowRequested_Impl {
+    fn Invoke(&self, _sender: Ref<IWv2>, args: Ref<IWv2NewWindowRequestedEventArgs>) -> Result<()> {
+        if let Ok(args) = args.ok() {
+            let _ = unsafe { args.put_handled(true) };
         }
         Ok(())
     }
@@ -1139,6 +1378,40 @@ impl CompWebview {
             } {
                 tokens.push(t);
                 handlers.push(h.cast()?);
+            }
+        }
+        {
+            // Hosted pages are all NavigateToString'd local documents —
+            // navigation past about:blank or a popup request is
+            // page-initiated from widget/theme JS, so both are denied.
+            // Separate handler instances per event (the runtime takes
+            // one ref per registration).
+            let nav: IWv2NavigationStarting = NavigationStarting.into();
+            if let Ok(t) = unsafe {
+                webview.add_NavigationStarting(
+                    Interface::as_raw(&nav) as *const IWv2NavigationStarting,
+                )
+            } {
+                tokens.push(t);
+                handlers.push(nav.cast()?);
+            }
+            let frame_nav: IWv2NavigationStarting = NavigationStarting.into();
+            if let Ok(t) = unsafe {
+                webview.add_FrameNavigationStarting(
+                    Interface::as_raw(&frame_nav) as *const IWv2NavigationStarting
+                )
+            } {
+                tokens.push(t);
+                handlers.push(frame_nav.cast()?);
+            }
+            let popup: IWv2NewWindowRequested = NewWindowRequested.into();
+            if let Ok(t) = unsafe {
+                webview.add_NewWindowRequested(
+                    Interface::as_raw(&popup) as *const IWv2NewWindowRequested
+                )
+            } {
+                tokens.push(t);
+                handlers.push(popup.cast()?);
             }
         }
         let cursor = Rc::new(Cell::new(std::ptr::null_mut()));
