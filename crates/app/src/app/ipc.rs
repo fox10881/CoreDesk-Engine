@@ -982,7 +982,10 @@ impl App {
                 Ok(mutation(active, None, Value::Null))
             }
             Method::ThemeImport { path } => {
-                let p = PathBuf::from(path);
+                // Same absolute-path contract as config.import — a
+                // relative path would resolve against the app's CWD, a
+                // location the caller did not pick.
+                let p = absolute_path(path)?;
                 self.import_theme_from(&p);
                 Ok(json!({ "changed": true, "imported": p }))
             }
