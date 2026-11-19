@@ -74,6 +74,7 @@ const SURFACE_KEYS: &[&str] = &[
     "backdrop",
     "clockStyle",
     "visualizerStyle",
+    "taskbarWidgetStyle",
     "desktopEffect",
     "wallpaperPath",
 ];
