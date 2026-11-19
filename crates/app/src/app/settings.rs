@@ -2104,21 +2104,16 @@ impl App {
                     // The incident counts as answered either way; on a write
                     // failure the prompt just never comes back for this lock.
                     coredesk_platform::compat_report::nodiag_mark_answered();
-                    match coredesk_platform::compat_report::write() {
-                        Ok(path) => {
-                            // Reveal the file for attaching, then open the
-                            // compatibility issue template in the browser.
-                            let _ = std::process::Command::new("explorer")
-                                .arg(format!("/select,{}", path.display()))
-                                .spawn();
-                            let _ = shell::shell_execute(
-                                std::path::Path::new("https://github.com/fox10881/CoreDesk-feedback/issues/new?template=compatibility.yml"),
-                                None,
-                                None,
-                            );
-                            self.settings_toast("Report saved — attach it to the issue that just opened");
-                        }
-                        Err(e) => self.settings_error(&format!("report failed: {e}")),
+                    // Keep a local copy for the record, then hand the user a
+                    // fully pre-filled issue — the only step left is GitHub's
+                    // own Submit, which can't be automated (it's their post).
+                    let _ = coredesk_platform::compat_report::write();
+                    let url = coredesk_platform::compat_report::share_issue_url();
+                    match shell::shell_execute(std::path::Path::new(&url), None, None) {
+                        Ok(()) => self.settings_toast(
+                            "Issue opened with the report filled in — press Submit to send",
+                        ),
+                        Err(e) => self.settings_error(&format!("could not open browser: {e}")),
                     }
                 }
                 Some("compatDismiss") => {

@@ -297,6 +297,50 @@ pub fn nodiag_unanswered() -> bool {
         .unwrap_or(true)
 }
 
+/// Builds the one-click GitHub issue URL — the whole report pre-filled in
+/// `body`, so after Share the only thing left on the user is GitHub's own
+/// Submit click (posting under their account can't be automated anyway).
+/// The body is capped so the URL stays well inside server/browser limits.
+pub fn share_issue_url() -> String {
+    const MAX_BODY: usize = 6000;
+    let mut body = render();
+    if body.len() > MAX_BODY {
+        let mut end = MAX_BODY;
+        while !body.is_char_boundary(end) {
+            end -= 1;
+        }
+        body.truncate(end);
+        body.push_str(
+            "\n\n_(truncated — the full report is saved under \
+             %LOCALAPPDATA%\\CoreDeskEngine\\reports\\)_\n",
+        );
+    }
+    format!(
+        "https://github.com/fox10881/CoreDesk-feedback/issues/new?title={}&body={}",
+        urlencoded(&format!(
+            "Compatibility report — CoreDesk {}",
+            env!("CARGO_PKG_VERSION")
+        )),
+        urlencoded(&body)
+    )
+}
+
+/// RFC 3986 unreserved set stays literal; everything else becomes `%XX`.
+/// The report carries arbitrary log text (non-ASCII included), so this
+/// works on raw UTF-8 bytes.
+fn urlencoded(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + s.len() / 4);
+    for &b in s.as_bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
 /// Records the incident as answered (share or dismiss — either counts).
 pub fn nodiag_mark_answered() {
     let Some(key) = nodiag_incident_key() else {
