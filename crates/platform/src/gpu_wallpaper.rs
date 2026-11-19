@@ -151,6 +151,15 @@ impl GpuSurface {
                 .ok()?;
         }
         let row_bytes = dimensions.0 as usize * 4;
+        // A RowPitch narrower than a decoded row would read past each
+        // row's valid span — nonsense for D3D11 staging, but cheap to
+        // check before trusting it.
+        if (mapped.RowPitch as usize) < row_bytes {
+            unsafe {
+                self.context.Unmap(staging, 0);
+            }
+            return Ok(());
+        }
         let mut pixels = vec![0u8; row_bytes * dimensions.1 as usize];
         // SAFETY: Map succeeded; each row is within the staging texture. Unmap before
         // closing the frame, even for a black frame (a valid scene transition).

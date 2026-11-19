@@ -553,6 +553,11 @@ unsafe fn query_stream_metrics(
         if w == 0 || h == 0 {
             return Err("invalid video dimensions (0x0)".to_string());
         }
+        // Same 33.1 MP cap as the GPU path — a crafted media type would
+        // otherwise size out_bgra allocations from attacker dimensions.
+        if u64::from(w) * u64::from(h) > 33_177_600 {
+            return Err(format!("video dimensions {w}x{h} exceed the 33.1 MP cap"));
+        }
         let stride = current
             .GetUINT32(&MF_MT_DEFAULT_STRIDE)
             .map(|s| s as i32)
@@ -697,14 +702,22 @@ unsafe fn copy_locked_frame(
             let mut scan0: *mut u8 = core::ptr::null_mut();
             let mut pitch: i32 = 0;
             if buf2d.Lock2D(&mut scan0, &mut pitch).is_ok() && !scan0.is_null() {
-                match kind {
-                    OutputKind::Rgb32 => copy_strided_rows(scan0, pitch, w, h, out_bgra),
-                    OutputKind::Nv12 => {
-                        nv12_to_bgra(scan0, pitch.unsigned_abs() as usize, w, h, out_bgra)
+                let abs_pitch = pitch.unsigned_abs() as usize;
+                // A stride narrower than a decoded row would overlap reads
+                // across rows — nonsense input; bail to the Lock path.
+                let min_row = match kind {
+                    OutputKind::Rgb32 => w * 4,
+                    OutputKind::Nv12 => w,
+                };
+                if abs_pitch >= min_row {
+                    match kind {
+                        OutputKind::Rgb32 => copy_strided_rows(scan0, pitch, w, h, out_bgra),
+                        OutputKind::Nv12 => nv12_to_bgra(scan0, abs_pitch, w, h, out_bgra),
                     }
+                    let _ = buf2d.Unlock2D();
+                    return true;
                 }
                 let _ = buf2d.Unlock2D();
-                return true;
             }
         }
 
@@ -713,11 +726,18 @@ unsafe fn copy_locked_frame(
         if buffer.Lock(&mut ptr, None, Some(&mut cur_len)).is_ok() && !ptr.is_null() {
             let pitch = if stride != 0 { stride } else { (w * 4) as i32 };
             let abs_pitch = pitch.unsigned_abs() as usize;
+            // A stride narrower than a decoded row overlaps reads across
+            // rows. NV12's UV plane holds ceil(h/2) rows — `h * 3 / 2`
+            // under-counts on odd heights and passes an undersized buffer.
+            let min_row = match kind {
+                OutputKind::Rgb32 => w * 4,
+                OutputKind::Nv12 => w,
+            };
             let needed = match kind {
                 OutputKind::Rgb32 => abs_pitch.saturating_mul(h),
-                OutputKind::Nv12 => abs_pitch.saturating_mul(h * 3 / 2),
+                OutputKind::Nv12 => abs_pitch.saturating_mul(h + h.div_ceil(2)),
             };
-            if (cur_len as usize) >= needed {
+            if abs_pitch >= min_row && (cur_len as usize) >= needed {
                 match kind {
                     OutputKind::Rgb32 => copy_strided_rows(ptr, pitch, w, h, out_bgra),
                     OutputKind::Nv12 => nv12_to_bgra(ptr, abs_pitch, w, h, out_bgra),
