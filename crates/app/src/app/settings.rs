@@ -1944,7 +1944,9 @@ impl App {
                     // Explorer opens Documents for a path it cannot see: hand it the real one.
                     use std::os::windows::process::CommandExt;
                     let path = self.state.config_path_on_disk();
-                    let mut explorer = std::process::Command::new("explorer.exe");
+                    let mut explorer = std::process::Command::new(
+                        coredesk_platform::shell::system_root().join("explorer.exe"),
+                    );
                     if path.is_file() {
                         // Quoted as a whole (what `arg` does once a space appears), the
                         // `/select` argument opens Documents too.
@@ -2001,7 +2003,11 @@ impl App {
                 Some("openThemesFolder") => {
                     let dir = self.themes_dir();
                     let _ = std::fs::create_dir_all(&dir);
-                    let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
+                    let _ = std::process::Command::new(
+                        coredesk_platform::shell::system_root().join("explorer.exe"),
+                    )
+                    .arg(&dir)
+                    .spawn();
                 }
                 Some("exportItem") => match v.get("kind").and_then(|k| k.as_str()) {
                     Some("theme") => {

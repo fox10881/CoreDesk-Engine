@@ -26,7 +26,11 @@ impl App {
     pub(super) fn open_styles_folder(&self) {
         if let Some(dir) = coredesk_core::styles_fs::user_styles_root() {
             coredesk_core::styles_fs::ensure_modding_guide();
-            let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
+            let _ = std::process::Command::new(
+                coredesk_platform::shell::system_root().join("explorer.exe"),
+            )
+            .arg(&dir)
+            .spawn();
             return;
         }
         let dir = self
@@ -36,6 +40,10 @@ impl App {
             .unwrap_or_else(|| Path::new("."))
             .join("Styles");
         let _ = std::fs::create_dir_all(&dir);
-        let _ = std::process::Command::new("explorer.exe").arg(&dir).spawn();
+        let _ = std::process::Command::new(
+            coredesk_platform::shell::system_root().join("explorer.exe"),
+        )
+        .arg(&dir)
+        .spawn();
     }
 }

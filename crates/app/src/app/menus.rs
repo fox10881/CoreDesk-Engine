@@ -315,9 +315,11 @@ impl App {
                     let target = open_location_path(Path::new(p));
                     // `/select,"<path>"`: quoted as a whole (what `arg` does for a name with
                     // a space), the argument makes Explorer open Documents instead.
-                    let _ = std::process::Command::new("explorer.exe")
-                        .raw_arg(format!("/select,\"{}\"", target.display()))
-                        .spawn();
+                    let _ = std::process::Command::new(
+                        coredesk_platform::shell::system_root().join("explorer.exe"),
+                    )
+                    .raw_arg(format!("/select,\"{}\"", target.display()))
+                    .spawn();
                 }
             }
             CMD_ITEM_PROPERTIES => self.show_properties(fence, &items),

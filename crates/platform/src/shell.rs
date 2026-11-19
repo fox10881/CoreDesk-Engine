@@ -877,10 +877,19 @@ fn notify_shell_icons_changed() {
         )
     };
     // The known no-logoff flush: ie4uinit re-registers icon handlers so the
-    // desktop redraws overlays immediately.
+    // desktop redraws overlays immediately. Absolute System32 path — a bare
+    // name would resolve a hostile drop in our CWD first.
+    let ie4uinit = system_root().join(r"System32\ie4uinit.exe");
     for args in ["-show", "-ClearIconCache"] {
-        let _ = std::process::Command::new("ie4uinit.exe").arg(args).spawn();
+        let _ = std::process::Command::new(&ie4uinit).arg(args).spawn();
     }
+}
+
+/// `%SystemRoot%` (falling back to `C:\Windows`) — bare-name child
+/// spawns resolve through the CWD/PATH search order and pick up hostile
+/// drops, so every system binary we launch goes through here.
+pub fn system_root() -> PathBuf {
+    std::env::var_os("SystemRoot").map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from)
 }
 
 windows_core::link!("shell32.dll" "system" fn SHChangeNotify(event: i32, flags: u32, item1: *const core::ffi::c_void, item2: *const core::ffi::c_void));
@@ -1571,10 +1580,7 @@ fn namespace_activation_name(pidl: LPITEMIDLIST) -> Option<String> {
 /// app-activation handler refuse to run synchronously inside a foreign
 /// process — and silently no-op — but fire in the shell's own.
 fn explorer_activate(name: &str, owner: Option<HWND>) -> Result<()> {
-    let explorer = std::env::var_os("SystemRoot")
-        .map(|r| PathBuf::from(r).join("explorer.exe"))
-        .filter(|p| p.exists())
-        .unwrap_or_else(|| PathBuf::from("explorer.exe"));
+    let explorer = system_root().join("explorer.exe");
     let args = format!("\"{name}\"");
     shell_execute_raw(&explorer, Some(&args), None, None, SW_SHOWNORMAL, owner)
 }

@@ -176,17 +176,18 @@ fn resident_image() -> String {
 fn wer_section() -> String {
     let mut out = String::from("```\n");
     let query = r#""*[System[(EventID=1000 or EventID=1001)]]""#;
-    let result = std::process::Command::new("wevtutil")
-        .args([
-            "qe",
-            "Application",
-            "/q:",
-            query,
-            "/rd:true",
-            "/f:text",
-            "/c:200",
-        ])
-        .output();
+    let result =
+        std::process::Command::new(crate::shell::system_root().join(r"System32\wevtutil.exe"))
+            .args([
+                "qe",
+                "Application",
+                "/q:",
+                query,
+                "/rd:true",
+                "/f:text",
+                "/c:200",
+            ])
+            .output();
     let blocks: Vec<String> = match result {
         Ok(o) if o.status.success() => {
             let text = String::from_utf8_lossy(&o.stdout);
