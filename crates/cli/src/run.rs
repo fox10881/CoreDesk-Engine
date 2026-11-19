@@ -89,10 +89,7 @@ pub fn run(ctx: &Ctx, command: Command) -> Result<Reply, IpcError> {
         Command::Compat { cmd } => match cmd {
             CompatCmd::Report { print } => {
                 if print {
-                    crate::output::print_text(
-                        &coredesk_platform::compat_report::render(),
-                        false,
-                    );
+                    crate::output::print_text(&coredesk_platform::compat_report::render(), false);
                     std::process::exit(0);
                 }
                 let path = coredesk_platform::compat_report::write()

@@ -124,8 +124,8 @@ fn surfaces_section() -> String {
 /// The `NoDiag` breaker state — armed means the crash protection tripped on
 /// this OS revision and taskbar diagnostics are parked.
 fn nodiag_section() -> String {
-    let armed = crate::taskbar_styler::reg_dword(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiag")
-        == Some(1);
+    let armed =
+        crate::taskbar_styler::reg_dword(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiag") == Some(1);
     if !armed {
         return "- **NoDiag breaker**: not armed\n".to_string();
     }
@@ -135,8 +135,7 @@ fn nodiag_section() -> String {
     let ubr = crate::taskbar_styler::reg_dword(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagUbr")
         .map(|b| b.to_string())
         .unwrap_or_else(|| "?".into());
-    let dll = reg_sz(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagDll")
-        .unwrap_or_else(|| "?".into());
+    let dll = reg_sz(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagDll").unwrap_or_else(|| "?".into());
     format!(
         "- **NoDiag breaker**: ARMED — taskbar styling parked on build {build}.{ubr}, resident `{dll}`\n"
     )
@@ -258,9 +257,7 @@ pub fn render() -> String {
 /// Writes the report under `%LOCALAPPDATA%\CoreDeskEngine\reports\` and
 /// returns its path.
 pub fn write() -> Result<PathBuf, String> {
-    let dir = localdata_dir()
-        .ok_or("no %LOCALAPPDATA%")?
-        .join("reports");
+    let dir = localdata_dir().ok_or("no %LOCALAPPDATA%")?.join("reports");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -280,8 +277,8 @@ pub fn nodiag_incident_key() -> Option<String> {
     }
     let build = crate::taskbar_styler::reg_dword(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagBuild")
         .unwrap_or(0);
-    let ubr = crate::taskbar_styler::reg_dword(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagUbr")
-        .unwrap_or(0);
+    let ubr =
+        crate::taskbar_styler::reg_dword(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagUbr").unwrap_or(0);
     let dll = reg_sz(HKEY_CURRENT_USER, DEBUG_SUBKEY, "NoDiagDll").unwrap_or_default();
     Some(format!("{build}.{ubr}.{dll}"))
 }
