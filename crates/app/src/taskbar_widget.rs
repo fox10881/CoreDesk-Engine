@@ -433,18 +433,27 @@ impl Core {
             return;
         };
         let ok = panel.draw(dpi, |s, _w, h| {
+            // The swap chain keeps prior pixels — wipe to transparent or
+            // every tick's text piles onto the last frame (ghost glyphs).
+            s.clear(ColorF::new(0.0, 0.0, 0.0, 0.0));
             let ink_b = s.create_solid_brush(ink)?;
             let acc_b = s.create_solid_brush(accent)?;
+            // DrawText is top-aligned in its box: centre the line inside
+            // the strip's full height instead of pinning it to the top.
+            let line_h = TextLayout::new("Ag", &lfmt, 10_000.0, 10_000.0)
+                .map(|l| l.metrics().height)
+                .unwrap_or(h);
+            let y = ((h - line_h) / 2.0).max(0.0);
             let draw_at = |dx: f32, dy: f32, brush: &Brush| {
                 let mut x = pad + dx;
                 for (i, (label, value)) in segs.iter().enumerate() {
                     if i > 0 {
-                        s.draw_text(&sep, &lfmt, &dip_rect(x, dy, h), brush);
+                        s.draw_text(&sep, &lfmt, &dip_rect(x, y + dy, h), brush);
                         x += measure(&sep, &lfmt);
                     }
-                    s.draw_text(label, &lfmt, &dip_rect(x, dy, h), brush);
+                    s.draw_text(label, &lfmt, &dip_rect(x, y + dy, h), brush);
                     x += measure(label, &lfmt);
-                    s.draw_text(value, &vfmt, &dip_rect(x, dy, h), brush);
+                    s.draw_text(value, &vfmt, &dip_rect(x, y + dy, h), brush);
                     x += measure(value, &vfmt);
                 }
             };
@@ -461,7 +470,7 @@ impl Core {
                     x += measure(&sep, &lfmt);
                 }
                 x += measure(label, &lfmt);
-                s.draw_text(value, &vfmt, &dip_rect(x, 0.0, h), &acc_b);
+                s.draw_text(value, &vfmt, &dip_rect(x, y, h), &acc_b);
                 x += measure(value, &vfmt);
             }
             Ok(())
