@@ -44,3 +44,6 @@ Thumbs.db
 # Release-agent outputs and local credentials
 /out/
 /secrets/
+
+# Cloudflare Wrangler local state (cache, account identity)
+.wrangler/
