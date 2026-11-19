@@ -761,6 +761,17 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     </div>
   </div>
 </div>
+<div class="modal-veil" id="compatVeil" hidden>
+  <!-- On a glass page --card is translucent; a safety prompt must read as a solid surface. -->
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cmpTitle" aria-describedby="cmpText" style="background: var(--sheet); border-color: var(--brand); box-shadow: 0 12px 40px #000c">
+    <div class="t" id="cmpTitle">Taskbar styling paused after an Explorer crash</div>
+    <div class="s" id="cmpText">CoreDesk detected Explorer crashing while taskbar styling was active and parked the diagnostics session to protect the shell on this Windows build. A compatibility report — build info, armed styles and recent crash records, nothing personal — can help fix it. Share it?</div>
+    <div class="modal-actions">
+      <button class="accent" id="cmpShare">Share report</button>
+      <button id="cmpDismiss">Not now</button>
+    </div>
+  </div>
+</div>
 <div class="infobar" id="toast" role="status"><span class="ic" aria-hidden="true"></span><span id="toastText"></span></div>
 <script>
 (() => {
@@ -2062,6 +2073,11 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
     else if (m.type === 'feedbackInfo') { fbInfo = m; fbCrash ||= !!m.crashed; renderFeedback(); }
     else if (m.type === 'showFeedback') showFeedback(!!m.crash);
     else if (m.type === 'toast') toast(m.text, !!m.error);
+    else if (m.type === 'compatPrompt') {
+      // Crash-breaker prompt: NoDiag armed and this incident never answered.
+      document.getElementById('compatVeil').hidden = false;
+      document.getElementById('cmpShare').focus();
+    }
     else if (m.type === 'glass' && m.sheet) {
       // The host HWND carries the real DWM material; --sheet is the
       // translucent layer that lets it show through the client area.
@@ -2102,6 +2118,13 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
   document.getElementById('tswDiscard').onclick = () => tswDecide('discard');
   document.getElementById('tswCancel').onclick = () => tswDecide('cancel');
   tswVeil.addEventListener('keydown', e => { if (e.key === 'Escape') tswDecide('cancel'); });
+  // Crash-breaker share prompt: Share generates the report and opens the
+  // feedback issue form; Dismiss and Escape both mark the incident answered.
+  const cmpVeil = document.getElementById('compatVeil');
+  const cmpDecide = share => { cmpVeil.hidden = true; send({ type: 'action', name: share ? 'compatShare' : 'compatDismiss' }); };
+  document.getElementById('cmpShare').onclick = () => cmpDecide(true);
+  document.getElementById('cmpDismiss').onclick = () => cmpDecide(false);
+  cmpVeil.addEventListener('keydown', e => { if (e.key === 'Escape') cmpDecide(false); });
   send({ type: 'ready' });
   // The File Explorer glass section collapsed to a launcher: the dedicated
   // maximized editor (its own window, its own page) owns the EBM controls.

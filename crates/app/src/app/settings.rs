@@ -1634,6 +1634,14 @@ impl App {
                     self.post_show_fence(fence);
                 }
                 self.show_pending_feedback();
+                // The crash-breaker share prompt — asked once per incident,
+                // only now that the page can actually render it.
+                if coredesk_platform::compat_report::nodiag_unanswered()
+                    && let Some(h) = self.settings.as_ref()
+                {
+                    tracing::info!("settings: crash-breaker share prompt posted");
+                    h.post_json("{\"type\":\"compatPrompt\"}");
+                }
                 // The initial `set_glass` post can land before the page's
                 // message listener exists — re-push now that it is live.
                 self.sync_app_glass();
@@ -2091,6 +2099,30 @@ impl App {
                     // resident re-arms diagnostics. A repeat crash re-trips it.
                     coredesk_platform::taskbar_styler::nodiag_clear();
                     self.request_shell_restart("manual refresh");
+                }
+                Some("compatShare") => {
+                    // The incident counts as answered either way; on a write
+                    // failure the prompt just never comes back for this lock.
+                    coredesk_platform::compat_report::nodiag_mark_answered();
+                    match coredesk_platform::compat_report::write() {
+                        Ok(path) => {
+                            // Reveal the file for attaching, then open the
+                            // compatibility issue template in the browser.
+                            let _ = std::process::Command::new("explorer")
+                                .arg(format!("/select,{}", path.display()))
+                                .spawn();
+                            let _ = shell::shell_execute(
+                                std::path::Path::new("https://github.com/fox10881/CoreDesk-feedback/issues/new?template=compatibility.yml"),
+                                None,
+                                None,
+                            );
+                            self.settings_toast("Report saved — attach it to the issue that just opened");
+                        }
+                        Err(e) => self.settings_error(&format!("report failed: {e}")),
+                    }
+                }
+                Some("compatDismiss") => {
+                    coredesk_platform::compat_report::nodiag_mark_answered();
                 }
                 Some("repairIcons") => self.set_desktop_icons_hidden(false),
                 Some("hideDesktopIcons") => self.set_desktop_icons_hidden(true),
