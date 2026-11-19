@@ -11,8 +11,9 @@
 //!   unadvised, death watch disarmed.
 
 use crate::bindings::{
-    FindWindowExW, FindWindowW, GetClassNameW, GetModuleFileNameW, GetPropW,
-    GetWindowThreadProcessId, HWND, HWND_MESSAGE, LPARAM, SendMessageTimeoutW, WPARAM,
+    CreateWindowExW, DefWindowProcW, FindWindowExW, FindWindowW, GetClassNameW, GetModuleFileNameW,
+    GetPropW, GetWindowThreadProcessId, HBRUSH, HCURSOR, HICON, HINSTANCE, HWND, HWND_MESSAGE,
+    LPARAM, LRESULT, RegisterClassExW, SendMessageTimeoutW, WNDCLASSEXW, WPARAM,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -284,13 +285,94 @@ struct CopyDataStruct {
 
 /// `WM_COPYDATA` delivery to the in-Explorer command window — used by the
 /// taskbar styler for `CDES-TBS1` theme wires + the host-pid hello.
+/// `wParam` carries one of our own HWNDs (`sender_hwnd`) so the resident
+/// can authenticate the sender's process image before touching payload.
 pub fn send_copydata(hwnd: HWND, dw_data: usize, bytes: &[u8]) -> bool {
     let cds = CopyDataStruct {
         dw_data,
         cb_data: bytes.len() as u32,
         lp_data: bytes.as_ptr() as *const core::ffi::c_void,
     };
-    send_cmd(hwnd, WM_COPYDATA, 0, &cds as *const CopyDataStruct as isize)
+    send_cmd(
+        hwnd,
+        WM_COPYDATA,
+        sender_hwnd().0 as usize,
+        &cds as *const CopyDataStruct as isize,
+    )
+}
+
+/// An HWND owned by this process, stamped into `WM_COPYDATA`'s `wParam`
+/// so the resident can authenticate the sender's image — unauthenticated
+/// wires would otherwise hand any same-user process `SetValue` /
+/// `LoadLibraryW` primitives inside a signed shell host. Prefers the
+/// app's `CoreDeskEngine.Control` window (created at boot before any
+/// styler can arm); class names are forgeable per-process, so the owner
+/// pid must match ours. Falls back to a private message-only window for
+/// senders that run before the control window exists.
+pub fn sender_hwnd() -> HWND {
+    for class in ["CoreDeskEngine.Control", "CoreDeskEngine.Sender"] {
+        let name = wide(class);
+        let h = unsafe { FindWindowW(PCWSTR(name.as_ptr()), PCWSTR::null()) };
+        if h.0.is_null() {
+            continue;
+        }
+        let mut pid = 0u32;
+        unsafe {
+            let _ = GetWindowThreadProcessId(h, Some(&mut pid));
+        }
+        if pid == unsafe { GetCurrentProcessId() } {
+            return h;
+        }
+    }
+    create_sender_window()
+}
+
+/// Lazily-created `CoreDeskEngine.Sender` message-only window — the
+/// fallback `sender_hwnd()` stamp for senders that run before the app's
+/// control window exists. Registration is idempotent: a racing second
+/// call just fails with `ERROR_CLASS_ALREADY_EXISTS`.
+fn create_sender_window() -> HWND {
+    let name = wide("CoreDeskEngine.Sender");
+    unsafe {
+        let wc = WNDCLASSEXW {
+            cbSize: core::mem::size_of::<WNDCLASSEXW>() as u32,
+            style: 0,
+            lpfnWndProc: Some(sender_wndproc),
+            cbClsExtra: 0,
+            cbWndExtra: 0,
+            hInstance: HINSTANCE::default(),
+            hIcon: HICON::default(),
+            hCursor: HCURSOR::default(),
+            hbrBackground: HBRUSH::default(),
+            lpszMenuName: PCWSTR::null(),
+            lpszClassName: PCWSTR(name.as_ptr()),
+            hIconSm: HICON::default(),
+        };
+        let _ = RegisterClassExW(&wc);
+        CreateWindowExW(
+            0,
+            PCWSTR(name.as_ptr()),
+            PCWSTR::null(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            Some(HWND_MESSAGE),
+            None,
+            None,
+            None,
+        )
+    }
+}
+
+unsafe extern "system" fn sender_wndproc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
 
 /// Sends a registered message to the in-Explorer command window and waits for

@@ -204,7 +204,7 @@ fn send_copydata(hwnd: HWND, tag: usize, payload: &[u8]) -> bool {
         SendMessageTimeoutW(
             hwnd,
             WM_COPYDATA,
-            WPARAM(0),
+            WPARAM(crate::tap::sender_hwnd().0 as usize),
             LPARAM(&cds as *const CopyDataStruct as isize),
             SMTO_ABORTIFHUNG | SMTO_BLOCK | SMTO_ERRORONEXIT,
             3_000,

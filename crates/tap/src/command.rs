@@ -419,10 +419,97 @@ const CDS_FE_LAYOUT_RESET: usize = u32::from_be_bytes(*b"FELR") as usize;
 /// Explorer's five `SHGetImageList` instances directly via `IImageList2`.
 const CDS_LINK_OVERLAY: usize = u32::from_be_bytes(*b"SLNK") as usize;
 
-fn handle_message(_hwnd: HWND, msg: u32, _wparam: WPARAM, lparam: LPARAM) {
+/// First `coredesk.exe` pid authenticated on this channel — wires after the
+/// first must come from the same process instance, so a foreign binary
+/// renamed `coredesk.exe` can only win the channel by racing the real
+/// app's first message.
+static AUTH_PID: AtomicU32 = AtomicU32::new(0);
+
+/// ASCII case-insensitive compare of a UTF-16 slice against a &str.
+fn eq_ascii_ci(w: &[u16], s: &str) -> bool {
+    w.len() == s.len()
+        && w.iter()
+            .zip(s.bytes())
+            .all(|(&c, b)| c < 0x80 && (c as u8).eq_ignore_ascii_case(&b))
+}
+
+/// `WM_COPYDATA` sender authentication. The app stamps one of its own
+/// HWNDs as `wParam` (`tap::sender_hwnd`); resolving that window's owner
+/// and checking its image name closes the "any same-user process posts
+/// one message" surface — the `EBML` `LoadLibraryW` and the `*ST` style
+/// wires are remote code/shaping primitives inside signed shell hosts.
+/// The first authenticated sender is pinned in `AUTH_PID`; a foreign
+/// exe renamed `coredesk.exe` must additionally win the race against
+/// the real app's first message, and wins only while no pid is pinned.
+fn sender_is_app(hwnd: HWND) -> bool {
+    if hwnd.0.is_null() {
+        return false;
+    }
+    let mut pid = 0u32;
+    unsafe {
+        let _ = GetWindowThreadProcessId(hwnd, &mut pid);
+    }
+    if pid == 0 {
+        return false;
+    }
+    let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, BOOL(0), pid) };
+    if h.is_null() {
+        return false;
+    }
+    let mut buf = [0u16; 512];
+    let mut len = buf.len() as u32;
+    let ok = unsafe { QueryFullProcessImageNameW(h, 0, PWSTR(buf.as_mut_ptr()), &mut len) };
+    unsafe {
+        let _ = CloseHandle(h);
+    }
+    if !ok.as_bool() || len as usize >= buf.len() {
+        return false;
+    }
+    let path = &buf[..len as usize];
+    let name_off = path
+        .iter()
+        .rposition(|&c| c == b'\\' as u16)
+        .map_or(0, |i| i + 1);
+    if !eq_ascii_ci(&path[name_off..], "coredesk.exe") {
+        return false;
+    }
+    let known = AUTH_PID.load(Ordering::Acquire);
+    if known == pid {
+        return true;
+    }
+    if known != 0 {
+        // Repin only once the pinned sender is gone — OpenProcess on a
+        // live pid succeeds, so a live pin always rejects a new sender.
+        let h = unsafe {
+            OpenProcess(
+                SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+                BOOL(0),
+                known,
+            )
+        };
+        if !h.is_null() {
+            unsafe {
+                let _ = CloseHandle(h);
+            }
+            return false;
+        }
+    }
+    AUTH_PID.store(pid, Ordering::Release);
+    true
+}
+
+fn handle_message(_hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) {
     if msg == UNLOAD_MSG.load(Ordering::Acquire) && msg != 0 {
         crate::tap_log!("unload requested");
         unload(_hwnd);
+        return;
+    }
+    // Gate every COPYDATA marker (wires, hellos, EBML/EBMU, SLNK, FELR)
+    // behind sender authentication before any payload is touched — a
+    // forged message must die here rather than revive an inert resident
+    // or reach the wire/EBM paths below.
+    if msg == WM_COPYDATA && !sender_is_app(HWND(wparam as _)) {
+        crate::tap_log!("copydata drop: unauthenticated sender hwnd={:?}", wparam);
         return;
     }
     // An unloaded resident is inert: its timer is killed, and any wire or
