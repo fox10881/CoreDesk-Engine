@@ -474,6 +474,12 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
           <div class="toggle" role="switch" tabindex="0" data-bind="visualizerAdaptiveColor"></div></div>
       </div>
       <div class="group">
+        <div class="card"><div class="l"><span class="ic">&#xE9F5;</span><div><div class="t">任务栏资源小组件</div><div class="s">任务栏左侧的原生 CPU / RAM / GPU / 网络监视器 — 零 WebView2 开销；可横向拖动，右键菜单锁定位置</div></div></div>
+          <select id="taskbarWidgetStyleSel" data-bind="taskbarWidgetStyle" data-str></select></div>
+        <div class="card child"><div class="l"><div><div class="t">锁定位置</div><div class="s">防止误拖动 — 右键菜单中的「锁定位置」与此同步</div></div></div>
+          <div class="toggle" role="switch" tabindex="0" data-bind="taskbarWidgetLocked"></div></div>
+      </div>
+      <div class="group">
         <div class="card"><div class="l"><span class="ic">&#xE945;</span><div><div class="t">桌面动态效果</div><div class="s">原生 Direct2D 粒子与天气引擎 — 零 WebView2 开销；窗口最大化或进入游戏时自动暂停至零占用</div></div></div>
           <select id="desktopEffectSel" data-bind="desktopEffect" data-str></select></div>
         <div class="card child"><div class="l"><div><div class="t">效果强度</div><div class="s">粒子数量密度，10% – 100%</div></div></div>
@@ -1100,6 +1106,32 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       }));
     }
     sel.value = String(state.settings.visualizerStyle ?? 'none');
+  }
+
+  // 任务栏资源小组件: none + `Styles\Taskbar Widget\<id>.json` descriptors —
+  // native D2D text strip, no WebView. Same file-backed catalog plumbing as
+  // the clock (`state.taskbarWidgetDesigns`: {id, label, custom}).
+  const TASKBAR_WIDGET_DESIGNS = [
+    ['none', '无（关闭）'],
+    ['system', '系统资源'], ['full', '完整监控'], ['network', '网络速度'],
+  ];
+  function renderTaskbarWidgetStyles() {
+    const sel = document.getElementById('taskbarWidgetStyleSel');
+    if (!sel) return;
+    const opts = (state.taskbarWidgetDesigns && state.taskbarWidgetDesigns.length)
+      ? state.taskbarWidgetDesigns
+      : TASKBAR_WIDGET_DESIGNS.map(([v, name]) => ({ id: v, label: name }));
+    const sig = opts.map(o => o.id + '' + o.custom).join('');
+    if (sel.dataset.opts !== sig) {
+      sel.dataset.opts = sig;
+      sel.replaceChildren(...opts.map(o => {
+        const e = document.createElement('option');
+        e.value = o.id;
+        e.textContent = t(o.label) + (o.custom ? ' (' + t('自定义') + ')' : '');
+        return e;
+      }));
+    }
+    sel.value = String(state.settings.taskbarWidgetStyle ?? 'none');
   }
 
   // 桌面动态效果: none + the native Direct2D effects.
@@ -2059,6 +2091,7 @@ html.light.glass { --card: #fbfbfbb3; --subtle: #00000010; }
       renderNotificationCenterStyles(m);
       renderClockStyles();
       renderVisualizerStyles();
+      renderTaskbarWidgetStyles();
       renderDesktopEffects();
       bindAll(); bindThemeStyle(); bindIconTint(); bindChameleonIntensity(); bindDesktopEffectIntensity(); renderAdvDisplayModal(); renderDependents(); renderFences(); renderRules(); renderLayout(); updateKind(); renderAppearance(); renderDesktopIconsStatus();
       update = m.update; renderUpdate();
