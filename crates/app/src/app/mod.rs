@@ -463,6 +463,9 @@ pub struct App {
     /// still coming back would leave a half-dead shell, so callers coalesce
     /// through `request_shell_restart`.
     shell_restart_at: Option<std::time::Instant>,
+    /// Taskbar pid seen at the last counted `TaskbarCreated` — a forged
+    /// broadcast never moves it, so only a real shell respawn counts.
+    last_taskbar_pid: Option<u32>,
     /// Rolling window of `TaskbarCreated` respawns. An injected styler that
     /// keeps crashing Explorer produces one every ~30 s — each death blacks
     /// the desktop out and reloads it. Past the trip count the breaker drops
@@ -1490,6 +1493,7 @@ impl App {
             cut_paste: None,
             restart_shell_on_exit: false,
             shell_restart_at: None,
+            last_taskbar_pid: None,
             shell_respawns: VecDeque::new(),
             wallpaper_sig: None,
             wallpaper_cache: BackdropCache::default(),
@@ -2473,6 +2477,17 @@ impl App {
     fn note_shell_respawn(&mut self) {
         const WINDOW: std::time::Duration = std::time::Duration::from_secs(180);
         const TRIP: usize = 4;
+        // Corroborate before counting: `TaskbarCreated` is a broadcast any
+        // process can forge — four posts inside the window would wipe the
+        // user's styles. Only a message that arrives with a *changed*
+        // taskbar pid reflects a real shell respawn.
+        let Some(pid) = coredesk_platform::tap::find_taskbar().map(|(_, p)| p) else {
+            return;
+        };
+        if self.last_taskbar_pid == Some(pid) {
+            return;
+        }
+        self.last_taskbar_pid = Some(pid);
         let now = std::time::Instant::now();
         self.shell_respawns.push_back(now);
         while self

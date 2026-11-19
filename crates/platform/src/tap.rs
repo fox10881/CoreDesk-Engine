@@ -163,7 +163,9 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(core::iter::once(0)).collect()
 }
 
-pub(crate) fn find_taskbar() -> Option<(HWND, u32)> {
+/// Current `Shell_TrayWnd` + owning pid — read-only lookup, also used by
+/// the app layer to corroborate `TaskbarCreated` broadcasts.
+pub fn find_taskbar() -> Option<(HWND, u32)> {
     let hwnd = unsafe { FindWindowW(PCWSTR(wide("Shell_TrayWnd").as_ptr()), PCWSTR::null()) };
     if hwnd.0.is_null() {
         return None;
