@@ -333,6 +333,12 @@ pub const COMMANDS: &[Entry] = &[
         "Where CoreDesk Engine keeps config.json, backups, the log and crash dumps (offline; asks a running instance first)",
         "coredesk-cli paths"
     ),
+    entry!(
+        "compat report",
+        None,
+        "Compatibility report: app/Windows build, resident tag, NoDiag state, armed styles, recent WER crashes; writes under reports\\ unless --print (offline)",
+        "coredesk-cli compat report --print"
+    ),
 ];
 
 /// Methods reachable only through a flag of a command listed above.
