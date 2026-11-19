@@ -209,8 +209,18 @@ impl TaskbarWidgetHost {
                             (x, y) = ((r.left + r.right) / 2, r.top - 8);
                         }
                         let menu = tray::PopupMenu::new();
-                        menu.item(MENU_REFRESH, "تحديث", false, false);
-                        menu.item(MENU_LOCK, "قفل الموقع", c.locked, false);
+                        menu.item(
+                            MENU_REFRESH,
+                            coredesk_core::i18n::text("刷新"),
+                            false,
+                            false,
+                        );
+                        menu.item(
+                            MENU_LOCK,
+                            coredesk_core::i18n::text("锁定位置"),
+                            c.locked,
+                            false,
+                        );
                         let pick = menu.show_context(hwnd, x, y);
                         drop(c);
                         match pick {

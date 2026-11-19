@@ -170,7 +170,12 @@ impl ClockHost {
                                 (x, y)
                             };
                             let menu = tray::PopupMenu::new();
-                            menu.item(MENU_CLOCK_REFRESH, "تحديث", false, false);
+                            menu.item(
+                                MENU_CLOCK_REFRESH,
+                                coredesk_core::i18n::text("刷新"),
+                                false,
+                                false,
+                            );
                             if menu.show_context(hwnd, x, y) == MENU_CLOCK_REFRESH {
                                 queue.push(Command::RefreshClock);
                             }

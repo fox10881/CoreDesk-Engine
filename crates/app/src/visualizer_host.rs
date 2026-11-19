@@ -201,7 +201,12 @@ impl VisualizerHost {
                                 (x, y)
                             };
                             let menu = tray::PopupMenu::new();
-                            menu.item(MENU_VIZ_REFRESH, "تحديث", false, false);
+                            menu.item(
+                                MENU_VIZ_REFRESH,
+                                coredesk_core::i18n::text("刷新"),
+                                false,
+                                false,
+                            );
                             if menu.show_context(hwnd, x, y) == MENU_VIZ_REFRESH {
                                 queue.push(Command::RefreshVisualizer);
                             }
