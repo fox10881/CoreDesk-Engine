@@ -37,6 +37,7 @@ windows_core::link!("kernel32.dll" "system" fn CloseHandle(hobject: *mut core::f
 windows_core::link!("kernel32.dll" "system" fn CreateToolhelp32Snapshot(dwflags: u32, th32processid: u32) -> *mut core::ffi::c_void);
 windows_core::link!("kernel32.dll" "system" fn GetCurrentProcessId() -> u32);
 windows_core::link!("kernel32.dll" "system" fn OpenProcess(dwdesiredaccess: u32, binherithandle: BOOL, dwprocessid: u32) -> *mut core::ffi::c_void);
+windows_core::link!("kernel32.dll" "system" fn QueryFullProcessImageNameW(hprocess: *mut core::ffi::c_void, dwflags: u32, lpexename: PWSTR, lpdwsize: *mut u32) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn Process32FirstW(hsnapshot: *mut core::ffi::c_void, lppe: *mut core::ffi::c_void) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn Process32NextW(hsnapshot: *mut core::ffi::c_void, lppe: *mut core::ffi::c_void) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn ProcessIdToSessionId(dwprocessid: u32, psessionid: *mut u32) -> BOOL);
@@ -1031,8 +1032,15 @@ pub fn restart_explorer() -> bool {
         if h.is_null() {
             continue;
         }
+        // The snapshot ran before OpenProcess — a recycled pid must be
+        // re-identified before TerminateProcess, or a same-session
+        // process that merely reused the pid would be killed.
+        if handle_image_is_explorer(h) {
+            unsafe {
+                let _ = TerminateProcess(h, 0);
+            }
+        }
         unsafe {
-            let _ = TerminateProcess(h, 0);
             let _ = CloseHandle(h);
         }
     }
@@ -1057,15 +1065,48 @@ pub fn restart_explorer() -> bool {
         // child from inheriting our pipes.
         Some((_, pid)) => !victims.contains(&pid),
         None => {
-            session_explorer_pids().is_some_and(|p| p.is_empty())
-                && std::process::Command::new("explorer.exe")
+            if !session_explorer_pids().is_some_and(|p| p.is_empty()) {
+                return false;
+            }
+            // Absolute %SystemRoot% path — a bare name would resolve a
+            // hostile explorer.exe dropped in our CWD first. Bounded
+            // retries so a transient spawn failure doesn't leave the
+            // user shell-less; null stdio keeps the child off our pipes.
+            let exe = std::env::var_os("SystemRoot")
+                .map_or_else(|| PathBuf::from(r"C:\Windows"), PathBuf::from)
+                .join("explorer.exe");
+            for attempt in 0..3 {
+                if std::process::Command::new(&exe)
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
                     .spawn()
                     .is_ok()
+                {
+                    return true;
+                }
+                tracing::warn!(attempt, "explorer.exe respawn failed — retrying");
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+            tracing::error!("explorer.exe respawn failed after 3 attempts");
+            false
         }
     }
+}
+
+/// Image-name re-check on an already-open process handle —
+/// `session_explorer_pids` ran before `OpenProcess`, so a pid could have
+/// been recycled in between. Never terminate a process we haven't just
+/// re-identified as `explorer.exe`.
+fn handle_image_is_explorer(h: *mut core::ffi::c_void) -> bool {
+    let mut buf = [0u16; 260];
+    let mut len = buf.len() as u32;
+    let ok = unsafe { QueryFullProcessImageNameW(h, 0, PWSTR(buf.as_mut_ptr()), &mut len) };
+    ok.as_bool()
+        && String::from_utf16_lossy(&buf[..len as usize])
+            .rsplit('\\')
+            .next()
+            .is_some_and(|f| f.eq_ignore_ascii_case("explorer.exe"))
 }
 
 /// Call on shutdown: restores the taskbar and unloads the DLL if injected.
