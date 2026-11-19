@@ -56,17 +56,21 @@ pub const VISUALIZER_WIDGET_DIR: &str = "Visualizer Widget";
 /// Live-desktop-effect presets — one `<id>.json` per entry
 /// (`{base, label, params}` composing a compiled `Effect` variant).
 pub const LIVE_EFFECTS_DIR: &str = "Live Effects";
+/// Native taskbar resource-widget descriptors — one `<id>.json` per layout
+/// (`{font, metrics, colors}` rendered by the Direct2D overlay, no WebView).
+pub const TASKBAR_WIDGET_DIR: &str = "Taskbar Widget";
 
-/// All six category directories in canonical order — the layout the
+/// All seven category directories in canonical order — the layout the
 /// installers ship under `{app}\Styles\` and the scaffold the user layer
 /// gets so an empty config still shows modders where files land.
-pub const CATEGORY_DIRS: [&str; 6] = [
+pub const CATEGORY_DIRS: [&str; 7] = [
     TASKBAR_DIR,
     START_MENU_DIR,
     NOTIFICATION_CENTER_DIR,
     CLOCK_WIDGET_DIR,
     VISUALIZER_WIDGET_DIR,
     LIVE_EFFECTS_DIR,
+    TASKBAR_WIDGET_DIR,
 ];
 
 /// A hand-edited style bigger than this is a mistake (the shipped set tops
@@ -140,7 +144,7 @@ matching Settings dropdown automatically. No restart, no registration.
 
   Contents
   --------
-  1.  The six folders
+  1.  The seven folders
   2.  File naming rules (id, label, shadowing)
   3.  Shell style .json — document schema
   4.  Target selector grammar
@@ -152,14 +156,15 @@ matching Settings dropdown automatically. No restart, no registration.
   10. DANGER ZONE — rules that keep Explorer alive (read before shipping)
   11. Live Effects presets
   12. Widget .html contract
+  12b. Taskbar Widget .json contract
   13. .cde theme archives
   14. Failure behavior + testing workflow
   15. Live host trees — verified namespace map (UWPSpy)
 
 
-1. The six folders
-------------------
-The engine creates all six for you — empty is normal, they mark where
+1. The seven folders
+--------------------
+The engine creates all seven for you — empty is normal, they mark where
 each kind of file belongs.
 
   Taskbar style              Windows 11 taskbar visuals — one .json per style
@@ -168,6 +173,8 @@ each kind of file belongs.
   Clock Widget               Desktop clock designs — one .html per design
   Visualizer Widget          Audio visualizer designs — one .html per design
   Live Effects               Direct2D overlay presets — one .json per effect
+  Taskbar Widget             Taskbar resource-widget layouts — one .json
+                             per design (native Direct2D, never a WebView)
 
   .user-backups              The app's own backups of your files — never
                              edit or store anything here yourself.
@@ -483,6 +490,31 @@ URIs for assets (no base URL: relative paths load nothing).
               \"peak\":y,\"paused\":b} every ~33 ms.
   - Draw only when your ready message has been acked — the host reveals
     the widget on it.
+
+
+12b. Taskbar Widget .json contract
+----------------------------------
+The taskbar resource widget is native Direct2D — a descriptor, not a page.
+One JSON object per file:
+
+{
+  \"id\": \"Compact\",                // must equal the file name
+  \"label\": \"Compact Strip\",       // dropdown text (optional)
+  \"font\": \"Segoe UI\",             // family name (optional)
+  \"fontSize\": 11.0,                 // DIPs (optional)
+  \"fontWeight\": 600,                // 100..900 (optional)
+  \"metrics\": [\"cpu\",\"ram\",\"gpu\"], // order = display order; any of
+                                  //   cpu ram gpu net (optional)
+  \"separator\": \"  ·  \",           // between metrics (optional)
+  \"paddingX\": 8,                    // horizontal inset DIPs (optional)
+  \"textColor\": \"auto\",            // \"#RRGGBB\"/\"#AARRGGBB\"/\"auto\" =
+                                  //   backdrop-contrast picked at apply
+  \"accentColor\": \"auto\",          // metric values; \"auto\" = backdrop accent
+  \"shadow\": true                    // soft offset shadow for legibility
+}
+
+Unknown fields are ignored; missing fields take the compiled defaults
+shown above. No scripts run — a style can only describe, never execute.
 
 
 13. .cde theme archives

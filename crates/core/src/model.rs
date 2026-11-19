@@ -278,6 +278,21 @@ pub struct Settings {
     /// desktop is visible (occlusion-gated). `.cde` themes carry it.
     #[serde(default)]
     pub visualizer_style: String,
+    /// Taskbar resource widget: `"none"`/`""` = hidden (default); otherwise
+    /// a `Styles\Taskbar Widget\<id>.json` descriptor rendered by the native
+    /// Direct2D overlay sitting on the taskbar's free left area — never a
+    /// WebView, zero browser cost. `.cde` themes carry it.
+    #[serde(default)]
+    pub taskbar_widget_style: String,
+    /// Horizontal offset in physical pixels from the taskbar's left edge;
+    /// `None` = the default margin. Written when the user drags the widget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taskbar_widget_offset: Option<i32>,
+    /// Drag lock — the widget's right-click 「قفل الموقع」 toggle. Locked
+    /// widgets don't move on drag (the context menu still opens so the
+    /// lock can be released).
+    #[serde(default)]
+    pub taskbar_widget_locked: bool,
     /// Adaptive backdrop coloring for the visualizer: samples the wallpaper
     /// behind the widget and rebases every design's palette onto the sampled
     /// accent hue (deepening strokes on bright backdrops). Off = fixed
@@ -1010,6 +1025,9 @@ impl Default for Settings {
             clock_use_24_hour: true,
             visualizer_style: String::new(),
             visualizer_adaptive_color: true,
+            taskbar_widget_style: "none".to_string(),
+            taskbar_widget_offset: None,
+            taskbar_widget_locked: false,
             desktop_effect: "none".to_string(),
             desktop_effect_intensity: 50,
             effect_params: BTreeMap::new(),
@@ -2803,6 +2821,21 @@ impl Config {
             && !crate::styles_fs::is_valid_style_id(&s.visualizer_style)
         {
             s.visualizer_style = "none".into();
+        }
+        // Taskbar resource widget: the id names a `Styles\Taskbar Widget\
+        // <id>.json` descriptor — same file-catalog rule.
+        if !s.taskbar_widget_style.is_empty()
+            && s.taskbar_widget_style != "none"
+            && !crate::styles_fs::is_valid_style_id(&s.taskbar_widget_style)
+        {
+            s.taskbar_widget_style = "none".into();
+        }
+        // Taskbar-left-edge offset in physical pixels — a sane bound keeps a
+        // corrupted value from parking the widget off the bar entirely.
+        if s.taskbar_widget_offset
+            .is_some_and(|o| !(-512..=16384).contains(&o))
+        {
+            s.taskbar_widget_offset = None;
         }
         // Live desktop effect: `none`/`""` or a `Live Effects` preset id —
         // file ids resolve through `resolve_effect_base` at apply time.

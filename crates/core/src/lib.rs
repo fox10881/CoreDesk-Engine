@@ -16,6 +16,7 @@ pub mod rules;
 pub mod start_menu_themes;
 pub mod styles_fs;
 pub mod taskbar_themes;
+pub mod taskbar_widget_styles;
 pub mod updates;
 
 pub use config_store::{ConfigStore, Lint, LintLevel, LoadOutcome};
