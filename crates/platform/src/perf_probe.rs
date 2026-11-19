@@ -245,7 +245,11 @@ fn counter_array_map(counter: isize, skip: impl Fn(&str) -> bool) -> Vec<(String
     if rc != PDH_MORE_DATA || size == 0 {
         return Vec::new();
     }
-    let n = size as usize / size_of::<PdhFmtItem>();
+    // `size` counts item structs AND the instance-name strings PDH packs
+    // behind them — never an exact struct multiple. Rounding UP keeps the
+    // backing allocation ≥ `size` bytes; truncating would let PDH write
+    // past the buffer and trip the heap checker (`0xC0000409` fast-fail).
+    let n = (size as usize).div_ceil(size_of::<PdhFmtItem>());
     let mut buf = vec![
         PdhFmtItem {
             name: std::ptr::null_mut(),
@@ -265,6 +269,8 @@ fn counter_array_map(counter: isize, skip: impl Fn(&str) -> bool) -> Vec<(String
             buf.as_mut_ptr(),
         )
     };
+    // `count` — not `buf.len()` — bounds the read: `size` bytes of backing
+    // hold `count` items plus their strings, so the tail stays name-free.
     if rc != 0 {
         return Vec::new();
     }
