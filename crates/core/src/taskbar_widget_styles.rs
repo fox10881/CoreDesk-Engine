@@ -95,9 +95,7 @@ impl Default for TbWidgetStyle {
 /// (including `"none"` typos) parses as `None` — adaptive — never a hard
 /// failure on a hand-edited file.
 fn parse_color(v: &serde_json::Value) -> StyleColor {
-    let Some(s) = v.as_str() else {
-        return None;
-    };
+    let s = v.as_str()?;
     let s = s.trim().trim_start_matches('#');
     let rgb = match s.len() {
         6 => &s[0..6],
