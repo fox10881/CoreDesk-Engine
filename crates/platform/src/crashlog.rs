@@ -15,9 +15,41 @@ use windows_core::PCWSTR;
 static DUMP_DIR: OnceLock<PathBuf> = OnceLock::new();
 static INSTANCE: OnceLock<String> = OnceLock::new();
 
+/// Keep at most `KEEP` `crash-*.dmp` files — each is a full minidump
+/// (tens of MB) that otherwise accumulates forever, and a stale dump is
+/// sensitive memory content nobody will symbolize anyway.
+fn prune_dumps(dir: &std::path::Path) {
+    const KEEP: usize = 8;
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut dumps: Vec<PathBuf> = rd
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("crash-") && n.ends_with(".dmp"))
+        })
+        .collect();
+    if dumps.len() <= KEEP {
+        return;
+    }
+    // Oldest first; the tick suffix is chronological too, but mtimes are
+    // the honest ordering — unknown mtimes prune first.
+    dumps.sort_by_key(|p| {
+        std::fs::metadata(p)
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH)
+    });
+    for p in dumps.iter().take(dumps.len() - KEEP) {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
 /// Installs the filter. `dump_dir` receives `crash-<instance>-<ticks>.dmp`; `instance` tags the
 /// files of a second (test) instance.
 pub fn install(dump_dir: PathBuf, instance: &str) {
+    prune_dumps(&dump_dir);
     let _ = DUMP_DIR.set(dump_dir);
     let _ = INSTANCE.set(instance.to_string());
     // SAFETY: registering a plain extern "system" callback.
