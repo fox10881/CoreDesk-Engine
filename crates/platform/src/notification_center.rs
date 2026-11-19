@@ -181,8 +181,10 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(core::iter::once(0)).collect()
 }
 
-/// Pids of every running `ShellExperienceHost.exe`/`ShellHost.exe` — the
-/// shell spawns them lazily and they can idle-exit any time.
+/// Pids of every running `ShellExperienceHost.exe`/`ShellHost.exe` *in our
+/// session* — the shell spawns them lazily and they can idle-exit any
+/// time. Session-scoped so an elevated run never reaches another user's
+/// hosts.
 fn find_nc_pids() -> Vec<u32> {
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snap.is_null() {
@@ -209,7 +211,9 @@ fn find_nc_pids() -> Vec<u32> {
             .position(|&c| c == 0)
             .unwrap_or(pe.exe_file.len());
         let name = from_wide(&pe.exe_file[..len]);
-        if NC_HOSTS.iter().any(|h| name.eq_ignore_ascii_case(h)) {
+        if NC_HOSTS.iter().any(|h| name.eq_ignore_ascii_case(h))
+            && crate::tap::pid_in_current_session(pe.pid)
+        {
             found.push(pe.pid);
         }
         cur = unsafe { Process32NextW(snap, (&mut pe as *mut ProcessEntry).cast()) };

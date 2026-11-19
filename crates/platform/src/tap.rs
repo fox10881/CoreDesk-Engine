@@ -952,6 +952,24 @@ pub fn resident_window() -> Option<HWND> {
 ///
 /// Everything re-arms itself afterwards: the next anchor tick sees the new
 /// pid, `ensure_resident` re-injects, the resident's own `WM_TIMER` retries
+/// Our own session id — the filter every pid snapshot applies so styler
+/// discovery/injection can never reach another user's shell hosts.
+pub(crate) fn current_session_id() -> Option<u32> {
+    let mut session = u32::MAX;
+    (unsafe { ProcessIdToSessionId(GetCurrentProcessId(), &mut session) } != BOOL(0))
+        .then_some(session)
+}
+
+/// `true` when `pid` lives in our session — `false` on query failure too
+/// (a pid we cannot scope is not ours to touch).
+pub(crate) fn pid_in_current_session(pid: u32) -> bool {
+    let Some(session) = current_session_id() else {
+        return false;
+    };
+    let mut pid_session = u32::MAX;
+    (unsafe { ProcessIdToSessionId(pid, &mut pid_session) } != BOOL(0)) && pid_session == session
+}
+
 /// `PROCESSENTRY32W` — the fields `session_explorer_pids` reads (`szExeFile`
 /// tail is MAX_PATH).
 #[repr(C)]

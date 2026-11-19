@@ -141,8 +141,10 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(core::iter::once(0)).collect()
 }
 
-/// Pid of `exe`, or `None` when the shell hasn't spawned it yet (both
-/// Start-Menu hosts idle out and respawn on demand).
+/// Pid of `exe` *in our session*, or `None` when the shell hasn't spawned
+/// it yet (both Start-Menu hosts idle out and respawn on demand). The
+/// session filter matters when the app runs elevated: a session-blind
+/// match would inject into another user's StartMenuExperienceHost.
 fn find_pid(exe: &str) -> Option<u32> {
     let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snap.is_null() {
@@ -168,7 +170,9 @@ fn find_pid(exe: &str) -> Option<u32> {
             .iter()
             .position(|&c| c == 0)
             .unwrap_or(pe.exe_file.len());
-        if from_wide(&pe.exe_file[..len]).eq_ignore_ascii_case(exe) {
+        if from_wide(&pe.exe_file[..len]).eq_ignore_ascii_case(exe)
+            && crate::tap::pid_in_current_session(pe.pid)
+        {
             found = Some(pe.pid);
             break;
         }
