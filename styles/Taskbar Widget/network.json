@@ -1,0 +1,15 @@
+{
+  "id": "network",
+  "label": "网络速度",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "font": "Segoe UI",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "metrics": ["net"],
+  "separator": "  ·  ",
+  "paddingX": 8,
+  "textColor": "auto",
+  "accentColor": "auto",
+  "shadow": true
+}

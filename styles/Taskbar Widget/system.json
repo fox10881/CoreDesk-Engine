@@ -1,0 +1,15 @@
+{
+  "id": "system",
+  "label": "系统资源",
+  "author": "CoreDesk Engine",
+  "version": 1,
+  "font": "Segoe UI",
+  "fontSize": 11,
+  "fontWeight": 600,
+  "metrics": ["cpu", "ram"],
+  "separator": "  ·  ",
+  "paddingX": 8,
+  "textColor": "auto",
+  "accentColor": "auto",
+  "shadow": true
+}
