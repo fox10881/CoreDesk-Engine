@@ -2032,10 +2032,25 @@ impl App {
                     }
                 }
                 Some("openUrl") => {
+                    // Host-boundary check: the allowlisted origin must be
+                    // followed by a path/query/fragment delimiter — a bare
+                    // starts_with would also pass `https://cloudconvert
+                    // .com.attacker.tld`.
                     if let Some(url) = v.get("url").and_then(|u| u.as_str())
-                        && (url.starts_with("https://cloudconvert.com")
-                            || url.starts_with("https://www.freeconvert.com")
-                            || url.starts_with("https://freeconvert.com"))
+                        && [
+                            "https://cloudconvert.com",
+                            "https://www.freeconvert.com",
+                            "https://freeconvert.com",
+                        ]
+                        .iter()
+                        .any(|p| {
+                            url.strip_prefix(p).is_some_and(|rest| {
+                                rest.is_empty()
+                                    || rest.starts_with('/')
+                                    || rest.starts_with('?')
+                                    || rest.starts_with('#')
+                            })
+                        })
                     {
                         let _ = shell::shell_execute(Path::new(url), None, None);
                     }
