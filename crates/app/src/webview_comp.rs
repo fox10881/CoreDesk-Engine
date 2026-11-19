@@ -505,6 +505,33 @@ impl IWv2Settings {
             .ok()
         }
     }
+    pub unsafe fn put_AreDevToolsEnabled(&self, enabled: bool) -> Result<()> {
+        unsafe {
+            (Interface::vtable(self).put_AreDevToolsEnabled)(
+                Interface::as_raw(self),
+                enabled as i32,
+            )
+            .ok()
+        }
+    }
+    pub unsafe fn put_AreDefaultScriptDialogsEnabled(&self, enabled: bool) -> Result<()> {
+        unsafe {
+            (Interface::vtable(self).put_AreDefaultScriptDialogsEnabled)(
+                Interface::as_raw(self),
+                enabled as i32,
+            )
+            .ok()
+        }
+    }
+    pub unsafe fn put_AreBrowserAcceleratorKeysEnabled(&self, enabled: bool) -> Result<()> {
+        unsafe {
+            (Interface::vtable(self).put_AreBrowserAcceleratorKeysEnabled)(
+                Interface::as_raw(self),
+                enabled as i32,
+            )
+            .ok()
+        }
+    }
 }
 #[repr(C)]
 pub struct IWv2Settings_Vtbl {
@@ -514,11 +541,11 @@ pub struct IWv2Settings_Vtbl {
     get_IsWebMessageEnabled: usize,
     put_IsWebMessageEnabled: usize,
     get_AreDefaultScriptDialogsEnabled: usize,
-    put_AreDefaultScriptDialogsEnabled: usize,
+    put_AreDefaultScriptDialogsEnabled: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_IsStatusBarEnabled: usize,
     put_IsStatusBarEnabled: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_AreDevToolsEnabled: usize,
-    put_AreDevToolsEnabled: usize,
+    put_AreDevToolsEnabled: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_AreDefaultContextMenusEnabled: usize,
     put_AreDefaultContextMenusEnabled: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_AreHostObjectsAllowed: usize,
@@ -527,6 +554,10 @@ pub struct IWv2Settings_Vtbl {
     put_IsZoomControlEnabled: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_IsBuiltInErrorPageEnabled: usize,
     put_IsBuiltInErrorPageEnabled: usize,
+    get_UserAgent: usize,
+    put_UserAgent: usize,
+    get_AreBrowserAcceleratorKeysEnabled: usize,
+    put_AreBrowserAcceleratorKeysEnabled: unsafe extern "system" fn(CF, i32) -> HRESULT,
 }
 impl windows_core::RuntimeName for IWv2Settings {}
 
@@ -1363,6 +1394,13 @@ impl CompWebview {
                 let _ = settings.put_AreDefaultContextMenusEnabled(false);
                 let _ = settings.put_IsStatusBarEnabled(false);
                 let _ = settings.put_IsZoomControlEnabled(false);
+                // No page we host should ever reach devtools, a native
+                // alert()/prompt() dialog, or the browser accelerator
+                // table (F12/Ctrl+key) — widget JS comes from bundled
+                // .cde themes.
+                let _ = settings.put_AreDevToolsEnabled(false);
+                let _ = settings.put_AreDefaultScriptDialogsEnabled(false);
+                let _ = settings.put_AreBrowserAcceleratorKeysEnabled(false);
             }
         }
 
