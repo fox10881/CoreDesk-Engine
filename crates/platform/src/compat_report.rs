@@ -216,6 +216,19 @@ fn wer_section() -> String {
     out
 }
 
+/// Strip the user-profile prefix (both separator styles) — the report
+/// lands in a public GitHub issue body where `C:\Users\<name>` is PII.
+fn redact_paths(text: &str) -> String {
+    let mut out = text.to_string();
+    if let Some(p) = std::env::var_os("USERPROFILE") {
+        let p = p.to_string_lossy().into_owned();
+        out = out
+            .replace(&p, r"C:\Users\<redacted>")
+            .replace(&p.replace('\\', "/"), r"C:/Users/<redacted>");
+    }
+    out
+}
+
 /// Last ~120 lines of the runtime log — enough context without the flood.
 fn log_tail() -> String {
     let mut out = String::from("```\n");
@@ -226,10 +239,8 @@ fn log_tail() -> String {
         Some(text) => {
             let lines: Vec<&str> = text.lines().collect();
             let start = lines.len().saturating_sub(120);
-            for l in &lines[start..] {
-                out.push_str(l);
-                out.push('\n');
-            }
+            out.push_str(&redact_paths(&lines[start..].join("\n")));
+            out.push('\n');
         }
         None => out.push_str("_(log unreadable)_\n"),
     }
