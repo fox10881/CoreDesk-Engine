@@ -764,8 +764,8 @@ pub struct IWv2NavigationStartingEventArgs_Vtbl {
     get_IsUserInitiated: usize,
     get_IsRedirected: usize,
     get_NavigationId: usize,
-    put_Cancel: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_Cancel: usize,
+    put_Cancel: unsafe extern "system" fn(CF, i32) -> HRESULT,
 }
 impl windows_core::RuntimeName for IWv2NavigationStartingEventArgs {}
 
@@ -834,10 +834,10 @@ impl IWv2NewWindowRequestedEventArgs {
 pub struct IWv2NewWindowRequestedEventArgs_Vtbl {
     pub base__: IUnknown_Vtbl,
     get_Uri: usize,
-    put_NewWindow: usize,
     get_NewWindow: usize,
-    put_Handled: unsafe extern "system" fn(CF, i32) -> HRESULT,
+    put_NewWindow: usize,
     get_Handled: usize,
+    put_Handled: unsafe extern "system" fn(CF, i32) -> HRESULT,
     get_IsUserInitiated: usize,
     get_WindowFeatures: usize,
     get_Deferral: usize,
