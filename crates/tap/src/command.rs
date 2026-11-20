@@ -435,9 +435,14 @@ fn eq_ascii_ci(w: &[u16], s: &str) -> bool {
 
 /// `WM_COPYDATA` sender authentication. The app stamps one of its own
 /// HWNDs as `wParam` (`tap::sender_hwnd`); resolving that window's owner
-/// and checking its image name closes the "any same-user process posts
+/// pid and proving it is the app closes the "any same-user process posts
 /// one message" surface — the `EBML` `LoadLibraryW` and the `*ST` style
 /// wires are remote code/shaping primitives inside signed shell hosts.
+/// `sender_pid_is_app` prefers the image name (Toolhelp, then
+/// `OpenProcess`); inside an AppContainer host neither can see an
+/// unpackaged process, so the pid baked into this resident's own staged
+/// filename (`coredesk_tap_v*_p<pid>_<hash>.dll`) is the fallback —
+/// a kernel-verified claim an attacker can't adopt.
 /// The first authenticated sender is pinned in `AUTH_PID`; a foreign
 /// exe renamed `coredesk.exe` must additionally win the race against
 /// the real app's first message, and wins only while no pid is pinned.
@@ -452,25 +457,7 @@ fn sender_is_app(hwnd: HWND) -> bool {
     if pid == 0 {
         return false;
     }
-    let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, BOOL(0), pid) };
-    if h.is_null() {
-        return false;
-    }
-    let mut buf = [0u16; 512];
-    let mut len = buf.len() as u32;
-    let ok = unsafe { QueryFullProcessImageNameW(h, 0, PWSTR(buf.as_mut_ptr()), &mut len) };
-    unsafe {
-        let _ = CloseHandle(h);
-    }
-    if !ok.as_bool() || len as usize >= buf.len() {
-        return false;
-    }
-    let path = &buf[..len as usize];
-    let name_off = path
-        .iter()
-        .rposition(|&c| c == b'\\' as u16)
-        .map_or(0, |i| i + 1);
-    if !eq_ascii_ci(&path[name_off..], "coredesk.exe") {
+    if !sender_pid_is_app(pid) {
         return false;
     }
     let known = AUTH_PID.load(Ordering::Acquire);
@@ -496,6 +483,110 @@ fn sender_is_app(hwnd: HWND) -> bool {
     }
     AUTH_PID.store(pid, Ordering::Release);
     true
+}
+
+/// Whether `pid` is our app. Process inspection (image name) answers
+/// first where the sandbox permits it — it's the strongest check and also
+/// defeats pid reuse. Inside an AppContainer host neither listing nor
+/// `OpenProcess` can see an unpackaged sender (`ACCESS_DENIED`), so the
+/// last resort is the pid baked into this resident's staged filename —
+/// an identity claim the kernel verifies, readable via our own module
+/// name even under the sandbox.
+fn sender_pid_is_app(pid: u32) -> bool {
+    if let Some(named) = toolhelp_pid_named_app(pid) {
+        return named;
+    }
+    if let Some(named) = openprocess_pid_named_app(pid) {
+        return named;
+    }
+    staged_app_pid() == Some(pid)
+}
+
+/// `Some(image name == "coredesk.exe")` when the query answers,
+/// `None` when the process can't be inspected at all.
+fn openprocess_pid_named_app(pid: u32) -> Option<bool> {
+    let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, BOOL(0), pid) };
+    if h.is_null() {
+        return None;
+    }
+    let mut buf = [0u16; 512];
+    let mut len = buf.len() as u32;
+    let ok = unsafe { QueryFullProcessImageNameW(h, 0, PWSTR(buf.as_mut_ptr()), &mut len) };
+    unsafe {
+        let _ = CloseHandle(h);
+    }
+    if !ok.as_bool() || len as usize >= buf.len() {
+        return None;
+    }
+    let path = &buf[..len as usize];
+    let name_off = path
+        .iter()
+        .rposition(|&c| c == b'\\' as u16)
+        .map_or(0, |i| i + 1);
+    Some(eq_ascii_ci(&path[name_off..], "coredesk.exe"))
+}
+
+/// The app pid baked into this resident's staged filename —
+/// `coredesk_tap_v<ver>_p<pid>_<hash>.dll`. `None` on unstaged images
+/// (plain `coredesk_tap.dll` loads) so dev builds keep relying on process
+/// inspection alone.
+fn staged_app_pid() -> Option<u32> {
+    static PID: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+    *PID.get_or_init(|| {
+        let mut buf = [0u16; 512];
+        let n = unsafe {
+            GetModuleFileNameW(
+                crate::dll_instance(),
+                PWSTR(buf.as_mut_ptr()),
+                buf.len() as u32,
+            )
+        };
+        if n == 0 {
+            return None;
+        }
+        let path = String::from_utf16_lossy(&buf[..n as usize]);
+        let stem = path.rsplit(['\\', '/']).next()?.strip_suffix(".dll")?;
+        stem.split('_').nth(3)?.strip_prefix('p')?.parse().ok()
+    })
+}
+
+/// `Some(name == "coredesk.exe")` when the snapshot lists `pid`,
+/// `None` when the snapshot itself can't answer.
+fn toolhelp_pid_named_app(pid: u32) -> Option<bool> {
+    let snap = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snap.is_null() {
+        return None;
+    }
+    let mut pe = ProcessEntry {
+        size: core::mem::size_of::<ProcessEntry>() as u32,
+        usage: 0,
+        pid: 0,
+        heap: 0,
+        module: 0,
+        threads: 0,
+        parent_pid: 0,
+        base_pri: 0,
+        flags: 0,
+        exe_file: [0; 260],
+    };
+    let mut found = None;
+    let mut cur = unsafe { Process32FirstW(snap, (&mut pe as *mut ProcessEntry).cast()) };
+    while cur.0 != 0 {
+        if pe.pid == pid {
+            let len = pe
+                .exe_file
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(pe.exe_file.len());
+            found = Some(eq_ascii_ci(&pe.exe_file[..len], "coredesk.exe"));
+            break;
+        }
+        cur = unsafe { Process32NextW(snap, (&mut pe as *mut ProcessEntry).cast()) };
+    }
+    unsafe {
+        let _ = CloseHandle(snap);
+    }
+    found
 }
 
 fn handle_message(_hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) {

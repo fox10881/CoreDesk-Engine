@@ -212,7 +212,18 @@ pub(crate) fn tap_injectable_path() -> Option<PathBuf> {
             for &b in &bytes {
                 h = (h ^ b as u64).wrapping_mul(0x100000001b3);
             }
-            let name = format!("coredesk_tap_v{TAP_PROTOCOL_VERSION}_{h:016x}.dll");
+            // The name also carries our own pid (`_p<pid>_` between the
+            // version and the hash): a resident inside an AppContainer
+            // host can't query an unpackaged sender process at all, so it
+            // authenticates `WM_COPYDATA` senders by comparing the pid
+            // baked into its own module name — an identity claim the
+            // kernel verifies — against `GetWindowThreadProcessId`.
+            // Keeping `<hash>` last preserves the `rsplit('_')` tag read
+            // by `tap_image_tag`/`own_dll_tag`.
+            let name = format!(
+                "coredesk_tap_v{TAP_PROTOCOL_VERSION}_p{}_{h:016x}.dll",
+                std::process::id()
+            );
             let dir = std::env::var_os("LOCALAPPDATA")
                 .map(PathBuf::from)?
                 .join("CoreDeskEngine")

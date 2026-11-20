@@ -94,6 +94,26 @@ windows_core::link!("kernel32.dll" "system" fn FindNextFileW(hfindfile: HANDLE, 
 windows_core::link!("kernel32.dll" "system" fn FindClose(hfindfile: HANDLE) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn GetWindowsDirectoryW(lpbuffer: PWSTR, usize: u32) -> u32);
 windows_core::link!("kernel32.dll" "system" fn OpenProcess(dwdesiredaccess: u32, binherithandle: BOOL, dwprocessid: u32) -> HANDLE);
+windows_core::link!("kernel32.dll" "system" fn CreateToolhelp32Snapshot(dwflags: u32, th32processid: u32) -> *mut core::ffi::c_void);
+windows_core::link!("kernel32.dll" "system" fn Process32FirstW(hsnapshot: *mut core::ffi::c_void, lppe: *mut core::ffi::c_void) -> BOOL);
+windows_core::link!("kernel32.dll" "system" fn Process32NextW(hsnapshot: *mut core::ffi::c_void, lppe: *mut core::ffi::c_void) -> BOOL);
+
+pub const TH32CS_SNAPPROCESS: u32 = 0x0000_0002;
+
+/// `PROCESSENTRY32W` (the fields we read — `szExeFile` tail is MAX_PATH).
+#[repr(C)]
+pub struct ProcessEntry {
+    pub size: u32,
+    pub usage: u32,
+    pub pid: u32,
+    pub heap: usize,
+    pub module: u32,
+    pub threads: u32,
+    pub parent_pid: u32,
+    pub base_pri: i32,
+    pub flags: u32,
+    pub exe_file: [u16; 260],
+}
 windows_core::link!("kernel32.dll" "system" fn QueryFullProcessImageNameW(hprocess: HANDLE, dwflags: u32, lpexename: PWSTR, lpdwsize: *mut u32) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn RegisterWaitForSingleObject(phnewwaitobject: *mut HANDLE, hobject: HANDLE, callback: WAITORTIMERCALLBACK, context: *const core::ffi::c_void, dwmilliseconds: u32, dwflags: u32) -> BOOL);
 windows_core::link!("kernel32.dll" "system" fn SetEvent(hevent: HANDLE) -> BOOL);
