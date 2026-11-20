@@ -15,6 +15,7 @@ top of that self-healing.
 
 | App version | Windows build | UBR | Result | Date | Source |
 |---|---|---|---|---|---|
+| 1.3.5 | 26300 | 9974 | Stable — taskbar/Start/Notification Center (incl. `ShellExperienceHost`)/Quick Settings all styled, glass taskbar widget live-verified, zero `NoDiag` trips | 2026-11-20 | dev |
 | 1.3.4 | 26300 | 9974 | Stable — taskbar/Start/Notification Center/Quick Settings all styled, zero `NoDiag` trips | 2026-11-17 | dev |
 
 `Source` is `dev` (verified on the maintainer's machines before release) or
