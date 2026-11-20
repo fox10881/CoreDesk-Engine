@@ -307,32 +307,27 @@ pub fn nodiag_unanswered() -> bool {
         .unwrap_or(true)
 }
 
-/// Builds the one-click GitHub issue URL — the whole report pre-filled in
-/// `body`, so after Share the only thing left on the user is GitHub's own
-/// Submit click (posting under their account can't be automated anyway).
-/// The body is capped so the URL stays well inside server/browser limits.
+/// Builds the GitHub issue URL the Share flow opens. The report itself
+/// goes on the clipboard ([`share_clipboard`]): a pre-filled `body` param
+/// percent-encodes several KB of markdown into a URL longer than the
+/// server/browser "request url is too long" limit, which used to drop the
+/// user on an error page instead of the issue form. Only `title` rides
+/// the URL — the body is pasted from the clipboard.
 pub fn share_issue_url() -> String {
-    const MAX_BODY: usize = 6000;
-    let mut body = render();
-    if body.len() > MAX_BODY {
-        let mut end = MAX_BODY;
-        while !body.is_char_boundary(end) {
-            end -= 1;
-        }
-        body.truncate(end);
-        body.push_str(
-            "\n\n_(truncated — the full report is saved under \
-             %LOCALAPPDATA%\\CoreDeskEngine\\reports\\)_\n",
-        );
-    }
     format!(
-        "https://github.com/fox10881/CoreDesk-feedback/issues/new?title={}&body={}",
+        "https://github.com/fox10881/CoreDesk-feedback/issues/new?title={}",
         urlencoded(&format!(
             "Compatibility report — CoreDesk {}",
             env!("CARGO_PKG_VERSION")
-        )),
-        urlencoded(&body)
+        ))
     )
+}
+
+/// The full report on the clipboard for the issue body's paste. `false`
+/// when the clipboard can't be taken right now — the caller can still
+/// open the issue page (the report is also saved under `reports\`).
+pub fn share_clipboard() -> bool {
+    crate::clipboard::set_text(&render())
 }
 
 /// RFC 3986 unreserved set stays literal; everything else becomes `%XX`.
@@ -396,5 +391,23 @@ fn set_reg_sz(root: isize, sub: &str, name: &str, value: &str) {
             (data.len() * 2) as u32,
         );
         let _ = RegCloseKey(hkey);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn share_issue_url_carries_no_report_body() {
+        let url = share_issue_url();
+        assert!(url.starts_with("https://github.com/"));
+        assert!(
+            !url.contains("&body=") && !url.contains("?body="),
+            "report body must not ride the URL: {url}"
+        );
+        // Browser/server URL limits are the whole point of the clipboard
+        // flow — keep the link comfortably short.
+        assert!(url.len() < 200, "share url too long: {}", url.len());
     }
 }

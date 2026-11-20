@@ -6,6 +6,13 @@ use crate::dragdrop;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+windows_core::link!("user32.dll" "system" fn OpenClipboard(hwndnewowner: HWND) -> windows_core::BOOL);
+windows_core::link!("user32.dll" "system" fn EmptyClipboard() -> windows_core::BOOL);
+windows_core::link!("user32.dll" "system" fn SetClipboardData(uformat: u32, hmem: HANDLE) -> HANDLE);
+windows_core::link!("user32.dll" "system" fn CloseClipboard() -> windows_core::BOOL);
+windows_core::link!("kernel32.dll" "system" fn GlobalAlloc(uflags: u32, dwbytes: usize) -> HGLOBAL);
+windows_core::link!("kernel32.dll" "system" fn GlobalFree(hmem: HGLOBAL) -> HGLOBAL);
+
 static PREFERRED_EFFECT_FORMAT: OnceLock<u16> = OnceLock::new();
 
 /// Files currently on the clipboard and whether they were cut (`true`) or copied (`false`).
@@ -52,4 +59,63 @@ pub fn clear() {
 pub fn sequence() -> u32 {
     // SAFETY: plain FFI call.
     unsafe { GetClipboardSequenceNumber() }
+}
+
+/// `CF_UNICODETEXT` text on the clipboard — used by the compat-report
+/// share flow, which can't fit the report into a GitHub issue URL.
+/// `false` when the clipboard can't be opened (another app holds it).
+pub fn set_text(text: &str) -> bool {
+    const CF_UNICODETEXT: u32 = 13;
+    const GMEM_MOVEABLE: u32 = 0x0002;
+    let wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    // SAFETY: standard OpenClipboard / EmptyClipboard / SetClipboardData
+    // protocol; on SetClipboardData success the system owns `mem`, so we
+    // free only the failure paths.
+    unsafe {
+        if OpenClipboard(HWND::default()).0 == 0 {
+            return false;
+        }
+        let _ = EmptyClipboard();
+        let mem = GlobalAlloc(GMEM_MOVEABLE, wide.len() * 2);
+        if mem.0.is_null() {
+            let _ = CloseClipboard();
+            return false;
+        }
+        let dst = GlobalLock(mem);
+        if dst.is_null() {
+            let _ = GlobalFree(mem);
+            let _ = CloseClipboard();
+            return false;
+        }
+        core::ptr::copy_nonoverlapping(wide.as_ptr(), dst as *mut u16, wide.len());
+        let _ = GlobalUnlock(mem);
+        let ok = !SetClipboardData(CF_UNICODETEXT, mem).0.is_null();
+        if !ok {
+            let _ = GlobalFree(mem);
+        }
+        let _ = CloseClipboard();
+        ok
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_text_bumps_the_clipboard_sequence() {
+        let before = sequence();
+        // Another app can momentarily hold the clipboard — retry briefly
+        // instead of flaking.
+        let mut ok = false;
+        for _ in 0..50 {
+            if set_text("coredesk clipboard test — تجربة") {
+                ok = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert!(ok, "clipboard stayed locked for a whole second");
+        assert_ne!(sequence(), before);
+    }
 }

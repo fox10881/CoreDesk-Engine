@@ -2213,15 +2213,19 @@ impl App {
                     // The incident counts as answered either way; on a write
                     // failure the prompt just never comes back for this lock.
                     coredesk_platform::compat_report::nodiag_mark_answered();
-                    // Keep a local copy for the record, then hand the user a
-                    // fully pre-filled issue — the only step left is GitHub's
-                    // own Submit, which can't be automated (it's their post).
+                    // Keep a local copy for the record, put the full report
+                    // on the clipboard, then open the issue form — pre-filling
+                    // `body` blew past the URL length limit ("request url is
+                    // too long"), so the body is pasted instead.
                     let _ = coredesk_platform::compat_report::write();
+                    let copied = coredesk_platform::compat_report::share_clipboard();
                     let url = coredesk_platform::compat_report::share_issue_url();
                     match shell::shell_execute(std::path::Path::new(&url), None, None) {
-                        Ok(()) => self.settings_toast(
-                            "Issue opened with the report filled in — press Submit to send",
-                        ),
+                        Ok(()) => self.settings_toast(if copied {
+                            "Report copied — paste it into the issue body (Ctrl+V), then Submit"
+                        } else {
+                            "Issue opened — the report is saved under %LOCALAPPDATA%\\CoreDeskEngine\\reports\\"
+                        }),
                         Err(e) => self.settings_error(&format!("could not open browser: {e}")),
                     }
                 }
