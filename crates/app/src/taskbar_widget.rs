@@ -23,7 +23,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-use coredesk_core::taskbar_widget_styles::{Metric, TbWidgetStyle};
+use coredesk_core::taskbar_widget_styles::{Metric, TbWidgetChrome, TbWidgetStyle};
 use coredesk_platform::window::{
     self, ClassOptions, MessageHandler, Window, WindowBuilder, WindowClass, style,
 };
@@ -32,7 +32,8 @@ use coredesk_platform::{
     tray,
 };
 use coredesk_render::{
-    Brush, ColorF, FontWeight, Panel, Rect, RenderStack, TextFormat, TextLayout,
+    Brush, ColorF, FontWeight, GradientStop, Panel, Rect, RenderStack, RoundedRect, TextFormat,
+    TextLayout, Vector2,
 };
 use windows_composition::{ContainerVisual, DesktopWindowTarget};
 use windows_core::Result;
@@ -437,15 +438,57 @@ impl Core {
         let sep = self.style.separator.clone();
         let pad = self.style.padding_x;
         let shadow = self.style.shadow;
+        let chrome = self.style.chrome;
         let (ink, accent, shadow_ink) = (self.ink, self.accent, self.shadow_ink);
         let dpi = self.dpi;
         let Some(panel) = self.panel.as_ref() else {
             return;
         };
-        let ok = panel.draw(dpi, |s, _w, h| {
+        let ok = panel.draw(dpi, |s, w, h| {
             // The swap chain keeps prior pixels — wipe to transparent or
             // every tick's text piles onto the last frame (ghost glyphs).
             s.clear(ColorF::new(0.0, 0.0, 0.0, 0.0));
+            if chrome == TbWidgetChrome::Glass {
+                // The clock-widget capsule: dark glass fill letting the
+                // taskbar's own backdrop show through, an accent rim that
+                // follows the backdrop hue (authored `accentColor` wins),
+                // and a faint top-lit sheen inside the rim.
+                let inset_y = (h * 0.14).clamp(2.5, 5.0);
+                let pill = Rect::from_xywh(0.5, inset_y, w - 1.0, h - inset_y * 2.0);
+                let radius = (pill.bottom - pill.top) / 2.0;
+                let fill = s.create_linear_gradient(
+                    Vector2::new(pill.left, pill.top),
+                    Vector2::new(pill.left, pill.bottom),
+                    &[
+                        GradientStop::new(0.0, ColorF::new(0.075, 0.082, 0.11, 0.62)),
+                        GradientStop::new(0.5, ColorF::new(0.045, 0.05, 0.07, 0.52)),
+                        GradientStop::new(1.0, ColorF::new(0.028, 0.032, 0.048, 0.58)),
+                    ],
+                )?;
+                s.fill_rounded_rect(&RoundedRect::uniform(pill, radius), &fill);
+                let rim = s.create_solid_brush(ColorF::new(accent.r, accent.g, accent.b, 0.85))?;
+                s.draw_rounded_rect(&RoundedRect::uniform(pill, radius), &rim, 1.1);
+                let inner = Rect::from_xywh(
+                    pill.left + 1.6,
+                    pill.top + 1.6,
+                    (pill.right - pill.left - 3.2).max(0.0),
+                    (pill.bottom - pill.top - 3.2).max(0.0),
+                );
+                let sheen = s.create_linear_gradient(
+                    Vector2::new(inner.left, inner.top),
+                    Vector2::new(inner.left, inner.bottom),
+                    &[
+                        GradientStop::new(0.0, ColorF::new(1.0, 1.0, 1.0, 0.16)),
+                        GradientStop::new(0.45, ColorF::new(1.0, 1.0, 1.0, 0.03)),
+                        GradientStop::new(1.0, ColorF::new(1.0, 1.0, 1.0, 0.07)),
+                    ],
+                )?;
+                s.draw_rounded_rect(
+                    &RoundedRect::uniform(inner, (radius - 1.6).max(0.0)),
+                    &sheen,
+                    0.8,
+                );
+            }
             let ink_b = s.create_solid_brush(ink)?;
             let acc_b = s.create_solid_brush(accent)?;
             // DrawText is top-aligned in its box: centre the line inside
