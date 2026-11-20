@@ -56,6 +56,16 @@ pub enum Metric {
 /// opaque text; kept for future translucent fills).
 pub type StyleColor = Option<[u8; 3]>;
 
+/// The strip's chrome behind the text. `Glass` draws the dark translucent
+/// capsule + accent rim (the clock-widget look); `Plain` keeps the bare
+/// text-on-taskbar strip.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TbWidgetChrome {
+    #[default]
+    Glass,
+    Plain,
+}
+
 /// A parsed `.json` descriptor — every field carries the compiled default
 /// a modder sees in the shipped file, so `None`-fields never change the
 /// rendered output.
@@ -73,6 +83,7 @@ pub struct TbWidgetStyle {
     pub text_color: StyleColor,
     pub accent_color: StyleColor,
     pub shadow: bool,
+    pub chrome: TbWidgetChrome,
 }
 
 impl Default for TbWidgetStyle {
@@ -87,6 +98,7 @@ impl Default for TbWidgetStyle {
             text_color: None,
             accent_color: None,
             shadow: true,
+            chrome: TbWidgetChrome::Glass,
         }
     }
 }
@@ -162,6 +174,14 @@ pub fn style(id: &str) -> Option<TbWidgetStyle> {
     }
     if let Some(b) = doc["shadow"].as_bool() {
         out.shadow = b;
+    }
+    if let Some(s) = doc["chrome"].as_str() {
+        // "none"/"flat"/"plain" opt back into the bare-text strip;
+        // anything else (including absent) keeps the glass capsule.
+        out.chrome = match s.trim().to_ascii_lowercase().as_str() {
+            "none" | "flat" | "plain" | "off" => TbWidgetChrome::Plain,
+            _ => TbWidgetChrome::Glass,
+        };
     }
     Some(out)
 }

@@ -6,10 +6,14 @@
   "font": "Segoe UI",
   "fontSize": 11,
   "fontWeight": 600,
-  "metrics": ["cpu", "ram"],
+  "metrics": [
+    "cpu",
+    "ram"
+  ],
   "separator": "  ·  ",
   "paddingX": 8,
   "textColor": "auto",
   "accentColor": "auto",
-  "shadow": true
+  "shadow": true,
+  "chrome": "glass"
 }
