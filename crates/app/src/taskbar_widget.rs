@@ -659,7 +659,12 @@ impl Core {
             .name("coredesk-tbw-probe".into())
             .spawn(move || {
                 let _com = coredesk_platform::com::MtaGuard::init();
-                let sample = backdrop_probe::sample(HWND(hwnd as _), rect, &monitors::enumerate());
+                let monitors = monitors::enumerate();
+                let mut sample = backdrop_probe::sample(HWND(hwnd as _), rect, &monitors);
+                // The rim follows the wallpaper's dominant hue — the strip
+                // rect under the bar is a thin, often-grayscale sliver that
+                // would always fall back to the default accent.
+                sample.accent = backdrop_probe::wallpaper_sample(rect, &monitors).accent;
                 let token = backdrop_probe::publish(sample);
                 window::post_message(HWND(hwnd as _), WM_TBW_SAMPLE, 0, token);
             })
@@ -685,7 +690,7 @@ impl Core {
             .style
             .accent_color
             .map(|c| cf(c, 1.0))
-            .unwrap_or_else(|| cf(sample.accent, 1.0));
+            .unwrap_or_else(|| cf(lift_accent(sample.accent), 1.0));
         self.shadow_ink = if dark_backdrop {
             ColorF::new(0.0, 0.0, 0.0, 0.55)
         } else {
@@ -702,6 +707,22 @@ fn cf(rgb: [u8; 3], a: f32) -> ColorF {
         b: rgb[2] as f32 / 255.0,
         a,
     }
+}
+
+/// Wallpaper-dominant hues can be deep forest greens/maroons that sink
+/// into the dark glass — lift dim accents toward ~120 luminance while
+/// preserving the hue, so the rim and the value digits stay readable.
+fn lift_accent(rgb: [u8; 3]) -> [u8; 3] {
+    let lum = 0.2126 * rgb[0] as f32 + 0.7152 * rgb[1] as f32 + 0.0722 * rgb[2] as f32;
+    if lum >= 120.0 || lum < 1.0 {
+        return rgb;
+    }
+    let k = (120.0 / lum).min(3.0);
+    [
+        (rgb[0] as f32 * k).min(255.0) as u8,
+        (rgb[1] as f32 * k).min(255.0) as u8,
+        (rgb[2] as f32 * k).min(255.0) as u8,
+    ]
 }
 
 fn metric_label(m: Metric) -> &'static str {
