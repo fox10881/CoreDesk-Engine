@@ -268,3 +268,28 @@ pub fn sample(exclude: HWND, rect: RECT, monitors: &[MonitorInfo]) -> Sample {
     }
     probe_background(rect, monitors)
 }
+
+/// The dominant hue of the *whole* wallpaper on the monitor under `rect`
+/// — unlike `sample`, it skips whatever window happens to cover the band
+/// (a maximized window would poison the average) and averages the full
+/// monitor frame rather than the thin strip under a widget. Live players
+/// are captured through the same `still` path as `probe_wallpaper`.
+pub fn wallpaper_sample(rect: RECT, monitors: &[MonitorInfo]) -> Sample {
+    let cx = (rect.left + rect.right) / 2;
+    let cy = (rect.top + rect.bottom) / 2;
+    let Some(mon) = monitors
+        .iter()
+        .find(|m| {
+            let b = m.bounds;
+            cx >= b.left && cx < b.right && cy >= b.top && cy < b.bottom
+        })
+        .or_else(|| monitors.iter().find(|m| m.primary))
+        .or(monitors.first())
+    else {
+        return probe_background(rect, monitors);
+    };
+    if let Some((px, w, h, frame)) = probe_wallpaper(mon.bounds, monitors) {
+        return analyze(&px, w, h, frame, mon.bounds);
+    }
+    probe_background(rect, monitors)
+}
