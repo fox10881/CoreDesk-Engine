@@ -1014,18 +1014,26 @@ impl IWv2WebMessageReceived_Impl for WebMessageReceived_Impl {
 }
 
 /// Navigation gate: every hosted page is a `NavigateToString`'d local
-/// document, so the only legitimate navigation is its `about:blank`
-/// initial load. Anything else — `location.href` hops, injected links —
-/// is page-initiated from widget/theme JS and is cancelled.
+/// document. `NavigateToString` doesn't report `about:blank` as its URI,
+/// so a URI allowlist can't tell our loads from page-initiated hops —
+/// count instead: each `navigate_to_string` mints one token the next
+/// NavigationStarting consumes, and anything beyond those (injected
+/// links, `location.href`) is cancelled. The control's implicit
+/// `about:blank` navigation is always allowed.
 #[implement(IWv2NavigationStarting)]
-struct NavigationStarting;
+struct NavigationStarting(Rc<Cell<usize>>);
 
 impl IWv2NavigationStarting_Impl for NavigationStarting_Impl {
     fn Invoke(&self, _sender: Ref<IWv2>, args: Ref<IWv2NavigationStartingEventArgs>) -> Result<()> {
         if let Ok(args) = args.ok() {
-            let uri = unsafe { args.uri() }.unwrap_or_default();
-            if !uri.eq_ignore_ascii_case("about:blank") {
-                let _ = unsafe { args.put_cancel(true) };
+            let minted = self.0.get() > 0;
+            if minted {
+                self.0.set(self.0.get() - 1);
+            } else {
+                let uri = unsafe { args.uri() }.unwrap_or_default();
+                if !uri.is_empty() && !uri.eq_ignore_ascii_case("about:blank") {
+                    let _ = unsafe { args.put_cancel(true) };
+                }
             }
         }
         Ok(())
@@ -1330,6 +1338,9 @@ pub struct CompWebview {
     /// Kept for lifetime only — `RootVisualTarget` owns the on-screen role.
     _visual: IDCompositionVisual,
     cursor: Rc<Cell<HCURSOR>>,
+    /// Outstanding `navigate_to_string` calls; each mints one navigation
+    /// the `NavigationStarting` gate lets through (see `NavigationStarting`).
+    nav_tokens: Rc<Cell<usize>>,
     _env: IWv2Environment3,
     _registrations: Vec<i64>,
     _handlers: Vec<IUnknown>,
@@ -1418,13 +1429,14 @@ impl CompWebview {
                 handlers.push(h.cast()?);
             }
         }
+        // Hosted pages are all NavigateToString'd local documents —
+        // navigation past the ones we mint a token for, or a popup
+        // request, is page-initiated from widget/theme JS and denied.
+        // One token up front covers the initial load below; the frame
+        // handler gets an empty pool (our documents have no iframes).
+        let nav_tokens = Rc::new(Cell::new(1usize));
         {
-            // Hosted pages are all NavigateToString'd local documents —
-            // navigation past about:blank or a popup request is
-            // page-initiated from widget/theme JS, so both are denied.
-            // Separate handler instances per event (the runtime takes
-            // one ref per registration).
-            let nav: IWv2NavigationStarting = NavigationStarting.into();
+            let nav: IWv2NavigationStarting = NavigationStarting(nav_tokens.clone()).into();
             if let Ok(t) = unsafe {
                 webview.add_NavigationStarting(
                     Interface::as_raw(&nav) as *const IWv2NavigationStarting,
@@ -1433,7 +1445,8 @@ impl CompWebview {
                 tokens.push(t);
                 handlers.push(nav.cast()?);
             }
-            let frame_nav: IWv2NavigationStarting = NavigationStarting.into();
+            let frame_nav: IWv2NavigationStarting =
+                NavigationStarting(Rc::new(Cell::new(0))).into();
             if let Ok(t) = unsafe {
                 webview.add_FrameNavigationStarting(
                     Interface::as_raw(&frame_nav) as *const IWv2NavigationStarting
@@ -1501,6 +1514,7 @@ impl CompWebview {
             target,
             _visual: visual,
             cursor,
+            nav_tokens,
             _env: env.env3.clone(),
             _registrations: tokens,
             _handlers: handlers,
@@ -1691,6 +1705,10 @@ impl CompWebview {
     /// Loads a fresh HTML document in place — the widget hosts' design-swap
     /// path (the new page re-posts its ready handshake on load).
     pub fn navigate_to_string(&self, html: &str) -> Result<()> {
+        // Mint the navigation token the gate consumes for this load;
+        // bounded so leftovers can't accumulate into a bypass.
+        self.nav_tokens
+            .set(self.nav_tokens.get().saturating_add(1).min(4));
         unsafe { self.webview.NavigateToString(&HSTRING::from(html))? };
         Ok(())
     }
