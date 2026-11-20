@@ -7,6 +7,7 @@ release. Used by release.yml to replace --generate-notes; runnable locally:
     python scripts/release_notes.py --to v1.3.4 --repo fox10881/CoreDesk-Engine
 """
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -72,6 +73,28 @@ def build_notes(commits, repo, frm, to):
     return "\n".join(lines).rstrip() + "\n"
 
 
+def verified_line(version):
+    """The release-checklist footer: 'Verified live on Windows build
+    <build>.<UBR>' parsed from the version's `COMPATIBILITY.md` row —
+    the matrix entry is the public record, so the notes quote it instead
+    of trusting a second source. `None` when no row matches.
+    """
+    path = os.path.join(os.path.dirname(__file__), "..", "COMPATIBILITY.md")
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return None
+    row = re.search(
+        rf"^\|\s*{re.escape(version)}\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|",
+        text,
+        re.M,
+    )
+    if not row:
+        return None
+    return f"Verified live on Windows build {row.group(1)}.{row.group(2)}."
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--to", default="HEAD", help="tag/ref the notes describe")
@@ -89,6 +112,14 @@ def main():
             system="You write concise release intros for an open-source Windows desktop tool.")
         if intro:
             notes = intro.strip() + "\n\n" + notes
+    footer = verified_line(args.to.lstrip("v"))
+    if footer:
+        notes = notes.rstrip() + "\n\n" + footer + "\n"
+    else:
+        sys.stderr.write(
+            f"warning: no COMPATIBILITY.md row for {args.to} — "
+            "'Verified live' footer skipped\n"
+        )
     if args.out:
         with open(args.out, "w", encoding="utf-8", newline="\n") as f:
             f.write(notes)
